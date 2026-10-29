@@ -9,6 +9,7 @@ type RevierZeile = {
   id: string;
   name: string;
   flaeche_ha: number | null;
+  hegering_id: string;
   hegering: string;
   inhaber: string[];
   mitglieder: number;
@@ -35,7 +36,7 @@ export function AdminPanel({
       supabase.from('hegeringe').select('id, name').order('name'),
       supabase
         .from('reviere')
-        .select('id, name, flaeche_ha, hegeringe(name), revier_mitglieder(user_id, rolle, profiles(name))')
+        .select('id, name, flaeche_ha, hegering_id, hegeringe(name), revier_mitglieder(user_id, rolle, profiles(name))')
         .order('name'),
     ]);
     const err = hr.error ?? rv.error;
@@ -46,6 +47,7 @@ export function AdminPanel({
         id: r.id,
         name: r.name,
         flaeche_ha: r.flaeche_ha,
+        hegering_id: r.hegering_id,
         hegering: r.hegeringe?.name ?? '–',
         inhaber: r.revier_mitglieder.filter((m) => m.rolle === 'inhaber').map((m) => m.profiles?.name ?? '?'),
         mitglieder: r.revier_mitglieder.length,
@@ -90,6 +92,17 @@ export function AdminPanel({
     await laden();
     await onGeaendert();
   }
+
+  // Hegeringe lassen sich nur löschen, wenn ihnen kein Revier mehr zugeordnet ist
+  async function hegeringLoeschen(h: Hegering) {
+    if (!window.confirm(`Hegering „${h.name}“ löschen?`)) return;
+    setFehler(null);
+    const { error } = await supabase.from('hegeringe').delete().eq('id', h.id);
+    if (error) setFehler(fehlertext(error));
+    await laden();
+  }
+
+  const revierAnzahl = (hegeringId: string) => reviere.filter((r) => r.hegering_id === hegeringId).length;
 
   return (
     <div className="admin">
@@ -143,6 +156,35 @@ export function AdminPanel({
           setEinladenFuer(id);
         }}
       />
+      <Gruppe
+        titel="Hegeringe"
+        fuss="Ein Hegering lässt sich erst löschen, wenn ihm kein Revier mehr zugeordnet ist."
+      >
+        {hegeringe.length === 0 && <Zeile label="Noch keine Hegeringe angelegt" />}
+        {hegeringe.map((h) => {
+          const anzahl = revierAnzahl(h.id);
+          return (
+            <Zeile
+              key={h.id}
+              label={
+                <>
+                  {h.name}
+                  <small>
+                    {anzahl} {anzahl === 1 ? 'Revier' : 'Reviere'}
+                  </small>
+                </>
+              }
+            >
+              {anzahl === 0 && (
+                <button className="link gefahr" onClick={() => hegeringLoeschen(h)}>
+                  Löschen
+                </button>
+              )}
+            </Zeile>
+          );
+        })}
+      </Gruppe>
+
       <HegeringAnlegen onAngelegt={laden} />
     </div>
   );
