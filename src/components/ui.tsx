@@ -1,5 +1,5 @@
 import { navigieren } from '../lib/router';
-import { createContext, useContext, useId, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from 'react';
+import { createContext, useContext, useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from 'react';
 
 export function Gruppe({ titel, fuss, children }: { titel?: string; fuss?: ReactNode; children: ReactNode }) {
   return (
@@ -85,7 +85,7 @@ export function Zeile({ label, wert, children }: { label: ReactNode; wert?: Reac
   );
 }
 
-type KnopfProps = ButtonHTMLAttributes<HTMLButtonElement> & { variante?: 'primaer' | 'sekundaer' | 'gefahr' };
+type KnopfProps = ButtonHTMLAttributes<HTMLButtonElement> & { variante?: 'akzent' | 'primaer' | 'sekundaer' | 'ghost' | 'gefahr' };
 
 export function Knopf({ variante = 'primaer', className, ...rest }: KnopfProps) {
   return <button className={`knopf knopf-${variante} ${className ?? ''}`} {...rest} />;
@@ -227,5 +227,27 @@ export function CodeAnzeige({ code, beschreibung }: { code: string; beschreibung
         Code kopieren
       </Knopf>
     </div>
+  );
+}
+
+/** Farbwahl, die erst nach kurzer Pause speichert (der Farbwähler feuert beim Ziehen laufend) */
+export function Farbwahl({ wert, label, onAendern }: { wert: string; label: string; onAendern: (farbe: string) => void }) {
+  const [lokal, setLokal] = useState(wert);
+  const timer = useRef<number | null>(null);
+  useEffect(() => setLokal(wert), [wert]);
+  useEffect(() => () => { if (timer.current) window.clearTimeout(timer.current); }, []);
+  return (
+    <input
+      type="color"
+      className="farbwahl"
+      aria-label={label}
+      value={lokal}
+      onChange={(e) => {
+        const neu = e.target.value;
+        setLokal(neu);
+        if (timer.current) window.clearTimeout(timer.current);
+        timer.current = window.setTimeout(() => onAendern(neu), 450);
+      }}
+    />
   );
 }

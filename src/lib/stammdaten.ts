@@ -115,4 +115,4 @@ export const GESCHLECHTER: Array<{ wert: Enums<'geschlecht'>; label: string; kur
   { wert: 'unbekannt', label: 'unbekannt', kurz: '?' },
 ];
 
-export const ZONENFARBEN = ['#2f5d3a', '#b5651d', '#1f6fb2', '#8e44ad', '#c0392b', '#16a085', '#d4a017', '#5d6d7e'];
+export const ZONENFARBEN = ['#1e5c3a', '#b5651d', '#1f6fb2', '#8e44ad', '#c0392b', '#16a085', '#d4a017', '#5d6d7e'];

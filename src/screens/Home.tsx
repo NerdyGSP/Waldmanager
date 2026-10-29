@@ -16,6 +16,10 @@ import { Abschuesse } from './module/Abschuesse';
 import { Erfassung } from './module/Erfassung';
 import { Zaehlung } from './module/Zaehlung';
 import { Monitoring } from './module/Monitoring';
+import { Wildschaeden } from './module/Wildschaeden';
+import { Aufgaben } from './module/Aufgaben';
+import { Begehungsscheine } from './module/Begehungsscheine';
+import { Datenimport } from './module/Datenimport';
 import type { RevierKontext } from './module/kontext';
 
 // Die Karte ist groß (MapLibre) und wird erst bei Bedarf geladen
@@ -28,9 +32,13 @@ const MODULE = [
   { pfad: 'zaehlung', titel: 'Wildzählung', text: 'Zählsitzung je Zone mit Gesamtübersicht und Historie', symbol: '🔢' },
   { pfad: 'erfassung', titel: 'Einzelerfassung', text: 'Beobachtungen unterwegs, auch ohne Netz', symbol: '👁' },
   { pfad: 'abschuesse', titel: 'Abschüsse', text: 'Strecke mit Wildart, Geschlecht, Altersklasse', symbol: '🎯' },
+  { pfad: 'wildschaeden', titel: 'Wildschäden', text: 'Schäden erfassen, Anmeldefrist im Blick', symbol: '🌾' },
+  { pfad: 'aufgaben', titel: 'Aufgaben', text: 'Revierarbeiten planen und verteilen', symbol: '✅' },
+  { pfad: 'begehungsscheine', titel: 'Begehungsscheine', text: 'Gastjäger-Scheine ausstellen und prüfen', symbol: '📄' },
   { pfad: 'monitoring', titel: 'Monitoring', text: 'Statistik und Quervergleich im Hegering', symbol: '📈' },
   { pfad: 'zonen', titel: 'Zonen', text: 'Erfassungszonen anlegen und ordnen', symbol: '▦' },
   { pfad: 'freigaben', titel: 'Freigaben', text: 'Wildarten für den Quervergleich freigeben', symbol: '🤝' },
+  { pfad: 'import', titel: 'Datenimport', text: 'Historische Zählungen und Abschüsse aus CSV', symbol: '⬆️' },
 ];
 
 export function Home({ session }: { session: Session }) {
@@ -73,6 +81,11 @@ export function Home({ session }: { session: Session }) {
         neuLaden: kontext.neuLaden,
       }
     : null;
+
+  // Abgedocktes Monitoring: eigenes Fenster ohne Seitenleiste und Karte
+  if (revierKontext && modul === 'monitoring' && pfad[1] === 'fenster') {
+    return <MonitoringFenster k={revierKontext} kontext={kontext} revierId={revierId} revierWechseln={revierWechseln} />;
+  }
 
   // Browseransicht: Seitenleiste mit Navigation und Modulinhalt, rechts dauerhaft die Karte
   if (breit && revierKontext) {
@@ -158,9 +171,13 @@ const NAVIGATION = [
   { pfad: 'zaehlung', titel: 'Wildzählung' },
   { pfad: 'erfassung', titel: 'Einzelerfassung' },
   { pfad: 'abschuesse', titel: 'Abschüsse' },
+  { pfad: 'wildschaeden', titel: 'Wildschäden' },
+  { pfad: 'aufgaben', titel: 'Aufgaben' },
+  { pfad: 'begehungsscheine', titel: 'Begehungsscheine' },
   { pfad: 'monitoring', titel: 'Monitoring' },
   { pfad: 'zonen', titel: 'Zonen' },
   { pfad: 'freigaben', titel: 'Freigaben' },
+  { pfad: 'import', titel: 'Datenimport' },
   { pfad: 'einstellungen', titel: 'Einstellungen' },
 ];
 
@@ -186,10 +203,28 @@ function DesktopLayout({
   userId: string;
 }) {
   const [panelEl, setPanelEl] = useState<HTMLDivElement | null>(null);
+  const [eingeklappt, setEingeklappt] = useState(() => {
+    try {
+      return localStorage.getItem('hegewerk.menue') === 'zu';
+    } catch {
+      return false;
+    }
+  });
   const titel = NAVIGATION.find((n) => n.pfad === modul)?.titel ?? '';
+  // Monitoring kann die ganze Breite einnehmen (Karte ausgeblendet) – Adresse /monitoring/voll
+  const voll = modul === 'monitoring' && unterpfad[0] === 'voll';
+
+  function einklappen(zu: boolean) {
+    setEingeklappt(zu);
+    try {
+      localStorage.setItem('hegewerk.menue', zu ? 'zu' : 'offen');
+    } catch {
+      /* Speicher nicht verfügbar – Zustand gilt nur für diese Sitzung */
+    }
+  }
 
   return (
-    <div className="desk">
+    <div className={`desk ${eingeklappt && !voll ? 'desk-zu' : ''} ${voll ? 'desk-voll' : ''}`}>
       <aside className="desk-seite">
         <div className="desk-kopf">
           <div className="desk-marke">
@@ -199,6 +234,17 @@ function DesktopLayout({
               <span className="warteschlange" title="Noch nicht übertragene Erfassungen">
                 {offen} offline
               </span>
+            )}
+            {!voll && (
+              <button
+                className="desk-einklappen"
+                onClick={() => einklappen(!eingeklappt)}
+                aria-label={eingeklappt ? 'Menü ausklappen' : 'Menü einklappen'}
+                aria-expanded={!eingeklappt}
+                title={eingeklappt ? 'Menü ausklappen' : 'Menü einklappen'}
+              >
+                <Symbol name={eingeklappt ? 'ausklappen' : 'einklappen'} />
+              </button>
             )}
           </div>
           {kontext.mitgliedschaften.length > 1 ? (
@@ -217,7 +263,16 @@ function DesktopLayout({
 
         <nav className="desk-nav" aria-label="Module">
           {NAVIGATION.map((n) => (
-            <button key={n.pfad} aria-current={modul === n.pfad} onClick={() => navigieren(`/${n.pfad}`)}>
+            <button
+              key={n.pfad}
+              aria-current={modul === n.pfad}
+              title={n.titel}
+              onClick={() => {
+                // Im eingeklappten Menü öffnet ein Modul die Seitenleiste wieder (die Karte braucht sie nicht)
+                if (eingeklappt && n.pfad !== 'karte') einklappen(false);
+                navigieren(`/${n.pfad}`);
+              }}
+            >
               <Symbol name={n.pfad} />
               <span>{n.titel}</span>
             </button>
@@ -230,13 +285,13 @@ function DesktopLayout({
             {modul === 'karte' ? null : modul === 'einstellungen' ? (
               <Einstellungen userId={userId} kontext={kontext} aktuell={aktuell} revierWechseln={revierWechseln} />
             ) : (
-              <ModulInhalt key={`${k.revierId}-${modul}`} modul={modul} unterpfad={unterpfad} k={k} />
+              <ModulInhalt key={`${k.revierId}-${modul}`} modul={modul} unterpfad={unterpfad} k={k} breit />
             )}
           </EingebettetKontext.Provider>
         </div>
       </aside>
 
-      <main className="desk-karte">
+      <main className="desk-karte" aria-hidden={voll}>
         <Suspense fallback={<div className="laden">Karte wird geladen …</div>}>
           <Karte
             key={k.revierId}
@@ -251,7 +306,7 @@ function DesktopLayout({
   );
 }
 
-function ModulInhalt({ modul, unterpfad, k }: { modul: string; unterpfad: string[]; k: RevierKontext }) {
+function ModulInhalt({ modul, unterpfad, k, breit = false }: { modul: string; unterpfad: string[]; k: RevierKontext; breit?: boolean }) {
   switch (modul) {
     case 'freigaben':
       return <Freigaben k={k} />;
@@ -264,7 +319,15 @@ function ModulInhalt({ modul, unterpfad, k }: { modul: string; unterpfad: string
     case 'zaehlung':
       return <Zaehlung k={k} sitzungId={unterpfad[0] ?? null} />;
     case 'monitoring':
-      return <Monitoring k={k} />;
+      return <Monitoring k={k} breit={breit} />;
+    case 'wildschaeden':
+      return <Wildschaeden k={k} />;
+    case 'aufgaben':
+      return <Aufgaben k={k} />;
+    case 'begehungsscheine':
+      return <Begehungsscheine k={k} />;
+    case 'import':
+      return <Datenimport k={k} />;
     case 'karte':
       return (
         <Suspense fallback={<div className="laden">Karte wird geladen …</div>}>
@@ -274,6 +337,48 @@ function ModulInhalt({ modul, unterpfad, k }: { modul: string; unterpfad: string
     default:
       return <Hinweis>Diese Seite gibt es nicht.</Hinweis>;
   }
+}
+
+function MonitoringFenster({
+  k,
+  kontext,
+  revierId,
+  revierWechseln,
+}: {
+  k: RevierKontext;
+  kontext: NutzerKontext;
+  revierId: string | null;
+  revierWechseln: (id: string) => void;
+}) {
+  return (
+    <div className="monitoring-fenster">
+      <header className="monitoring-fenster-kopf">
+        <Logo />
+        <strong>Hegewerk Monitoring</strong>
+        {kontext.mitgliedschaften.length > 1 ? (
+          <select aria-label="Aktuelles Revier" value={revierId ?? ''} onChange={(e) => revierWechseln(e.target.value)}>
+            {kontext.mitgliedschaften.map((m) => (
+              <option key={m.revier.id} value={m.revier.id}>
+                {m.revier.name}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <span>{k.revierName}</span>
+        )}
+        <span className="abstandhalter" />
+        <button className="knopf knopf-sekundaer klein" onClick={() => window.close()} title="Fenster schließen">
+          Fenster schließen
+        </button>
+        <button className="knopf knopf-ghost klein" onClick={() => navigieren('/monitoring')}>
+          Zurück zur App
+        </button>
+      </header>
+      <main className="monitoring-fenster-inhalt">
+        <Monitoring key={k.revierId} k={k} breit abgedockt />
+      </main>
+    </div>
+  );
 }
 
 function Start({

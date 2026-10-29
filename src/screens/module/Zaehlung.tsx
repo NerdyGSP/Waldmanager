@@ -171,7 +171,7 @@ function NeueSitzung({ k, onAbbrechen }: { k: RevierKontext; onAbbrechen: () => 
           <Feld label="Bemerkung" placeholder="z. B. Scheinwerferzählung" value={bemerkung} onChange={(e) => setBemerkung(e.target.value)} />
         </Gruppe>
         {fehler && <Hinweis art="fehler">{fehler}</Hinweis>}
-        <Knopf type="submit">Zählung starten</Knopf>
+        <Knopf type="submit" variante="akzent">Zählung starten</Knopf>
       </form>
     </Seite>
   );

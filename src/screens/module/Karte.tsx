@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { ZonenInfo, type GewaehlteZone } from './ZonenInfo';
 import { createPortal } from 'react-dom';
 import {
   GeolocateControl,
@@ -137,6 +138,8 @@ export default function Karte({
   const [ausgeblendet, setAusgeblendet] = useState<Set<string>>(new Set());
   const [zielEbene, setZielEbene] = useState('');
   const grenzeRef = useRef<MultiPolygon | null>(null);
+  const luftbildSchluessel = useRef('');
+  const [gewaehlteZone, setGewaehlteZone] = useState<GewaehlteZone | null>(null);
 
   const setModus = (m: Modus) => {
     modusRef.current = m;
@@ -209,13 +212,20 @@ export default function Karte({
         id: 'zonen-flaeche',
         type: 'fill',
         source: 'zonen',
-        paint: { 'fill-color': ['coalesce', ['get', 'farbe'], '#2f5d3a'], 'fill-opacity': 0.22 },
+        paint: { 'fill-color': ['coalesce', ['get', 'farbe'], '#1e5c3a'], 'fill-opacity': 0.22 },
       });
       m.addLayer({
         id: 'zonen-linie',
         type: 'line',
         source: 'zonen',
-        paint: { 'line-color': ['coalesce', ['get', 'farbe'], '#2f5d3a'], 'line-width': 1.5 },
+        paint: { 'line-color': ['coalesce', ['get', 'farbe'], '#1e5c3a'], 'line-width': 1.5 },
+      });
+      m.addLayer({
+        id: 'zonen-auswahl',
+        type: 'line',
+        source: 'zonen',
+        filter: ['==', ['get', 'id'], ''],
+        paint: { 'line-color': '#f26a1b', 'line-width': 4 },
       });
       m.addLayer({
         id: 'grenze-linie',
@@ -326,23 +336,28 @@ export default function Karte({
     grenzeRef.current = daten.grenze;
 
     // Luftbild nur für die Ausdehnung der Reviergrenze (+ ca. 150 m Rand) anfordern
-    if (m.getLayer('luftbild')) m.removeLayer('luftbild');
-    if (m.getSource('luftbild')) m.removeSource('luftbild');
+    // Nur neu aufbauen, wenn sich die Ausdehnung wirklich geändert hat – sonst lädt der Browser alle Kacheln erneut
     const bb = daten.grenze ? grenzen([daten.grenze]) : null;
-    if (bb) {
-      const rand = 0.002;
-      m.addSource('luftbild', {
-        type: 'raster',
-        tiles: [LUFTBILD_URL],
-        tileSize: 256,
-        maxzoom: 20,
-        bounds: [bb.getWest() - rand, bb.getSouth() - rand, bb.getEast() + rand, bb.getNorth() + rand],
-        attribution: 'Luftbild © LGLN',
-      });
-      m.addLayer(
-        { id: 'luftbild', type: 'raster', source: 'luftbild', layout: { visibility: ebenen.luftbild ? 'visible' : 'none' } },
-        'zonen-flaeche',
-      );
+    const schluessel = bb ? [bb.getWest(), bb.getSouth(), bb.getEast(), bb.getNorth()].map((v) => v.toFixed(5)).join(',') : '';
+    if (schluessel !== luftbildSchluessel.current || (bb && !m.getLayer('luftbild'))) {
+      luftbildSchluessel.current = schluessel;
+      if (m.getLayer('luftbild')) m.removeLayer('luftbild');
+      if (m.getSource('luftbild')) m.removeSource('luftbild');
+      if (bb) {
+        const rand = 0.002;
+        m.addSource('luftbild', {
+          type: 'raster',
+          tiles: [LUFTBILD_URL],
+          tileSize: 256,
+          maxzoom: 20,
+          bounds: [bb.getWest() - rand, bb.getSouth() - rand, bb.getEast() + rand, bb.getNorth() + rand],
+          attribution: 'Luftbild © LGLN',
+        });
+        m.addLayer(
+          { id: 'luftbild', type: 'raster', source: 'luftbild', layout: { visibility: ebenen.luftbild ? 'visible' : 'none' } },
+          'zonen-flaeche',
+        );
+      }
     }
 
     // Zonennamen als HTML-Beschriftung (kommt ohne Schrift-Server aus)
@@ -410,6 +425,16 @@ export default function Karte({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ebenen, bereit, ausgeblendet]);
 
+  // Ausgewählte Zone hervorheben
+  useEffect(() => {
+    const m = karte.current;
+    if (!m || !bereit || !m.getLayer('zonen-auswahl')) return;
+    m.setFilter('zonen-auswahl', ['==', ['get', 'id'], gewaehlteZone?.id ?? '']);
+  }, [gewaehlteZone, bereit]);
+  useEffect(() => {
+    if (modus) setGewaehlteZone(null);
+  }, [modus]);
+
   // Zeichnung anzeigen
   useEffect(() => {
     const m = karte.current;
@@ -450,7 +475,20 @@ export default function Karte({
       if (aktiv) return;
       const treffer = m.queryRenderedFeatures(e.point, { layers: ['einrichtungen-punkt', 'pirschwege-linie', 'zonen-flaeche'] });
       const f = treffer[0];
-      if (!f) return;
+      if (!f) {
+        setGewaehlteZone(null);
+        return;
+      }
+      if (f.layer.id === 'zonen-flaeche') {
+        const p = f.properties ?? {};
+        setGewaehlteZone({
+          id: String(p.id),
+          name: String(p.name ?? ''),
+          farbe: (p.farbe as string | null) ?? null,
+          flaecheHa: p.flaeche_ha != null ? Number(p.flaeche_ha) : null,
+        });
+        return;
+      }
       new Popup({ closeButton: true, maxWidth: '260px' })
         .setLngLat(e.lngLat)
         .setDOMContent(popupInhalt(f.layer.id, f.properties ?? {}))
@@ -930,6 +968,8 @@ export default function Karte({
           onAbbrechen={() => setNeueEinrichtung(null)}
         />
       )}
+
+      {gewaehlteZone && !modus && <ZonenInfo zone={gewaehlteZone} onSchliessen={() => setGewaehlteZone(null)} />}
 
       {kartenFehler && (
         <div className="karte-fehler" role="alert">

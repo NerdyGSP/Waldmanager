@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { fehlertext } from '../../lib/fehler';
 import { nameVergeben, useZonen, useZonenEbenen, ZONENFARBEN, type Zone, type ZonenEbene } from '../../lib/stammdaten';
 import { navigieren } from '../../lib/router';
-import { Auswahl, Feld, Gruppe, Hinweis, Knopf, Leer, Seite, Zeile } from '../../components/ui';
+import { Auswahl, Farbwahl, Feld, Gruppe, Hinweis, Knopf, Leer, Seite, Zeile } from '../../components/ui';
 import type { RevierKontext } from './kontext';
 
 export function Zonen({ k }: { k: RevierKontext }) {
@@ -38,6 +38,12 @@ export function Zonen({ k }: { k: RevierKontext }) {
     await laden();
   }
 
+  async function farbeSetzen(z: Zone, farbe: string) {
+    const { error } = await supabase.from('zonen').update({ farbe }).eq('id', z.id);
+    setFehler(error ? fehlertext(error) : null);
+    await laden();
+  }
+
   async function ebeneZuweisen(z: Zone, ebeneId: string) {
     const ebene = ebenen.find((e) => e.id === ebeneId);
     const { error } = await supabase
@@ -68,7 +74,7 @@ export function Zonen({ k }: { k: RevierKontext }) {
   }
 
   return (
-    <Seite titel="Zonen" untertitel="Erfassungszonen und individuelle Zonenebenen">
+    <Seite titel="Zonen" untertitel="Erfassungszonen und individuelle Zonenebenen · Farbe je Zone über den Farbpunkt">
       {fehler && <Hinweis art="fehler">{fehler}</Hinweis>}
 
       {gruppen.map(({ ebene, zonen: liste }) => (
@@ -82,7 +88,15 @@ export function Zonen({ k }: { k: RevierKontext }) {
               key={z.id}
               label={
                 <span className="zone-name">
-                  <i className="farbpunkt" style={{ background: ebene?.farbe ?? z.farbe ?? 'var(--akzent)' }} />
+                  {k.istInhaber ? (
+                    <Farbwahl
+                      wert={z.farbe ?? ebene?.farbe ?? '#1e5c3a'}
+                      label={`Farbe der Zone ${z.name}`}
+                      onAendern={(f) => void farbeSetzen(z, f)}
+                    />
+                  ) : (
+                    <i className="farbpunkt" style={{ background: z.farbe ?? ebene?.farbe ?? 'var(--akzent)' }} />
+                  )}
                   {z.name}
                   <small>{z.hatGeometrie ? 'Fläche gezeichnet' : 'ohne Fläche'}</small>
                 </span>
@@ -260,7 +274,7 @@ function Ebenen({
     <>
       <Gruppe
         titel="Zonenebenen"
-        fuss="Mit Ebenen legst du unabhängige Zoneneinteilungen an, z. B. „Zählzonen“ und „Ansitzbereiche“. Auf der Karte lässt sich jede Ebene einzeln ein- und ausblenden, eine Zählung kann auf eine Ebene beschränkt werden."
+        fuss="Die Ebenenfarbe wird auf alle Zonen der Ebene angewendet; danach kannst du einzelne Zonen wieder abweichend einfärben. Mit Ebenen legst du unabhängige Zoneneinteilungen an, z. B. „Zählzonen“ und „Ansitzbereiche“. Auf der Karte lässt sich jede Ebene einzeln ein- und ausblenden, eine Zählung kann auf eine Ebene beschränkt werden."
       >
         {ebenen.length === 0 && <Zeile label="Noch keine Ebenen angelegt" />}
         {ebenen.map((e) => (
@@ -272,7 +286,7 @@ function Ebenen({
                   type="color"
                   className="farbwahl"
                   aria-label={`Farbe der Ebene ${e.name}`}
-                  value={e.farbe ?? '#2f5d3a'}
+                  value={e.farbe ?? '#1e5c3a'}
                   onChange={(ev) => void aendern(e, { farbe: ev.target.value })}
                 />
                 {e.name}

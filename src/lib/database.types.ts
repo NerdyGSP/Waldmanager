@@ -803,6 +803,180 @@ export type Database = {
         }
         Relationships: []
       }
+      aufgaben: {
+        Row: {
+          aktualisiert_am: string
+          beschreibung: string | null
+          einrichtung_id: string | null
+          erledigt_am: string | null
+          erstellt_am: string
+          erstellt_von: string | null
+          faellig_am: string | null
+          geloescht_am: string | null
+          id: string
+          revier_id: string
+          status: string
+          titel: string
+          zugewiesen_an: string | null
+        }
+        Insert: {
+          aktualisiert_am?: string
+          beschreibung?: string | null
+          einrichtung_id?: string | null
+          erledigt_am?: string | null
+          erstellt_am?: string
+          erstellt_von?: string | null
+          faellig_am?: string | null
+          geloescht_am?: string | null
+          id?: string
+          revier_id: string
+          status?: string
+          titel: string
+          zugewiesen_an?: string | null
+        }
+        Update: {
+          aktualisiert_am?: string
+          beschreibung?: string | null
+          einrichtung_id?: string | null
+          erledigt_am?: string | null
+          erstellt_am?: string
+          erstellt_von?: string | null
+          faellig_am?: string | null
+          geloescht_am?: string | null
+          id?: string
+          revier_id?: string
+          status?: string
+          titel?: string
+          zugewiesen_an?: string | null
+        }
+        Relationships: []
+      }
+      begehungsscheine: {
+        Row: {
+          aktualisiert_am: string
+          art: string
+          ausgestellt_von: string | null
+          bedingungen: string | null
+          bereich: string | null
+          entgelt_eur: number | null
+          erstellt_am: string
+          gast_kontakt: string | null
+          gast_name: string
+          geloescht_am: string | null
+          gueltig_bis: string
+          gueltig_von: string
+          id: string
+          jagdschein_nr: string | null
+          revier_id: string
+          widerrufen_am: string | null
+          wildarten: string[]
+        }
+        Insert: {
+          aktualisiert_am?: string
+          art?: string
+          ausgestellt_von?: string | null
+          bedingungen?: string | null
+          bereich?: string | null
+          entgelt_eur?: number | null
+          erstellt_am?: string
+          gast_kontakt?: string | null
+          gast_name: string
+          geloescht_am?: string | null
+          gueltig_bis: string
+          gueltig_von: string
+          id?: string
+          jagdschein_nr?: string | null
+          revier_id: string
+          widerrufen_am?: string | null
+          wildarten?: string[]
+        }
+        Update: {
+          aktualisiert_am?: string
+          art?: string
+          ausgestellt_von?: string | null
+          bedingungen?: string | null
+          bereich?: string | null
+          entgelt_eur?: number | null
+          erstellt_am?: string
+          gast_kontakt?: string | null
+          gast_name?: string
+          geloescht_am?: string | null
+          gueltig_bis?: string
+          gueltig_von?: string
+          id?: string
+          jagdschein_nr?: string | null
+          revier_id?: string
+          widerrufen_am?: string | null
+          wildarten?: string[]
+        }
+        Relationships: []
+      }
+      wildschaeden: {
+        Row: {
+          aktualisiert_am: string
+          angemeldet_am: string | null
+          bemerkung: string | null
+          erfasst_von: string | null
+          erstellt_am: string
+          flaeche_ha: number | null
+          geloescht_am: string | null
+          geom: unknown
+          geschaedigter: string | null
+          id: string
+          kenntnis_am: string
+          kontakt: string | null
+          kultur: string
+          ort: string | null
+          revier_id: string
+          schaden_eur: number | null
+          status: string
+          wildart_id: string | null
+          zone_id: string | null
+        }
+        Insert: {
+          aktualisiert_am?: string
+          angemeldet_am?: string | null
+          bemerkung?: string | null
+          erfasst_von?: string | null
+          erstellt_am?: string
+          flaeche_ha?: number | null
+          geloescht_am?: string | null
+          geom?: unknown
+          geschaedigter?: string | null
+          id?: string
+          kenntnis_am?: string
+          kontakt?: string | null
+          kultur: string
+          ort?: string | null
+          revier_id: string
+          schaden_eur?: number | null
+          status?: string
+          wildart_id?: string | null
+          zone_id?: string | null
+        }
+        Update: {
+          aktualisiert_am?: string
+          angemeldet_am?: string | null
+          bemerkung?: string | null
+          erfasst_von?: string | null
+          erstellt_am?: string
+          flaeche_ha?: number | null
+          geloescht_am?: string | null
+          geom?: unknown
+          geschaedigter?: string | null
+          id?: string
+          kenntnis_am?: string
+          kontakt?: string | null
+          kultur?: string
+          ort?: string | null
+          revier_id?: string
+          schaden_eur?: number | null
+          status?: string
+          wildart_id?: string | null
+          zone_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

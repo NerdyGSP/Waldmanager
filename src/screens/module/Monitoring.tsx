@@ -2,17 +2,19 @@ import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { fehlertext } from '../../lib/fehler';
 import { useWildarten, wildartName } from '../../lib/stammdaten';
-import { aktuellesJagdjahr, letzteJagdjahre, type Jagdjahr } from '../../lib/zeit';
+import { aktuellesJagdjahr, datumDE, letzteJagdjahre, type Jagdjahr } from '../../lib/zeit';
 import { navigieren } from '../../lib/router';
 import type { Database } from '../../lib/database.types';
 import { Gruppe, Hinweis, Knopf, Leer, Seite, Segmente } from '../../components/ui';
-import { Balken, Verlauf } from '../../components/diagramme';
+import { Balken, Verlauf, VerlaufMehrere, type Serie } from '../../components/diagramme';
+import { Symbol } from '../../components/symbole';
 import type { RevierKontext } from './kontext';
 
 type Vergleich = Database['public']['Functions']['quervergleich']['Returns'][number];
 type Sitzungssumme = { id: string; datum: string; arten: Record<string, number> };
 
-export function Monitoring({ k }: { k: RevierKontext }) {
+export function Monitoring({ k, breit = false, abgedockt = false }: { k: RevierKontext; breit?: boolean; abgedockt?: boolean }) {
+  const voll = window.location.pathname.startsWith('/monitoring/voll');
   const wildarten = useWildarten();
   const [jahr, setJahr] = useState<Jagdjahr>(aktuellesJagdjahr());
   const [ansicht, setAnsicht] = useState<'revier' | 'vergleich'>('revier');
@@ -91,7 +93,7 @@ export function Monitoring({ k }: { k: RevierKontext }) {
   const streckeSumme = Object.values(strecke).reduce((a, n) => a + n, 0);
 
   return (
-    <Seite titel="Monitoring" untertitel={`Jagdjahr ${jahr.label}`}>
+    <Seite titel="Monitoring" untertitel={`Jagdjahr ${jahr.label}`} aktion={breit && !abgedockt ? <Anordnung voll={voll} /> : undefined}>
       <div className="filter-leiste">
         <label className="filter">
           <span>Jagdjahr</span>
@@ -117,8 +119,9 @@ export function Monitoring({ k }: { k: RevierKontext }) {
       {fehler && <Hinweis art="fehler">{fehler}</Hinweis>}
 
       {ansicht === 'revier' ? (
-        <>
-          <div className="kennzahlen">
+        <div className="monitoring-box">
+          <div className="monitoring-raster">
+          <div className="kennzahlen breit">
             <Kennzahl wert={sitzungen.length} label="Zählungen" />
             <Kennzahl wert={beobachtungen} label="Beobachtungen" />
             <Kennzahl wert={streckeSumme} label="Abschüsse" />
@@ -127,7 +130,20 @@ export function Monitoring({ k }: { k: RevierKontext }) {
               nachkomma={1}
               label="Abschüsse je 100 ha"
             />
+            <Kennzahl wert={gezaehlteArten.length} label="Gezählte Wildarten" />
+            <Kennzahl wert={Object.values(maxJeArt).reduce((a, n) => a + n, 0)} label="Summe der Höchstwerte" />
+            <Kennzahl
+              wert={k.flaecheHa ? (Object.values(maxJeArt).reduce((a, n) => a + n, 0) / k.flaecheHa) * 100 : null}
+              nachkomma={1}
+              label="Höchstwerte je 100 ha"
+            />
           </div>
+
+          {breit && (
+            <div className="breit">
+              <Jahresvergleich k={k} wildarten={wildarten} />
+            </div>
+          )}
 
           <Gruppe titel="Zählverlauf">
             {gezaehlteArten.length === 0 ? (
@@ -179,11 +195,241 @@ export function Monitoring({ k }: { k: RevierKontext }) {
               </div>
             )}
           </Gruppe>
-        </>
+          </div>
+        </div>
       ) : (
-        <Quervergleich daten={vergleich} hatFreigaben={hatFreigaben} />
+        <div className="monitoring-box">
+          <Quervergleich daten={vergleich} hatFreigaben={hatFreigaben} />
+        </div>
       )}
     </Seite>
+  );
+}
+
+function Anordnung({ voll }: { voll: boolean }) {
+  return (
+    <div className="monitoring-werkzeuge">
+      <button
+        className="knopf knopf-sekundaer klein"
+        onClick={() => navigieren(voll ? '/monitoring' : '/monitoring/voll')}
+        title={voll ? 'Zurück zur Seitenleiste mit Karte' : 'Monitoring über die ganze Breite anzeigen'}
+      >
+        {voll ? 'Mit Karte' : 'Vollbreite'}
+      </button>
+      <button
+        className="knopf knopf-sekundaer klein"
+        onClick={() => window.open('/monitoring/fenster', 'hegewerk-monitoring', 'popup=yes,width=1500,height=950')}
+        title="Monitoring in einem eigenen Fenster öffnen, z. B. auf dem zweiten Bildschirm"
+      >
+        <Symbol name="abdocken" /> Abdocken
+      </button>
+    </div>
+  );
+}
+
+type Sitzung = { id: string; datum: string; arten: Record<string, number> };
+
+function tagImJagdjahr(datum: string, start: number): number {
+  const t = (d: string) => Date.UTC(Number(d.slice(0, 4)), Number(d.slice(5, 7)) - 1, Number(d.slice(8, 10)));
+  return Math.max(0, Math.min(365, Math.round((t(datum) - Date.UTC(start, 3, 1)) / 86400000)));
+}
+
+/** Mehrjahresvergleich: Zählverläufe und kumulierte Strecke mehrerer Jagdjahre übereinander */
+function Jahresvergleich({ k, wildarten }: { k: RevierKontext; wildarten: ReturnType<typeof useWildarten> }) {
+  const jahre = useMemo(() => letzteJagdjahre(6), []);
+  const [gewaehlt, setGewaehlt] = useState<number[]>(() => jahre.slice(0, 3).map((j) => j.start));
+  const [kennzahl, setKennzahl] = useState<'zaehlung' | 'strecke'>('zaehlung');
+  const [bezug, setBezug] = useState<'stueck' | 'je100'>('stueck');
+  const [art, setArt] = useState('');
+  const [sitzungen, setSitzungen] = useState<Sitzung[]>([]);
+  const [abschuesse, setAbschuesse] = useState<Array<{ wildart_id: string; erlegt_am: string }>>([]);
+  const [fehler, setFehler] = useState<string | null>(null);
+  const [laedt, setLaedt] = useState(true);
+
+  useEffect(() => {
+    let aktiv = true;
+    const von = jahre[jahre.length - 1]!.von;
+    setLaedt(true);
+    void (async () => {
+      const [s, a] = await Promise.all([
+        supabase
+          .from('zaehlsitzungen')
+          .select('id, datum, zaehlungen(wildart_id, anzahl, geloescht_am)')
+          .eq('revier_id', k.revierId)
+          .eq('status', 'abgeschlossen')
+          .is('geloescht_am', null)
+          .gte('datum', von)
+          .order('datum'),
+        supabase
+          .from('abschuesse')
+          .select('wildart_id, erlegt_am')
+          .eq('revier_id', k.revierId)
+          .is('geloescht_am', null)
+          .gte('erlegt_am', `${von}T00:00:00`)
+          .order('erlegt_am')
+          .limit(5000),
+      ]);
+      if (!aktiv) return;
+      const err = s.error ?? a.error;
+      setFehler(err ? fehlertext(err) : null);
+      setSitzungen(
+        (s.data ?? []).map((x) => {
+          const arten: Record<string, number> = {};
+          for (const z of x.zaehlungen) if (!z.geloescht_am) arten[z.wildart_id] = (arten[z.wildart_id] ?? 0) + z.anzahl;
+          return { id: x.id, datum: x.datum, arten };
+        }),
+      );
+      setAbschuesse(a.data ?? []);
+      setLaedt(false);
+    })();
+    return () => {
+      aktiv = false;
+    };
+  }, [k.revierId, jahre]);
+
+  const verfuegbar = useMemo(() => {
+    const ids = new Set([...sitzungen.flatMap((s) => Object.keys(s.arten)), ...abschuesse.map((x) => x.wildart_id)]);
+    return wildarten.filter((w) => ids.has(w.id));
+  }, [sitzungen, abschuesse, wildarten]);
+
+  useEffect(() => {
+    if (verfuegbar.length && !verfuegbar.some((w) => w.id === art)) setArt(verfuegbar.find((w) => w.id === 'rehwild')?.id ?? verfuegbar[0]!.id);
+  }, [verfuegbar, art]);
+
+  const faktor = bezug === 'je100' && k.flaecheHa ? 100 / k.flaecheHa : 1;
+  const imJahr = (datum: string, start: number) => datum >= `${start}-04-01` && datum <= `${start + 1}-03-31`;
+
+  const gewaehlteJahre = jahre.filter((j) => gewaehlt.includes(j.start)).sort((a, b) => b.start - a.start);
+
+  const serien: Serie[] = gewaehlteJahre.map((j) => {
+    if (kennzahl === 'zaehlung') {
+      return {
+        id: String(j.start),
+        label: `Jagdjahr ${j.label}`,
+        punkte: sitzungen
+          .filter((s) => imJahr(s.datum, j.start) && s.arten[art] !== undefined)
+          .map((s) => ({ x: tagImJagdjahr(s.datum, j.start), wert: (s.arten[art] ?? 0) * faktor, titel: datumDE(s.datum) })),
+      };
+    }
+    let summe = 0;
+    const punkte = [{ x: 0, wert: 0, titel: '1. April' }];
+    for (const a of abschuesse) {
+      const tag = a.erlegt_am.slice(0, 10);
+      if (a.wildart_id !== art || !imJahr(tag, j.start)) continue;
+      summe++;
+      punkte.push({ x: tagImJagdjahr(tag, j.start), wert: summe * faktor, titel: datumDE(tag) });
+    }
+    return { id: String(j.start), label: `Jagdjahr ${j.label}`, punkte };
+  });
+
+  // Kennzahlen je Jagdjahr
+  const tabelle = gewaehlteJahre.map((j) => {
+    const s = sitzungen.filter((x) => imJahr(x.datum, j.start));
+    const werte = s.map((x) => x.arten[art]).filter((n): n is number => n !== undefined);
+    const strecke = abschuesse.filter((x) => imJahr(x.erlegt_am.slice(0, 10), j.start));
+    return {
+      jahr: j,
+      zaehlungen: werte.length,
+      max: werte.length ? Math.max(...werte) : null,
+      schnitt: werte.length ? werte.reduce((a, n) => a + n, 0) / werte.length : null,
+      streckeArt: strecke.filter((x) => x.wildart_id === art).length,
+      streckeAlle: strecke.length,
+    };
+  });
+
+  const einheit = bezug === 'je100' ? ' je 100 ha' : ' Stück';
+  const zahl = (n: number | null, nk = 1) => (n === null ? '–' : (n * (bezug === 'je100' && k.flaecheHa ? 100 / k.flaecheHa : 1)).toLocaleString('de-DE', { maximumFractionDigits: nk }));
+
+  return (
+    <Gruppe titel="Jahresvergleich" fuss="Zählungen: Summe aller Zonen je abgeschlossener Zählung. Strecke: Abschüsse der Wildart, kumuliert ab 1. April.">
+      <div className="diagramm-block">
+        {fehler && <Hinweis art="fehler">{fehler}</Hinweis>}
+        <div className="filter-leiste">
+          <label className="filter">
+            <span>Wildart</span>
+            <select value={art} onChange={(e) => setArt(e.target.value)} aria-label="Wildart im Jahresvergleich">
+              {verfuegbar.map((w) => (
+                <option key={w.id} value={w.id}>
+                  {w.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <Segmente
+            label="Kennzahl"
+            wert={kennzahl}
+            onAendern={setKennzahl}
+            optionen={[
+              { wert: 'zaehlung', label: 'Zählverlauf' },
+              { wert: 'strecke', label: 'Strecke' },
+            ]}
+          />
+          {k.flaecheHa && (
+            <Segmente
+              label="Bezug"
+              wert={bezug}
+              onAendern={setBezug}
+              optionen={[
+                { wert: 'stueck', label: 'Stück' },
+                { wert: 'je100', label: 'je 100 ha' },
+              ]}
+            />
+          )}
+        </div>
+        <fieldset className="jahreswahl" style={{ border: 0, padding: 0, margin: 0 }}>
+          <legend className="visuell-versteckt">Jagdjahre im Vergleich</legend>
+          {jahre.map((j) => (
+            <label key={j.start}>
+              <input
+                type="checkbox"
+                checked={gewaehlt.includes(j.start)}
+                onChange={(e) => setGewaehlt((alt) => (e.target.checked ? [...alt, j.start] : alt.filter((x) => x !== j.start)))}
+              />
+              {j.label}
+            </label>
+          ))}
+        </fieldset>
+        {laedt ? (
+          <Leer>Daten werden geladen …</Leer>
+        ) : serien.every((s) => s.punkte.length <= 1) ? (
+          <Leer>Für diese Auswahl liegen keine Werte vor.</Leer>
+        ) : (
+          <VerlaufMehrere
+            serien={serien}
+            titel={`${wildartName(wildarten, art)}: ${kennzahl === 'zaehlung' ? 'Zählverlauf' : 'kumulierte Strecke'} je Jagdjahr`}
+            hervorgehoben={String(gewaehlteJahre[0]?.start)}
+          />
+        )}
+        {tabelle.length > 0 && (
+          <div className="tabelle-rahmen">
+            <table className="tabelle">
+              <thead>
+                <tr>
+                  <th scope="col">Jagdjahr</th>
+                  <th scope="col" className="zahl">Zählungen</th>
+                  <th scope="col" className="zahl">Höchstwert{einheit}</th>
+                  <th scope="col" className="zahl">Ø{einheit}</th>
+                  <th scope="col" className="zahl">Strecke {wildartName(wildarten, art)}</th>
+                  <th scope="col" className="zahl">Strecke gesamt</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tabelle.map((z) => (
+                  <tr key={z.jahr.start}>
+                    <th scope="row">{z.jahr.label}</th>
+                    <td className="zahl">{z.zaehlungen}</td>
+                    <td className="zahl stark">{zahl(z.max, 1)}</td>
+                    <td className="zahl">{zahl(z.schnitt, 1)}</td>
+                    <td className="zahl">{z.streckeArt}</td>
+                    <td className="zahl">{z.streckeAlle}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </Gruppe>
   );
 }
 

@@ -10,6 +10,7 @@
     "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {
+    "@fontsource-variable/inter": "^5.3.0",
     "@supabase/supabase-js": "^2.118.0",
     "maplibre-gl": "^6.16.0",
     "react": "^19.3.1",
