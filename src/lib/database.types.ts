@@ -1152,6 +1152,10 @@ export type Database = {
         }[]
       }
       grenze_setzen: { Args: { p_geojson: Json; p_revier_id: string }; Returns: number }
+      masteradmin_letzte_logins: {
+        Args: Record<PropertyKey, never>
+        Returns: { user_id: string; letzter_login: string | null }[]
+      }
       karte_daten: { Args: { p_revier_id: string; p_tage?: number }; Returns: Json }
       zone_an_position: {
         Args: { p_lat: number; p_lon: number; p_revier_id: string }

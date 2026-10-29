@@ -395,7 +395,7 @@ button.kachel:active { transform: scale(0.98); }
 .karte-auswahl { width: 100%; min-width: 0; text-overflow: ellipsis; }
 
 /* ---------- Browseransicht: Seitenleiste + dauerhafte Karte ---------- */
-.desk { display: grid; grid-template-columns: minmax(360px, 420px) 1fr; height: 100dvh; overflow: hidden; }
+.desk { display: grid; grid-template-columns: minmax(380px, 33.333%) 1fr; height: 100dvh; overflow: hidden; }
 .desk-seite { display: flex; flex-direction: column; min-height: 0; min-width: 0; border-right: 0.5px solid var(--linie); background: var(--hintergrund); }
 .desk-kopf { padding: 16px 20px 6px; }
 .desk-marke { display: flex; align-items: center; gap: 8px; font-weight: 700; }
@@ -787,3 +787,30 @@ button.kachel:active { transform: none; }
 .bj-teiln h1 { margin: 0; font-size: 1.4rem; }
 .bj-legende { display: flex; gap: 12px; flex-wrap: wrap; font-size: .8rem; color: var(--color-text-muted); }
 .bj-warnung { border: 1px solid var(--color-danger); border-radius: var(--radius-md); padding: 12px; display: grid; gap: 10px; background: color-mix(in srgb, var(--color-danger) 8%, transparent); }
+
+/* Einklappbare Gruppe (Einstellungen → Konto) */
+.einklappbar { border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); }
+.einklappbar > summary { cursor: pointer; padding: 12px var(--abstand); font-weight: 600; list-style: none; display: flex; justify-content: space-between; }
+.einklappbar > summary::after { content: '›'; transition: transform .15s; }
+.einklappbar[open] > summary::after { transform: rotate(90deg); }
+.einklappbar > :not(summary) { padding: 0 12px 12px; display: grid; gap: 12px; }
+/* Umschalter 1/3 | Voll im Modulkopf */
+.breite-wahl { margin-left: auto; }
+.breite-wahl .segmente button { padding: 0 10px; min-height: 28px; font-size: .8rem; }
+.desk-kopf h1 { display: flex; align-items: center; gap: 12px; }
+/* Begehungsschein als schwebendes Fenster */
+.schein-fenster { position: fixed; z-index: 40; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(660px, 92vw); max-height: 86dvh; overflow: auto; background: var(--color-bg); border: 1px solid var(--color-border-input); border-radius: var(--radius-lg); box-shadow: 0 12px 40px rgba(0,0,0,.3); display: grid; gap: 12px; padding: 0 16px 16px; align-content: start; }
+.schein-fenster-kopf { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 8px; padding: 12px 0; background: var(--color-bg); }
+.schein-fenster-kopf h2 { margin: 0; font-size: 1.05rem; margin-right: auto; }
+@media (max-width: 899px) { .schein-fenster { inset: 0; transform: none; width: auto; max-height: none; border-radius: 0; border: 0; box-shadow: none; } }
+/* Masteradmin-Tabelle */
+.ma-filter { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.ma-filter input, .ma-filter select { min-height: var(--control-h); border: 1px solid var(--color-border-input); background: var(--color-surface); border-radius: var(--radius-sm); padding: 0 10px; color: inherit; }
+.ma-tabelle { overflow-x: auto; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); }
+.ma-tabelle table { border-collapse: collapse; width: 100%; font-size: .88rem; }
+.ma-tabelle th, .ma-tabelle td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--color-border); vertical-align: top; }
+.ma-tabelle th { white-space: nowrap; color: var(--color-text-muted); font-weight: 600; }
+.ma-tabelle th button { border: 0; background: none; font: inherit; color: inherit; cursor: pointer; padding: 0; }
+.ma-tabelle td small { display: block; color: var(--color-text-muted); }
+.ma-tabelle td .link { margin-right: 10px; }
+@media print { .schein-fenster { position: static !important; transform: none !important; max-height: none !important; overflow: visible !important; box-shadow: none !important; border: 0 !important; width: auto !important; padding: 0 !important; } .schein-fenster-kopf { display: none !important; } }

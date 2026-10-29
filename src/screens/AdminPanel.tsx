@@ -106,7 +106,7 @@ export function AdminPanel({
 
   return (
     <div className="admin">
-      <h2 className="bereich-titel">Masteradmin</h2>
+      <h2 className="bereich-titel">Hegeringe &amp; Reviere</h2>
       {fehler && <Hinweis art="fehler">{fehler}</Hinweis>}
 
       <Gruppe titel="Reviere">

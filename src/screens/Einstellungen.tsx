@@ -6,33 +6,45 @@ import type { Mitgliedschaft, NutzerKontext } from '../lib/useNutzerKontext';
 import { Feld, Gruppe, Hinweis, Knopf, PasswortFeld, Seite, Segmente, Zeile } from '../components/ui';
 import { useDarstellung, type Darstellung } from '../lib/darstellung';
 import { MitgliederPanel } from './MitgliederPanel';
-import { AdminPanel } from './AdminPanel';
 import { RevierdatenLoeschen } from './module/Revierdaten';
 
 const ROLLEN = { inhaber: 'Revierinhaber/-pächter', mitjaeger: 'Mitjäger' } as const;
 
 export function Einstellungen({
-  userId,
   kontext,
-  aktuell,
-  revierWechseln,
+  nachAenderung,
 }: {
-  userId: string;
   kontext: NutzerKontext;
-  aktuell: Mitgliedschaft | null;
-  revierWechseln: (id: string) => void;
+  nachAenderung: (neueRevierId?: string | null) => Promise<void>;
 }) {
-  const nachAenderung = async (neueRevierId?: string | null) => {
-    await kontext.neuLaden();
-    if (neueRevierId) revierWechseln(neueRevierId);
-  };
-
   return (
     <Seite titel="Einstellungen">
-      <Konto name={kontext.name} email={kontext.email} onGeaendert={() => nachAenderung()} />
+      <details className="einklappbar">
+        <summary>Konto</summary>
+        <Konto name={kontext.name} email={kontext.email} onGeaendert={() => nachAenderung()} />
+      </details>
       <DarstellungWahl />
       <KartenSpeicher />
 
+      <Knopf variante="gefahr" onClick={() => supabase.auth.signOut()}>
+        Abmelden
+      </Knopf>
+    </Seite>
+  );
+}
+
+// Revierverwaltung: Revier, Mitglieder & Einladungen, Kartendaten löschen, Revier verlassen, Code einlösen
+export function Reviermanagement({
+  userId,
+  aktuell,
+  nachAenderung,
+}: {
+  userId: string;
+  aktuell: Mitgliedschaft | null;
+  nachAenderung: (neueRevierId?: string | null) => Promise<void>;
+}) {
+  return (
+    <Seite titel="Reviermanagement">
       {aktuell && (
         <>
           <Revier aktuell={aktuell} onGeaendert={() => nachAenderung()} />
@@ -46,14 +58,7 @@ export function Einstellungen({
           )}
         </>
       )}
-
       <CodeEinloesen onEingeloest={nachAenderung} />
-
-      {kontext.istMasteradmin && <AdminPanel eigeneId={userId} onGeaendert={nachAenderung} />}
-
-      <Knopf variante="gefahr" onClick={() => supabase.auth.signOut()}>
-        Abmelden
-      </Knopf>
     </Seite>
   );
 }

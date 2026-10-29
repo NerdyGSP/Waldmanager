@@ -11,6 +11,8 @@ const PFADE: Record<string, string> = {
   aufgaben: 'M4 6.5l1.8 1.8L9 5M4 12.5l1.8 1.8L9 11M4 18.5l1.8 1.8L9 17M12 7h8M12 13h8M12 19h8',
   begehungsscheine: 'M6 3h9l4 4v14H6V3Zm9 0v4h4M9 12h7M9 16h7M9 8h3',
   bewegungsjagd: 'M12 21v-6M12 15c-3 0-5-2.5-5-6V4l2.5 2L12 3l2.5 3L17 4v5c0 3.5-2 6-5 6ZM9 9.5h.01M15 9.5h.01',
+  reviermanagement: 'M4 20V9l8-5 8 5v11M9 20v-6h6v6',
+  masteradmin: 'M12 3l8 4v5c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V7l8-4ZM9.5 12l2 2 3.5-4',
   import: 'M12 4v11m0 0-4-4m4 4 4-4M5 20h14',
   einklappen: 'M15 6l-6 6 6 6',
   ausklappen: 'M9 6l6 6-6 6',

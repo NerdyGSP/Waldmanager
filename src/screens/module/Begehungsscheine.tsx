@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { supabase } from '../../lib/supabase';
 import { fehlertext } from '../../lib/fehler';
@@ -47,8 +48,6 @@ export function Begehungsscheine({ k }: { k: RevierKontext }) {
   const aktive = liste.filter((s) => stand(s).aktiv);
   const sichtbar = alle ? liste : aktive;
 
-  if (ansicht) return <ScheinAnsicht k={k} schein={ansicht} onZurueck={() => setAnsicht(null)} onBearbeiten={() => { setBearbeiten(ansicht); setAnsicht(null); }} />;
-
   if (bearbeiten) {
     return (
       <ScheinFormular
@@ -97,15 +96,27 @@ export function Begehungsscheine({ k }: { k: RevierKontext }) {
         })}
       </Gruppe>
       {!k.istInhaber && <Leer>Begehungsscheine stellt der Revierinhaber aus. Hier siehst du, wer im Revier eine Erlaubnis hat.</Leer>}
+      {ansicht && <ScheinFenster k={k} schein={ansicht} onZurueck={() => setAnsicht(null)} onBearbeiten={() => { setBearbeiten(ansicht); setAnsicht(null); }} />}
     </Seite>
   );
 }
 
-function ScheinAnsicht({ k, schein, onZurueck, onBearbeiten }: { k: RevierKontext; schein: Schein; onZurueck: () => void; onBearbeiten: () => void }) {
+function ScheinFenster({ k, schein, onZurueck, onBearbeiten }: { k: RevierKontext; schein: Schein; onZurueck: () => void; onBearbeiten: () => void }) {
   const wildarten = useWildarten();
   const st = stand(schein);
-  return (
-    <Seite titel="Begehungsschein" zurueck={onZurueck} aktion={<Knopf variante="sekundaer" onClick={() => window.print()}>Drucken</Knopf>}>
+  useEffect(() => {
+    const taste = (e: KeyboardEvent) => e.key === 'Escape' && onZurueck();
+    window.addEventListener('keydown', taste);
+    return () => window.removeEventListener('keydown', taste);
+  }, [onZurueck]);
+  // Schwebendes Fenster (≥ 900 px) bzw. Vollbild-Sheet (Handy), unabhängig von der Seitenleiste
+  return createPortal(
+    <div className="schein-fenster" role="dialog" aria-label="Begehungsschein">
+      <div className="schein-fenster-kopf">
+        <h2>Begehungsschein</h2>
+        <Knopf variante="sekundaer" onClick={() => window.print()}>Drucken</Knopf>
+        <Knopf variante="ghost" onClick={onZurueck} aria-label="Schließen">Schließen</Knopf>
+      </div>
       <article className="schein-druck">
         <header>
           <p className="schein-revier">Revier {k.revierName}</p>
@@ -140,7 +151,8 @@ function ScheinAnsicht({ k, schein, onZurueck, onBearbeiten }: { k: RevierKontex
         </footer>
       </article>
       {k.istInhaber && <Knopf variante="sekundaer" onClick={onBearbeiten}>Bearbeiten</Knopf>}
-    </Seite>
+    </div>,
+    document.body,
   );
 }
 

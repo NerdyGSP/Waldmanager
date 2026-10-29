@@ -9,7 +9,10 @@ import { Symbol } from '../components/symbole';
 import { useBreit } from '../lib/useBreit';
 import type { NutzerKontext } from '../lib/useNutzerKontext';
 import { Logo } from './AuthScreen';
-import { CodeEinloesen, Einstellungen } from './Einstellungen';
+import { CodeEinloesen, Einstellungen, Reviermanagement } from './Einstellungen';
+import { Masteradmin } from './Masteradmin';
+import { useModulBreite } from '../lib/modulBreite';
+import { Segmente } from '../components/ui';
 import { Freigaben } from './module/Freigaben';
 import { Zonen } from './module/Zonen';
 import { Abschuesse } from './module/Abschuesse';
@@ -41,7 +44,12 @@ const MODULE = [
   { pfad: 'zonen', titel: 'Zonen', text: 'Erfassungszonen anlegen und ordnen', symbol: '▦' },
   { pfad: 'freigaben', titel: 'Freigaben', text: 'Wildarten für den Quervergleich freigeben', symbol: '🤝' },
   { pfad: 'import', titel: 'Datenimport', text: 'Historische Zählungen und Abschüsse aus CSV', symbol: '⬆️' },
+  { pfad: 'reviermanagement', titel: 'Reviermanagement', text: 'Revier, Mitglieder & Einladungen, Kartendaten', symbol: '🏡' },
+  { pfad: 'masteradmin', titel: 'Masteradmin', text: 'Hegeringe, Reviere und User im Überblick', symbol: '🛡' },
 ];
+
+// Seiten ohne Revier-Kontext-Modul (Einstellungen, Reviermanagement, Masteradmin)
+const SONDERSEITEN = ['einstellungen', 'reviermanagement', 'masteradmin'];
 
 export function Home({ session }: { session: Session }) {
   const kontext = useNutzerKontext(session.user.id);
@@ -66,6 +74,10 @@ export function Home({ session }: { session: Session }) {
     setRevierId(id);
     revierMerken(id);
   }
+  const nachAenderung = async (neueRevierId?: string | null) => {
+    await kontext.neuLaden();
+    if (neueRevierId) revierWechseln(neueRevierId);
+  };
 
   if (kontext.laedt) {
     return <div className="laden">Lade Daten …</div>;
@@ -107,6 +119,7 @@ export function Home({ session }: { session: Session }) {
         revierWechseln={revierWechseln}
         offen={offen}
         userId={session.user.id}
+        nachAenderung={nachAenderung}
       />
     );
   }
@@ -155,8 +168,8 @@ export function Home({ session }: { session: Session }) {
       <main className={modul === 'karte' ? 'inhalt inhalt-voll' : 'inhalt'}>
         {kontext.fehler && <Hinweis art="fehler">{fehlertext(kontext.fehler)}</Hinweis>}
 
-        {modul === 'einstellungen' ? (
-          <Einstellungen userId={session.user.id} kontext={kontext} aktuell={aktuell} revierWechseln={revierWechseln} />
+        {modul && SONDERSEITEN.includes(modul) ? (
+          <Sonderseite modul={modul} userId={session.user.id} kontext={kontext} aktuell={aktuell} nachAenderung={nachAenderung} />
         ) : modul && revierKontext ? (
           <ModulInhalt key={`${revierKontext.revierId}-${modul}`} modul={modul} unterpfad={pfad.slice(1)} k={revierKontext} />
         ) : (
@@ -186,6 +199,8 @@ const NAVIGATION = [
   { pfad: 'zonen', titel: 'Zonen' },
   { pfad: 'freigaben', titel: 'Freigaben' },
   { pfad: 'import', titel: 'Datenimport' },
+  { pfad: 'reviermanagement', titel: 'Reviermanagement' },
+  { pfad: 'masteradmin', titel: 'Masteradmin' },
   { pfad: 'einstellungen', titel: 'Einstellungen' },
 ];
 
@@ -199,6 +214,7 @@ function DesktopLayout({
   revierWechseln,
   offen,
   userId,
+  nachAenderung,
 }: {
   modul: string;
   unterpfad: string[];
@@ -209,6 +225,7 @@ function DesktopLayout({
   revierWechseln: (id: string) => void;
   offen: number;
   userId: string;
+  nachAenderung: (neueRevierId?: string | null) => Promise<void>;
 }) {
   const [panelEl, setPanelEl] = useState<HTMLDivElement | null>(null);
   const [eingeklappt, setEingeklappt] = useState(() => {
@@ -220,7 +237,10 @@ function DesktopLayout({
   });
   const titel = NAVIGATION.find((n) => n.pfad === modul)?.titel ?? '';
   // Monitoring kann die ganze Breite einnehmen (Karte ausgeblendet) – Adresse /monitoring/voll
-  const voll = modul === 'monitoring' && unterpfad[0] === 'voll';
+  const urlVoll = modul === 'monitoring' && unterpfad[0] === 'voll';
+  const [gespeicherteBreite, breiteSetzen] = useModulBreite(modul);
+  const breiteWaehlbar = modul !== 'karte';
+  const voll = urlVoll || (breiteWaehlbar && gespeicherteBreite === 'voll');
 
   function einklappen(zu: boolean) {
     setEingeklappt(zu);
@@ -266,11 +286,26 @@ function DesktopLayout({
           ) : (
             <div className="desk-revier-name">{k.revierName}</div>
           )}
-          <h1>{titel}</h1>
+          <h1>
+            {titel}
+            {breiteWaehlbar && (
+              <span className="breite-wahl">
+                <Segmente<'drittel' | 'voll'>
+                  label="Modulbreite"
+                  optionen={[{ wert: 'drittel', label: '1/3' }, { wert: 'voll', label: 'Voll' }]}
+                  wert={voll ? 'voll' : 'drittel'}
+                  onAendern={(b) => {
+                    breiteSetzen(b);
+                    if (b === 'drittel' && urlVoll) navigieren('/monitoring');
+                  }}
+                />
+              </span>
+            )}
+          </h1>
         </div>
 
         <nav className="desk-nav" aria-label="Module">
-          {NAVIGATION.map((n) => (
+          {NAVIGATION.filter((n) => n.pfad !== 'masteradmin' || kontext.istMasteradmin).map((n) => (
             <button
               key={n.pfad}
               aria-current={modul === n.pfad}
@@ -290,8 +325,8 @@ function DesktopLayout({
         <div className="desk-panel" ref={setPanelEl}>
           <EingebettetKontext.Provider value={true}>
             {kontext.fehler && <Hinweis art="fehler">{fehlertext(kontext.fehler)}</Hinweis>}
-            {modul === 'karte' ? null : modul === 'einstellungen' ? (
-              <Einstellungen userId={userId} kontext={kontext} aktuell={aktuell} revierWechseln={revierWechseln} />
+            {modul === 'karte' ? null : SONDERSEITEN.includes(modul) ? (
+              <Sonderseite modul={modul} userId={userId} kontext={kontext} aktuell={aktuell} nachAenderung={nachAenderung} />
             ) : (
               <ModulInhalt key={`${k.revierId}-${modul}`} modul={modul} unterpfad={unterpfad} k={k} breit />
             )}
@@ -312,6 +347,24 @@ function DesktopLayout({
       </main>
     </div>
   );
+}
+
+function Sonderseite({
+  modul,
+  userId,
+  kontext,
+  aktuell,
+  nachAenderung,
+}: {
+  modul: string;
+  userId: string;
+  kontext: NutzerKontext;
+  aktuell: Mitgliedschaft | null;
+  nachAenderung: (neueRevierId?: string | null) => Promise<void>;
+}) {
+  if (modul === 'reviermanagement') return <Reviermanagement userId={userId} aktuell={aktuell} nachAenderung={nachAenderung} />;
+  if (modul === 'masteradmin') return kontext.istMasteradmin ? <Masteradmin userId={userId} nachAenderung={nachAenderung} /> : <Hinweis>Diese Seite gibt es nicht.</Hinweis>;
+  return <Einstellungen kontext={kontext} nachAenderung={nachAenderung} />;
 }
 
 function ModulInhalt({ modul, unterpfad, k, breit = false }: { modul: string; unterpfad: string[]; k: RevierKontext; breit?: boolean }) {
@@ -409,7 +462,7 @@ function Start({
       <>
         <Hinweis>
           {istMasteradmin
-            ? 'Du bist noch keinem Revier zugeordnet. Reviere legst du in den Einstellungen im Bereich Masteradmin an.'
+            ? 'Du bist noch keinem Revier zugeordnet. Reviere legst du im Bereich Masteradmin an.'
             : 'Du bist noch keinem Revier zugeordnet. Löse einen Einladungscode ein, den du vom Revierinhaber bekommen hast.'}
         </Hinweis>
         <CodeEinloesen
@@ -419,8 +472,8 @@ function Start({
           }}
         />
         {istMasteradmin && (
-          <Knopf variante="sekundaer" onClick={() => navigieren('/einstellungen')}>
-            Zu den Einstellungen
+          <Knopf variante="sekundaer" onClick={() => navigieren('/masteradmin')}>
+            Zum Masteradmin
           </Knopf>
         )}
       </>
@@ -440,7 +493,7 @@ function Start({
       </header>
       <section>
         <div className="kacheln">
-          {MODULE.map((m) => (
+          {MODULE.filter((m) => m.pfad !== 'masteradmin' || istMasteradmin).map((m) => (
             <button key={m.pfad} className="kachel" onClick={() => navigieren(`/${m.pfad}`)}>
               <span className="kachel-symbol" aria-hidden="true">
                 {m.symbol}
