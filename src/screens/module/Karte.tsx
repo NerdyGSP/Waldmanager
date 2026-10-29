@@ -16,11 +16,12 @@ import {
 } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import kartenWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
-import type { Feature, FeatureCollection, Geometry, MultiPolygon, Polygon, Position } from 'geojson';
+import type { Feature, FeatureCollection, Geometry, MultiPolygon, Position } from 'geojson';
 import { supabase } from '../../lib/supabase';
 import { fehlertext } from '../../lib/fehler';
-import { nameVergeben, useWildarten, useZonen, wildartName, ZONENFARBEN } from '../../lib/stammdaten';
+import { EINRICHTUNGSTYPEN, nameVergeben, useWildarten, useZonen, wildartName, ZONENFARBEN } from '../../lib/stammdaten';
 import { aktuellesWetter, himmelsrichtung, linieEWKT, punktEWKT, type Wetter } from '../../lib/geo';
+import { navigieren } from '../../lib/router';
 import type { Enums, Json } from '../../lib/database.types';
 import type { RevierKontext } from './kontext';
 
@@ -49,19 +50,6 @@ const STIL: StyleSpecification = {
 
 const STANDARD_ZENTRUM: [number, number] = [9.47, 52.2]; // Raum Bad Münder
 
-export const EINRICHTUNGSTYPEN: Array<{ wert: Enums<'einrichtung_typ'>; label: string; farbe: string }> = [
-  { wert: 'hochsitz', label: 'Hochsitz', farbe: '#8b5a2b' },
-  { wert: 'kanzel', label: 'Kanzel', farbe: '#5d3a1a' },
-  { wert: 'ansitzleiter', label: 'Ansitzleiter', farbe: '#b07d4f' },
-  { wert: 'bodensitz', label: 'Bodensitz', farbe: '#a0855b' },
-  { wert: 'kirrung', label: 'Kirrung', farbe: '#d4a017' },
-  { wert: 'salzlecke', label: 'Salzlecke', farbe: '#9aa5b1' },
-  { wert: 'fuetterung', label: 'Fütterung', farbe: '#c97b2a' },
-  { wert: 'wildacker', label: 'Wildacker', farbe: '#4caf50' },
-  { wert: 'wildkamera', label: 'Wildkamera', farbe: '#1f6fb2' },
-  { wert: 'falle', label: 'Falle', farbe: '#7f4f9e' },
-  { wert: 'sonstiges', label: 'Sonstiges', farbe: '#5d6d7e' },
-];
 
 const LEER: FeatureCollection = { type: 'FeatureCollection', features: [] };
 
@@ -133,7 +121,6 @@ export default function Karte({
   const [panelOffen, setPanelOffen] = useState(false);
   const [kartenFehler, setKartenFehler] = useState<string | null>(null);
   const [meldung, setMeldung] = useState<{ art: 'fehler' | 'erfolg' | 'info'; text: string } | null>(null);
-  const [shpImport, setShpImport] = useState<Feature<Polygon | MultiPolygon>[] | null>(null);
   const aufzeichnung = useRef<number | null>(null);
   const [ausgeblendet, setAusgeblendet] = useState<Set<string>>(new Set());
   const [zielEbene, setZielEbene] = useState('');
@@ -446,9 +433,8 @@ export default function Karte({
     } else if (punkte.length >= 2) {
       features.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: punkte }, properties: {} });
     }
-    if (shpImport) features.push(...(shpImport as Feature[]));
     (m.getSource('zeichnung') as GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features });
-  }, [punkte, modus, bereit, shpImport]);
+  }, [punkte, modus, bereit]);
 
   // Klicks: im Zeichenmodus Punkte setzen, sonst Details anzeigen
   useEffect(() => {
@@ -680,89 +666,6 @@ export default function Karte({
     await laden();
   }
 
-  async function shpLesen(datei: File) {
-    setMeldung({ art: 'info', text: 'Shapefile wird gelesen …' });
-    try {
-      const { default: shp } = await import('shpjs');
-      const ergebnis = await shp(await datei.arrayBuffer());
-      const sammlungen = Array.isArray(ergebnis) ? ergebnis : [ergebnis];
-      const flaechen = sammlungen
-        .flatMap((s) => s.features)
-        .filter((f): f is Feature<Polygon | MultiPolygon> => f.geometry?.type === 'Polygon' || f.geometry?.type === 'MultiPolygon');
-      if (!flaechen.length) throw new Error('Keine Flächen im Shapefile gefunden.');
-      setShpImport(flaechen);
-      setMeldung(null);
-      const b = grenzen(flaechen.map((f) => f.geometry));
-      if (b) karte.current?.fitBounds(b, { padding: 40 });
-    } catch (err) {
-      setMeldung({ art: 'fehler', text: `Shapefile konnte nicht gelesen werden: ${fehlertext(err)}` });
-    }
-  }
-
-  async function shpAlsGrenze() {
-    if (!shpImport) return;
-    const geojson = {
-      type: 'MultiPolygon',
-      coordinates: shpImport.flatMap((f) => (f.geometry.type === 'Polygon' ? [f.geometry.coordinates] : f.geometry.coordinates)),
-    } as unknown as Json;
-    const { data, error } = await supabase.rpc('grenze_setzen', { p_revier_id: k.revierId, p_geojson: geojson });
-    if (error) {
-      setMeldung({ art: 'fehler', text: fehlertext(error) });
-      return;
-    }
-    setShpImport(null);
-    setMeldung({ art: 'erfolg', text: `Reviergrenze aus Shapefile übernommen · ${Number(data).toLocaleString('de-DE')} ha` });
-    await k.neuLaden();
-    await laden();
-  }
-
-  async function shpAlsZonen(namensfeld: string) {
-    if (!shpImport) return;
-    let anzahl = 0;
-    const probleme: string[] = [];
-    const vergeben = zonen.map((z) => z.name);
-    const ziel = daten?.ebenen.find((e) => e.id === zielEbene);
-    for (const [i, f] of shpImport.entries()) {
-      const name = String(f.properties?.[namensfeld] ?? `Zone ${zonen.length + i + 1}`).trim() || `Zone ${zonen.length + i + 1}`;
-      if (nameVergeben(vergeben, name)) {
-        probleme.push(`„${name}“ existiert bereits`);
-        continue;
-      }
-      const { data, error } = await supabase
-        .from('zonen')
-        .insert({
-          revier_id: k.revierId,
-          name,
-          ebene_id: ziel?.id ?? null,
-          farbe: ziel?.farbe ?? ZONENFARBEN[(zonen.length + i) % ZONENFARBEN.length],
-          sortierung: zonen.length + i,
-        })
-        .select('id')
-        .single();
-      if (error) {
-        probleme.push(`„${name}“: ${fehlertext(error)}`);
-        continue;
-      }
-      const geo = await supabase.rpc('zone_geometrie_setzen', { p_zone_id: data.id, p_geojson: f.geometry as unknown as Json });
-      if (geo.error) {
-        await supabase.from('zonen').delete().eq('id', data.id);
-        probleme.push(`„${name}“: ${fehlertext(geo.error)}`);
-        continue;
-      }
-      vergeben.push(name);
-      anzahl++;
-    }
-    setShpImport(null);
-    setMeldung({
-      art: probleme.length ? 'fehler' : 'erfolg',
-      text:
-        `${anzahl} Zonen aus Shapefile angelegt (auf Reviergrenze zugeschnitten).` +
-        (probleme.length ? ` Nicht übernommen: ${probleme.join('; ')}` : ''),
-    });
-    await zonenLaden();
-    await laden();
-  }
-
   // ---------- Darstellung ----------
 
   const zeichnet = modus && modus.art !== 'einrichtung';
@@ -889,19 +792,9 @@ export default function Karte({
 
               </Abschnitt>
               <Abschnitt titel="Import">
-              <label className="knopf knopf-sekundaer datei-knopf">
-                Shapefile (.zip) laden
-                <input
-                  type="file"
-                  accept=".zip"
-                  onChange={(e) => {
-                    const datei = e.target.files?.[0];
-                    if (datei) void shpLesen(datei);
-                    e.target.value = '';
-                  }}
-                />
-              </label>
-              {shpImport && <ShpAuswahl flaechen={shpImport} onGrenze={shpAlsGrenze} onZonen={shpAlsZonen} onAbbrechen={() => setShpImport(null)} />}
+              <button className="knopf knopf-sekundaer" onClick={() => navigieren('/import')}>
+                Geodaten importieren (SHP, GeoPackage)
+              </button>
               </Abschnitt>
             </>
           ) : (
@@ -1063,49 +956,6 @@ function EinrichtungFormular({
           Speichern
         </button>
       </div>
-    </div>
-  );
-}
-
-function ShpAuswahl({
-  flaechen,
-  onGrenze,
-  onZonen,
-  onAbbrechen,
-}: {
-  flaechen: Feature<Polygon | MultiPolygon>[];
-  onGrenze: () => Promise<void>;
-  onZonen: (namensfeld: string) => Promise<void>;
-  onAbbrechen: () => void;
-}) {
-  const felder = Object.keys(flaechen[0]?.properties ?? {});
-  const [feld, setFeld] = useState(felder.find((f) => /name|bez/i.test(f)) ?? felder[0] ?? '');
-  return (
-    <div className="shp-auswahl">
-      <p>
-        <strong>{flaechen.length} Flächen</strong> gefunden (blau in der Karte).
-      </p>
-      <button className="knopf knopf-primaer" onClick={() => void onGrenze()}>
-        Als Reviergrenze übernehmen
-      </button>
-      {felder.length > 0 && (
-        <label className="ebene">
-          Zonenname aus Feld
-          <select value={feld} onChange={(e) => setFeld(e.target.value)}>
-            {felder.map((f) => (
-              <option key={f} value={f}>
-                {f}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
-      <button className="knopf knopf-sekundaer" onClick={() => void onZonen(feld)}>
-        Als {flaechen.length} Zonen anlegen
-      </button>
-      <button className="link" onClick={onAbbrechen}>
-        Verwerfen
-      </button>
     </div>
   );
 }

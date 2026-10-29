@@ -25,7 +25,7 @@ export function useWildarten(): Wildart[] {
       .select('id, name, gruppe, sortierung, altersklassen')
       .order('sortierung')
       .then(({ data }) => {
-        wildartenCache = data ?? [];
+        wildartenCache = [...(data ?? [])].sort((a, b) => a.sortierung - b.sortierung);
         setListe(wildartenCache);
       });
   }, []);
@@ -116,3 +116,17 @@ export const GESCHLECHTER: Array<{ wert: Enums<'geschlecht'>; label: string; kur
 ];
 
 export const ZONENFARBEN = ['#1e5c3a', '#b5651d', '#1f6fb2', '#8e44ad', '#c0392b', '#16a085', '#d4a017', '#5d6d7e'];
+
+export const EINRICHTUNGSTYPEN: Array<{ wert: Enums<'einrichtung_typ'>; label: string; farbe: string }> = [
+  { wert: 'hochsitz', label: 'Hochsitz', farbe: '#8b5a2b' },
+  { wert: 'kanzel', label: 'Kanzel', farbe: '#5d3a1a' },
+  { wert: 'ansitzleiter', label: 'Ansitzleiter', farbe: '#b07d4f' },
+  { wert: 'bodensitz', label: 'Bodensitz', farbe: '#a0855b' },
+  { wert: 'kirrung', label: 'Kirrung', farbe: '#d4a017' },
+  { wert: 'salzlecke', label: 'Salzlecke', farbe: '#9aa5b1' },
+  { wert: 'fuetterung', label: 'Fütterung', farbe: '#c97b2a' },
+  { wert: 'wildacker', label: 'Wildacker', farbe: '#4caf50' },
+  { wert: 'wildkamera', label: 'Wildkamera', farbe: '#1f6fb2' },
+  { wert: 'falle', label: 'Falle', farbe: '#7f4f9e' },
+  { wert: 'sonstiges', label: 'Sonstiges', farbe: '#5d6d7e' },
+];

@@ -3,7 +3,8 @@ import { supabase } from '../lib/supabase';
 import { codeFormatieren, fehlertext } from '../lib/fehler';
 import { navigieren } from '../lib/router';
 import type { Mitgliedschaft, NutzerKontext } from '../lib/useNutzerKontext';
-import { Feld, Gruppe, Hinweis, Knopf, PasswortFeld, Seite, Zeile } from '../components/ui';
+import { Feld, Gruppe, Hinweis, Knopf, PasswortFeld, Seite, Segmente, Zeile } from '../components/ui';
+import { useDarstellung, type Darstellung } from '../lib/darstellung';
 import { MitgliederPanel } from './MitgliederPanel';
 import { AdminPanel } from './AdminPanel';
 
@@ -28,6 +29,7 @@ export function Einstellungen({
   return (
     <Seite titel="Einstellungen">
       <Konto name={kontext.name} email={kontext.email} onGeaendert={() => nachAenderung()} />
+      <DarstellungWahl />
 
       {aktuell && (
         <>
@@ -272,5 +274,25 @@ export function CodeEinloesen({ onEingeloest }: { onEingeloest: (revierId: strin
         Einlösen
       </Knopf>
     </form>
+  );
+}
+
+function DarstellungWahl() {
+  const [wert, setWert] = useDarstellung();
+  return (
+    <Gruppe titel="Darstellung" fuss="„System“ folgt der Einstellung deines Geräts. Die Wahl gilt nur für diesen Browser.">
+      <div style={{ padding: '10px var(--abstand)' }}>
+        <Segmente<Darstellung>
+          label="Darstellung"
+          wert={wert}
+          onAendern={setWert}
+          optionen={[
+            { wert: 'system', label: 'System' },
+            { wert: 'hell', label: 'Hell' },
+            { wert: 'dunkel', label: 'Dunkel' },
+          ]}
+        />
+      </div>
+    </Gruppe>
   );
 }

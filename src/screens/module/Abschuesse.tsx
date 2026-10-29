@@ -5,7 +5,7 @@ import { GESCHLECHTER, useMitglieder, useWildarten, useZonen, wildartName } from
 import { aktuellesJagdjahr, datumZeitDE, letzteJagdjahre, lokalDatumZeit } from '../../lib/zeit';
 import { aktuellePosition, punktEWKT } from '../../lib/geo';
 import type { Enums } from '../../lib/database.types';
-import { Auswahl, Feld, Gruppe, Hinweis, Knopf, Leer, Seite, Segmente, Zeile } from '../../components/ui';
+import { Auswahl, Feld, Gruppe, Hinweis, Knopf, Leer, Seite, Segmente, Zeile, WildartOptionen } from '../../components/ui';
 import type { RevierKontext } from './kontext';
 
 type Abschuss = {
@@ -206,11 +206,7 @@ function AbschussFormular({ k, vorlage, onFertig }: { k: RevierKontext; vorlage:
               setAltersklasse('');
             }}
           >
-            {wildarten.map((w) => (
-              <option key={w.id} value={w.id}>
-                {w.name}
-              </option>
-            ))}
+            <WildartOptionen wildarten={wildarten} />
           </Auswahl>
           <div className="zeile">
             <span className="zeile-label">Geschlecht</span>

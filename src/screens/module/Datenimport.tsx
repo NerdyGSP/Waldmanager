@@ -5,7 +5,8 @@ import { csvLesen, datumLesen, geschlechtLesen, normalisieren, textAusDatei, uhr
 import { useWildarten, useZonen, ZONENFARBEN } from '../../lib/stammdaten';
 import { datumDE } from '../../lib/zeit';
 import type { Enums } from '../../lib/database.types';
-import { Gruppe, Hinweis, Knopf, Leer, Seite, Segmente } from '../../components/ui';
+import { Gruppe, Hinweis, Knopf, Leer, Seite, Segmente, WildartOptionen } from '../../components/ui';
+import { Geoimport } from './Geoimport';
 import type { RevierKontext } from './kontext';
 
 type Typ = 'zaehlung' | 'abschuss';
@@ -63,6 +64,7 @@ const stuecke = <T,>(liste: T[], n: number): T[][] => Array.from({ length: Math.
 export function Datenimport({ k }: { k: RevierKontext }) {
   const wildarten = useWildarten();
   const { zonen, laden: zonenLaden } = useZonen(k.revierId);
+  const [bereich, setBereich] = useState<'csv' | 'geo'>('csv');
   const [typ, setTyp] = useState<Typ>('zaehlung');
   const [dateiname, setDateiname] = useState('');
   const [tabelle, setTabelle] = useState<string[][] | null>(null);
@@ -321,8 +323,30 @@ export function Datenimport({ k }: { k: RevierKontext }) {
 
   const felder = FELDER[typ];
 
+  const bereichWahl = (
+    <Segmente
+      label="Bereich"
+      wert={bereich}
+      onAendern={setBereich}
+      optionen={[
+        { wert: 'csv', label: 'Erfassungen (CSV)' },
+        { wert: 'geo', label: 'Geodaten (SHP/GPKG)' },
+      ]}
+    />
+  );
+
+  if (bereich === 'geo') {
+    return (
+      <Seite titel="Datenimport" untertitel="Reviergrenze, Zonen, Einrichtungen und Pirschwege aus Shapefile oder GeoPackage">
+        {bereichWahl}
+        <Geoimport k={k} />
+      </Seite>
+    );
+  }
+
   return (
     <Seite titel="Datenimport" untertitel="Historische Erfassungen aus CSV-Dateien übernehmen">
+      {bereichWahl}
       <Segmente
         label="Art der Daten"
         wert={typ}
@@ -419,11 +443,7 @@ export function Datenimport({ k }: { k: RevierKontext }) {
                           onChange={(e) => setArtZuordnung({ ...artZuordnung, [a.roh]: e.target.value })}
                         >
                           <option value="">nicht importieren</option>
-                          {wildarten.map((w) => (
-                            <option key={w.id} value={w.id}>
-                              {w.name}
-                            </option>
-                          ))}
+                          <WildartOptionen wildarten={wildarten} />
                         </select>
                       )}
                     </div>

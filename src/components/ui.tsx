@@ -1,5 +1,5 @@
 import { navigieren } from '../lib/router';
-import { createContext, useContext, useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from 'react';
+import { Fragment, createContext, useCallback, useContext, useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from 'react';
 
 export function Gruppe({ titel, fuss, children }: { titel?: string; fuss?: ReactNode; children: ReactNode }) {
   return (
@@ -249,5 +249,41 @@ export function Farbwahl({ wert, label, onAendern }: { wert: string; label: stri
         timer.current = window.setTimeout(() => onAendern(neu), 450);
       }}
     />
+  );
+}
+
+// Mausrad scrollt eine horizontale Leiste (Desktop-Browser kennen sonst nur Shift+Rad)
+export function useRadHorizontal<T extends HTMLElement>() {
+  const aufraeumen = useRef<(() => void) | null>(null);
+  return useCallback((el: T | null) => {
+    aufraeumen.current?.();
+    aufraeumen.current = null;
+    if (!el) return;
+    const rad = (e: WheelEvent) => {
+      if (el.scrollWidth <= el.clientWidth || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+      el.scrollLeft += e.deltaY;
+      e.preventDefault();
+    };
+    el.addEventListener('wheel', rad, { passive: false });
+    aufraeumen.current = () => el.removeEventListener('wheel', rad);
+  }, []);
+}
+
+// Hauptwildarten (Sortierung < 10) zuerst, danach Trennlinie und der Rest
+export const HAUPTWILDARTEN_BIS = 10;
+export function WildartOptionen({ wildarten }: { wildarten: Array<{ id: string; name: string; sortierung: number }> }) {
+  return (
+    <>
+      {wildarten.map((w, i) => (
+        <Fragment key={w.id}>
+          {i > 0 && w.sortierung >= HAUPTWILDARTEN_BIS && wildarten[i - 1]!.sortierung < HAUPTWILDARTEN_BIS && (
+            <option disabled value="__trenner">
+              ----------
+            </option>
+          )}
+          <option value={w.id}>{w.name}</option>
+        </Fragment>
+      ))}
+    </>
   );
 }

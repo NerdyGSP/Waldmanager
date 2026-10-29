@@ -231,8 +231,8 @@ function ScheinFormular({ k, vorlage, onFertig }: { k: RevierKontext; vorlage: S
         <details className="werkzeug-abschnitt">
           <summary>Wildarten ({arten.length ? `${arten.length} gewählt` : 'alle nach Absprache'})</summary>
           <div className="wildarten-wahl">
-            {wildarten.map((w) => (
-              <label key={w.id} className="ebene">
+            {wildarten.map((w, i) => (
+              <label key={w.id} className="ebene" style={i === 8 ? { borderTop: '1px solid var(--color-border)', paddingTop: 8, marginTop: 4 } : undefined}>
                 <input
                   type="checkbox"
                   checked={arten.includes(w.id)}

@@ -7,7 +7,7 @@ import { speichernOderMerken } from '../../lib/offline';
 import { datumDE, heuteISO, mondphase } from '../../lib/zeit';
 import { navigieren } from '../../lib/router';
 import type { Enums, Json } from '../../lib/database.types';
-import { Auswahl, Feld, Gruppe, Hinweis, Knopf, Leer, Seite, Zaehler, Zeile } from '../../components/ui';
+import { Auswahl, Feld, Gruppe, Hinweis, Knopf, Leer, Seite, Zaehler, Zeile, useRadHorizontal, WildartOptionen } from '../../components/ui';
 import type { RevierKontext } from './kontext';
 
 type Sitzung = {
@@ -181,6 +181,7 @@ function NeueSitzung({ k, onAbbrechen }: { k: RevierKontext; onAbbrechen: () => 
 
 function SitzungAnsicht({ k, sitzungId }: { k: RevierKontext; sitzungId: string }) {
   const wildarten = useWildarten();
+  const tabsRef = useRadHorizontal<HTMLDivElement>();
   const { zonen: alleZonen } = useZonen(k.revierId);
   const [sitzung, setSitzung] = useState<Sitzung | null>(null);
   // Ist die Zählung auf eine Zonenebene beschränkt, nur deren Zonen anbieten
@@ -323,7 +324,7 @@ function SitzungAnsicht({ k, sitzungId }: { k: RevierKontext; sitzungId: string 
       {fehler && <Hinweis art="fehler">{fehler}</Hinweis>}
       {offlineHinweis && <Hinweis>Kein Netz – Zählstände werden auf dem Gerät gehalten und automatisch übertragen.</Hinweis>}
 
-      <div className="zonen-tabs" role="tablist" aria-label="Zone">
+      <div className="zonen-tabs" role="tablist" aria-label="Zone" ref={tabsRef}>
         {zonen.map((z) => (
           <button key={z.id} role="tab" aria-selected={zoneId === z.id} onClick={() => setZoneId(z.id)}>
             {z.name}
@@ -371,11 +372,7 @@ function WildartHinzufuegen({
   return (
     <Gruppe titel="Wildart hinzufügen">
       <Auswahl label="Wildart" value={wildartId} onChange={(e) => setWildartId(e.target.value)}>
-        {wildarten.map((w) => (
-          <option key={w.id} value={w.id}>
-            {w.name}
-          </option>
-        ))}
+        <WildartOptionen wildarten={wildarten} />
       </Auswahl>
       <div className="zeile">
         <span className="zeile-label">Hinzufügen als</span>

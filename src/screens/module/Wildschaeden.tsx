@@ -5,7 +5,7 @@ import { useWildarten, useZonen, wildartName } from '../../lib/stammdaten';
 import { aktuellesJagdjahr, datumDE, heuteISO, letzteJagdjahre } from '../../lib/zeit';
 import { aktuellePosition, punktEWKT } from '../../lib/geo';
 import type { Tables } from '../../lib/database.types';
-import { Auswahl, Feld, Gruppe, Hinweis, Knopf, Leer, Seite, Zeile } from '../../components/ui';
+import { Auswahl, Feld, Gruppe, Hinweis, Knopf, Leer, Seite, Zeile, WildartOptionen } from '../../components/ui';
 import type { RevierKontext } from './kontext';
 
 type Schaden = Pick<
@@ -300,11 +300,7 @@ function SchadenFormular({ k, vorlage, onFertig }: { k: RevierKontext; vorlage: 
           <Feld label="Fläche (ha)" inputMode="decimal" placeholder="optional" value={flaeche} onChange={(e) => setFlaeche(e.target.value)} />
           <Auswahl label="Verursacher (vermutet)" value={wildart} onChange={(e) => setWildart(e.target.value)}>
             <option value="">unbekannt</option>
-            {wildarten.map((w) => (
-              <option key={w.id} value={w.id}>
-                {w.name}
-              </option>
-            ))}
+            <WildartOptionen wildarten={wildarten} />
           </Auswahl>
           <Feld label="Schaden (€)" inputMode="decimal" placeholder="geschätzt, optional" value={eur} onChange={(e) => setEur(e.target.value)} />
         </Gruppe>
