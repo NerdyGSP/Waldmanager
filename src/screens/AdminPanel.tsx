@@ -202,8 +202,9 @@ function RevierAnlegen({
   const [flaeche, setFlaeche] = useState('');
   const [fehler, setFehler] = useState<string | null>(null);
 
+  // Auswahl gültig halten: nach Löschen oder Neuanlage eines Hegerings nie auf eine alte ID zeigen
   useEffect(() => {
-    if (!hegeringId && hegeringe[0]) setHegeringId(hegeringe[0].id);
+    if (!hegeringe.some((h) => h.id === hegeringId)) setHegeringId(hegeringe[0]?.id ?? '');
   }, [hegeringe, hegeringId]);
 
   async function absenden(e: FormEvent) {

@@ -7,7 +7,8 @@ const bekannte: Array<[RegExp, string]> = [
   [/weak password|password is too weak/i, 'Das Passwort ist zu schwach. Bitte wähle ein längeres Passwort.'],
   [/rate limit|too many requests/i, 'Zu viele Versuche. Bitte warte kurz und versuche es erneut.'],
   [/database error saving new user/i, 'Registrierung fehlgeschlagen. Bitte prüfe den Einladungscode und die E-Mail-Adresse.'],
-  [/violates foreign key constraint "reviere_hegering_id_fkey"/i, 'Dem Hegering sind noch Reviere zugeordnet. Bitte diese zuerst löschen.'],
+  [/delete on table "hegeringe" violates foreign key/i, 'Dem Hegering sind noch Reviere zugeordnet. Bitte diese zuerst löschen.'],
+  [/insert or update on table "reviere" violates foreign key/i, 'Der gewählte Hegering existiert nicht mehr. Bitte die Seite neu laden und erneut auswählen.'],
   [/duplicate key value/i, 'Ein Eintrag mit diesem Namen existiert bereits.'],
   [/failed to fetch|network/i, 'Keine Verbindung zum Server. Bitte prüfe die Internetverbindung.'],
 ];
