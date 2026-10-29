@@ -121,7 +121,15 @@ export function Home({ session }: { session: Session }) {
           }}
         />
 
-        {kontext.istMasteradmin && <AdminPanel onGeaendert={kontext.neuLaden} />}
+        {kontext.istMasteradmin && (
+          <AdminPanel
+            eigeneId={session.user.id}
+            onGeaendert={async (neueRevierId) => {
+              await kontext.neuLaden();
+              if (neueRevierId) revierWechseln(neueRevierId);
+            }}
+          />
+        )}
       </main>
     </div>
   );

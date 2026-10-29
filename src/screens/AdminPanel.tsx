@@ -12,11 +12,19 @@ type RevierZeile = {
   hegering: string;
   inhaber: string[];
   mitglieder: number;
+  selbstMitglied: boolean;
 };
 
 // Masteradmin: Hegeringe und Reviere anlegen, Inhaber einladen, Reviere löschen.
-// Fachdaten der Reviere sind für den Masteradmin per RLS nicht sichtbar.
-export function AdminPanel({ onGeaendert }: { onGeaendert: () => Promise<void> }) {
+// Fachdaten der Reviere sind für den Masteradmin per RLS nicht sichtbar –
+// außer in Revieren, in denen er selbst Mitglied ist.
+export function AdminPanel({
+  eigeneId,
+  onGeaendert,
+}: {
+  eigeneId: string;
+  onGeaendert: (revierId?: string) => Promise<void>;
+}) {
   const [hegeringe, setHegeringe] = useState<Hegering[]>([]);
   const [reviere, setReviere] = useState<RevierZeile[]>([]);
   const [einladenFuer, setEinladenFuer] = useState<string | null>(null);
@@ -27,7 +35,7 @@ export function AdminPanel({ onGeaendert }: { onGeaendert: () => Promise<void> }
       supabase.from('hegeringe').select('id, name').order('name'),
       supabase
         .from('reviere')
-        .select('id, name, flaeche_ha, hegeringe(name), revier_mitglieder(rolle, profiles(name))')
+        .select('id, name, flaeche_ha, hegeringe(name), revier_mitglieder(user_id, rolle, profiles(name))')
         .order('name'),
     ]);
     const err = hr.error ?? rv.error;
@@ -41,9 +49,31 @@ export function AdminPanel({ onGeaendert }: { onGeaendert: () => Promise<void> }
         hegering: r.hegeringe?.name ?? '–',
         inhaber: r.revier_mitglieder.filter((m) => m.rolle === 'inhaber').map((m) => m.profiles?.name ?? '?'),
         mitglieder: r.revier_mitglieder.length,
+        selbstMitglied: r.revier_mitglieder.some((m) => m.user_id === eigeneId),
       })),
     );
-  }, []);
+  }, [eigeneId]);
+
+  // Masteradmin trägt sich selbst als Inhaber ein: Einladung erzeugen und sofort einlösen
+  async function selbstEintragen(r: RevierZeile) {
+    setFehler(null);
+    const erstellt = await supabase.rpc('einladung_erstellen', {
+      p_revier_id: r.id,
+      p_rolle: 'inhaber',
+      p_gueltig_tage: 1,
+    });
+    if (erstellt.error || !erstellt.data) {
+      setFehler(fehlertext(erstellt.error ?? 'Einladung konnte nicht erstellt werden.'));
+      return;
+    }
+    const eingeloest = await supabase.rpc('einladung_einloesen', { p_code: erstellt.data });
+    if (eingeloest.error) {
+      setFehler(fehlertext(eingeloest.error));
+      return;
+    }
+    await laden();
+    await onGeaendert(r.id);
+  }
 
   useEffect(() => {
     void laden();
@@ -83,6 +113,13 @@ export function AdminPanel({ onGeaendert }: { onGeaendert: () => Promise<void> }
                 </>
               }
             >
+              {r.selbstMitglied ? (
+                <span className="zeile-wert">Du bist Mitglied</span>
+              ) : (
+                <button className="link" onClick={() => selbstEintragen(r)}>
+                  Mich als Inhaber eintragen
+                </button>
+              )}
               <button className="link" onClick={() => setEinladenFuer(einladenFuer === r.id ? null : r.id)}>
                 Inhaber einladen
               </button>
