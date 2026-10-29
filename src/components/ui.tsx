@@ -1,5 +1,5 @@
 import { navigieren } from '../lib/router';
-import { useId, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from 'react';
+import { createContext, useContext, useId, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from 'react';
 
 export function Gruppe({ titel, fuss, children }: { titel?: string; fuss?: ReactNode; children: ReactNode }) {
   return (
@@ -99,6 +99,9 @@ export function Hinweis({ art = 'info', children }: { art?: 'info' | 'fehler' | 
   );
 }
 
+// In der Desktop-Seitenleiste stellt die Leiste selbst den Titel dar
+export const EingebettetKontext = createContext(false);
+
 export function Seite({
   titel,
   untertitel,
@@ -112,6 +115,29 @@ export function Seite({
   zurueck?: () => void;
   children: ReactNode;
 }) {
+  const eingebettet = useContext(EingebettetKontext);
+  if (eingebettet) {
+    // Unteransichten (mit eigenem Zurück) behalten ihren Titel, Modul-Startseiten nicht
+    return (
+      <div className="seite seite-eingebettet">
+        {(zurueck || untertitel || aktion) && (
+          <div className="seite-kopf">
+            {zurueck && (
+              <button className="zurueck" onClick={zurueck} aria-label="Zurück">
+                ‹ Zurück
+              </button>
+            )}
+            <div className="seite-titel">
+              {zurueck && <h2>{titel}</h2>}
+              {untertitel && <p>{untertitel}</p>}
+            </div>
+            {aktion && <div className="seite-aktion">{aktion}</div>}
+          </div>
+        )}
+        {children}
+      </div>
+    );
+  }
   return (
     <div className="seite">
       <div className="seite-kopf">

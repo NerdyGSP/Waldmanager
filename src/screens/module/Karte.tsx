@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import {
   GeolocateControl,
   LngLatBounds,
@@ -101,7 +102,20 @@ type Modus =
 
 // ---------- Komponente ----------
 
-export default function Karte({ k }: { k: RevierKontext }) {
+export default function Karte({
+  k,
+  eingebettet = false,
+  panelZiel = null,
+  aktualisierung,
+}: {
+  k: RevierKontext;
+  /** Desktop: Karte dauerhaft rechts, Werkzeuge in der Seitenleiste */
+  eingebettet?: boolean;
+  /** Element in der Seitenleiste, in das die Werkzeuge gerendert werden (nur wenn das Kartenmodul aktiv ist) */
+  panelZiel?: HTMLElement | null;
+  /** Ändert sich der Wert, werden die Kartendaten neu geladen */
+  aktualisierung?: unknown;
+}) {
   const wildarten = useWildarten();
   const { zonen, laden: zonenLaden } = useZonen(k.revierId);
   const container = useRef<HTMLDivElement>(null);
@@ -122,7 +136,8 @@ export default function Karte({ k }: { k: RevierKontext }) {
   const [punkte, setPunkte] = useState<Position[]>([]);
   const [neueEinrichtung, setNeueEinrichtung] = useState<Position | null>(null);
   const [wind, setWind] = useState<Wetter | null>(null);
-  const [panelOffen, setPanelOffen] = useState(window.innerWidth > 700);
+  const [panelOffen, setPanelOffen] = useState(false);
+  const [kartenFehler, setKartenFehler] = useState<string | null>(null);
   const [meldung, setMeldung] = useState<{ art: 'fehler' | 'erfolg' | 'info'; text: string } | null>(null);
   const [shpImport, setShpImport] = useState<Feature<Polygon | MultiPolygon>[] | null>(null);
   const aufzeichnung = useRef<number | null>(null);
@@ -155,14 +170,33 @@ export default function Karte({ k }: { k: RevierKontext }) {
   // Karte initialisieren
   useEffect(() => {
     if (!container.current) return;
-    const m = new KarteMap({
-      container: container.current,
-      style: STIL,
-      center: STANDARD_ZENTRUM,
-      zoom: 12,
-      attributionControl: { compact: true },
-    });
+    let m: KarteMap;
+    try {
+      m = new KarteMap({
+        container: container.current,
+        style: STIL,
+        center: STANDARD_ZENTRUM,
+        zoom: 12,
+        attributionControl: { compact: true },
+      });
+    } catch (err) {
+      // Typisch: WebGL im Browser deaktiviert oder vom Grafiktreiber gesperrt
+      setKartenFehler(String((err as Error)?.message ?? err));
+      return;
+    }
     karte.current = m;
+    let geladen = false;
+    let letzterFehler = '';
+    m.on('error', (e) => {
+      letzterFehler = String((e as unknown as { error?: { message?: string } }).error?.message ?? '');
+      if (!geladen && /webgl|context|worker/i.test(letzterFehler)) setKartenFehler(letzterFehler);
+    });
+    const zeitlimit = window.setTimeout(() => {
+      if (!geladen) setKartenFehler(letzterFehler || 'Die Karte wurde nach 20 Sekunden nicht fertig geladen.');
+    }, 20000);
+    // Größenänderungen des Containers (Seitenleiste, Drehen des Geräts) an die Karte weitergeben
+    const beobachter = new ResizeObserver(() => m.resize());
+    beobachter.observe(container.current);
     m.addControl(new NavigationControl({ visualizePitch: false }), 'top-right');
     m.addControl(
       new GeolocateControl({ positionOptions: { enableHighAccuracy: true }, trackUserLocation: true }),
@@ -263,10 +297,15 @@ export default function Karte({ k }: { k: RevierKontext }) {
           m.getCanvas().style.cursor = '';
         });
       }
+      geladen = true;
+      window.clearTimeout(zeitlimit);
+      setKartenFehler(null);
       setBereit(true);
     });
 
     return () => {
+      window.clearTimeout(zeitlimit);
+      beobachter.disconnect();
       m.remove();
       karte.current = null;
     };
@@ -274,7 +313,7 @@ export default function Karte({ k }: { k: RevierKontext }) {
 
   useEffect(() => {
     if (bereit) void laden();
-  }, [bereit, laden]);
+  }, [bereit, laden, aktualisierung]);
 
   // Daten in die Karte schreiben
   useEffect(() => {
@@ -314,7 +353,7 @@ export default function Karte({ k }: { k: RevierKontext }) {
     ];
     const b = grenzen(geometrien);
     // Auf breiten Bildschirmen liegt das Werkzeug-Panel links über der Karte
-    const links = window.innerWidth > 700 ? 360 : 30;
+    const links = 40;
     if (b) m.fitBounds(b, { padding: { top: 40, bottom: 60, left: links, right: 60 }, maxZoom: 16, duration: 0 });
     else
       navigator.geolocation?.getCurrentPosition(
@@ -616,6 +655,111 @@ export default function Karte({ k }: { k: RevierKontext }) {
   const zeichnet = modus && modus.art !== 'einrichtung';
   const anzahlBeob = daten?.beobachtungen.length ?? 0;
 
+  const werkzeuge = (
+    <>
+          {meldung && <div className={`hinweis hinweis-${meldung.art}`}>{meldung.text}</div>}
+
+          <Abschnitt titel="Ebenen" offen>
+          <EbenenSchalter label="Luftbild (LGLN)" an={ebenen.luftbild} onAendern={(an) => setEbenen({ ...ebenen, luftbild: an })} />
+          <EbenenSchalter label="Zonen" an={ebenen.zonen} onAendern={(an) => setEbenen({ ...ebenen, zonen: an })} />
+          <EbenenSchalter label="Einrichtungen" an={ebenen.einrichtungen} onAendern={(an) => setEbenen({ ...ebenen, einrichtungen: an })} />
+          <EbenenSchalter label="Pirschwege" an={ebenen.pirschwege} onAendern={(an) => setEbenen({ ...ebenen, pirschwege: an })} />
+          <EbenenSchalter
+            label={`Heatmap Beobachtungen (${anzahlBeob}, 12 Monate)`}
+            an={ebenen.heatmap}
+            onAendern={(an) => setEbenen({ ...ebenen, heatmap: an })}
+          />
+          <EbenenSchalter
+            label={`Abschüsse (${daten?.abschuesse.length ?? 0}, 12 Monate)`}
+            an={ebenen.abschuesse}
+            onAendern={(an) => setEbenen({ ...ebenen, abschuesse: an })}
+          />
+
+          {ebenen.einrichtungen && (
+            <div className="legende">
+              {EINRICHTUNGSTYPEN.filter((t) => daten?.einrichtungen.some((e) => e.properties?.typ === t.wert)).map((t) => (
+                <span key={t.wert}>
+                  <i style={{ background: t.farbe }} /> {t.label}
+                </span>
+              ))}
+            </div>
+          )}
+
+          </Abschnitt>
+
+          {k.istInhaber ? (
+            <>
+              <Abschnitt titel="Zeichnen" offen={!eingebettet ? false : true}>
+              <button className="knopf knopf-sekundaer" onClick={() => setModus({ art: 'grenze' })} disabled={!!modus}>
+                {daten?.grenze ? 'Reviergrenze neu zeichnen' : 'Reviergrenze zeichnen'}
+              </button>
+              <button className="knopf knopf-sekundaer" onClick={() => setModus({ art: 'zone', zoneId: null, name: '' })} disabled={!!modus}>
+                Neue Zone zeichnen
+              </button>
+              {zonen.length > 0 && (
+                <select
+                  className="karte-auswahl"
+                  value=""
+                  disabled={!!modus}
+                  aria-label="Fläche einer bestehenden Zone zeichnen"
+                  onChange={(e) => {
+                    const z = zonen.find((x) => x.id === e.target.value);
+                    if (z) setModus({ art: 'zone', zoneId: z.id, name: z.name });
+                  }}
+                >
+                  <option value="">Fläche für bestehende Zone …</option>
+                  {zonen.map((z) => (
+                    <option key={z.id} value={z.id}>
+                      {z.name}
+                      {z.hatGeometrie ? ' (neu zeichnen)' : ' (noch ohne Fläche)'}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <button className="knopf knopf-sekundaer" onClick={() => setModus({ art: 'einrichtung' })} disabled={!!modus}>
+                Einrichtung setzen
+              </button>
+              {modus?.art === 'einrichtung' && (
+                <button className="knopf knopf-gefahr" onClick={() => setModus(null)}>
+                  Einrichtungen setzen beenden
+                </button>
+              )}
+              <button className="knopf knopf-sekundaer" onClick={() => setModus({ art: 'pirschweg' })} disabled={!!modus}>
+                Pirschweg zeichnen
+              </button>
+              <button className="knopf knopf-sekundaer" onClick={aufzeichnungStarten} disabled={!!modus}>
+                Pirschweg per GPS aufzeichnen
+              </button>
+
+              </Abschnitt>
+              <Abschnitt titel="Import">
+              <label className="knopf knopf-sekundaer datei-knopf">
+                Shapefile (.zip) laden
+                <input
+                  type="file"
+                  accept=".zip"
+                  onChange={(e) => {
+                    const datei = e.target.files?.[0];
+                    if (datei) void shpLesen(datei);
+                    e.target.value = '';
+                  }}
+                />
+              </label>
+              {shpImport && <ShpAuswahl flaechen={shpImport} onGrenze={shpAlsGrenze} onZonen={shpAlsZonen} onAbbrechen={() => setShpImport(null)} />}
+              </Abschnitt>
+            </>
+          ) : (
+            <p className="leer">Zeichnen und Importieren kann nur der Revierinhaber.</p>
+          )}
+          <p className="leer">Heatmap und Abschüsse zeigen nur Erfassungen mit Position. Wind: Open-Meteo.</p>
+          {wildarten.length > 0 && anzahlBeob > 0 && (
+            <p className="leer">
+              Häufigste Wildart: {wildartName(wildarten, haeufigste(daten?.beobachtungen ?? []))}
+            </p>
+          )}
+    </>
+  );
+
   return (
     <div className="karte-seite">
       <div ref={container} className="karte" />
@@ -665,115 +809,39 @@ export default function Karte({ k }: { k: RevierKontext }) {
         <EinrichtungFormular onSpeichern={einrichtungSpeichern} onAbbrechen={() => setNeueEinrichtung(null)} />
       )}
 
-      <button className="panel-schalter" onClick={() => setPanelOffen((o) => !o)} aria-expanded={panelOffen}>
-        {panelOffen ? '✕' : '☰ Ebenen & Werkzeuge'}
-      </button>
-
-      {panelOffen && (
-        <aside className="karte-panel">
-          {meldung && <div className={`hinweis hinweis-${meldung.art}`}>{meldung.text}</div>}
-
-          <h3>Ebenen</h3>
-          <EbenenSchalter label="Luftbild (LGLN)" an={ebenen.luftbild} onAendern={(an) => setEbenen({ ...ebenen, luftbild: an })} />
-          <EbenenSchalter label="Zonen" an={ebenen.zonen} onAendern={(an) => setEbenen({ ...ebenen, zonen: an })} />
-          <EbenenSchalter label="Einrichtungen" an={ebenen.einrichtungen} onAendern={(an) => setEbenen({ ...ebenen, einrichtungen: an })} />
-          <EbenenSchalter label="Pirschwege" an={ebenen.pirschwege} onAendern={(an) => setEbenen({ ...ebenen, pirschwege: an })} />
-          <EbenenSchalter
-            label={`Heatmap Beobachtungen (${anzahlBeob}, 12 Monate)`}
-            an={ebenen.heatmap}
-            onAendern={(an) => setEbenen({ ...ebenen, heatmap: an })}
-          />
-          <EbenenSchalter
-            label={`Abschüsse (${daten?.abschuesse.length ?? 0}, 12 Monate)`}
-            an={ebenen.abschuesse}
-            onAendern={(an) => setEbenen({ ...ebenen, abschuesse: an })}
-          />
-
-          {ebenen.einrichtungen && (
-            <div className="legende">
-              {EINRICHTUNGSTYPEN.filter((t) => daten?.einrichtungen.some((e) => e.properties?.typ === t.wert)).map((t) => (
-                <span key={t.wert}>
-                  <i style={{ background: t.farbe }} /> {t.label}
-                </span>
-              ))}
-            </div>
-          )}
-
-          {k.istInhaber ? (
-            <>
-              <h3>Zeichnen</h3>
-              <button className="knopf knopf-sekundaer" onClick={() => setModus({ art: 'grenze' })} disabled={!!modus}>
-                {daten?.grenze ? 'Reviergrenze neu zeichnen' : 'Reviergrenze zeichnen'}
-              </button>
-              <button className="knopf knopf-sekundaer" onClick={() => setModus({ art: 'zone', zoneId: null, name: '' })} disabled={!!modus}>
-                Neue Zone zeichnen
-              </button>
-              {zonen.length > 0 && (
-                <select
-                  className="karte-auswahl"
-                  value=""
-                  disabled={!!modus}
-                  aria-label="Fläche einer bestehenden Zone zeichnen"
-                  onChange={(e) => {
-                    const z = zonen.find((x) => x.id === e.target.value);
-                    if (z) setModus({ art: 'zone', zoneId: z.id, name: z.name });
-                  }}
-                >
-                  <option value="">Fläche für bestehende Zone …</option>
-                  {zonen.map((z) => (
-                    <option key={z.id} value={z.id}>
-                      {z.name}
-                      {z.hatGeometrie ? ' (neu zeichnen)' : ' (noch ohne Fläche)'}
-                    </option>
-                  ))}
-                </select>
-              )}
-              <button className="knopf knopf-sekundaer" onClick={() => setModus({ art: 'einrichtung' })} disabled={!!modus}>
-                Einrichtung setzen
-              </button>
-              {modus?.art === 'einrichtung' && (
-                <button className="knopf knopf-gefahr" onClick={() => setModus(null)}>
-                  Einrichtungen setzen beenden
-                </button>
-              )}
-              <button className="knopf knopf-sekundaer" onClick={() => setModus({ art: 'pirschweg' })} disabled={!!modus}>
-                Pirschweg zeichnen
-              </button>
-              <button className="knopf knopf-sekundaer" onClick={aufzeichnungStarten} disabled={!!modus}>
-                Pirschweg per GPS aufzeichnen
-              </button>
-
-              <h3>Import</h3>
-              <label className="knopf knopf-sekundaer datei-knopf">
-                Shapefile (.zip) laden
-                <input
-                  type="file"
-                  accept=".zip"
-                  onChange={(e) => {
-                    const datei = e.target.files?.[0];
-                    if (datei) void shpLesen(datei);
-                    e.target.value = '';
-                  }}
-                />
-              </label>
-              {shpImport && <ShpAuswahl flaechen={shpImport} onGrenze={shpAlsGrenze} onZonen={shpAlsZonen} onAbbrechen={() => setShpImport(null)} />}
-            </>
-          ) : (
-            <p className="leer">Zeichnen und Importieren kann nur der Revierinhaber.</p>
-          )}
-          <p className="leer">Heatmap und Abschüsse zeigen nur Erfassungen mit Position. Wind: Open-Meteo.</p>
-          {wildarten.length > 0 && anzahlBeob > 0 && (
-            <p className="leer">
-              Häufigste Wildart: {wildartName(wildarten, haeufigste(daten?.beobachtungen ?? []))}
-            </p>
-          )}
-        </aside>
+      {kartenFehler && (
+        <div className="karte-fehler" role="alert">
+          <strong>Die Karte kann in diesem Browser nicht angezeigt werden.</strong>
+          <p>
+            Meist ist WebGL deaktiviert oder vom Grafiktreiber gesperrt. In Firefox: Einstellungen → Allgemein → Leistung →
+            „Hardwarebeschleunigung verwenden“ aktivieren und den Browser neu starten – oder Edge bzw. Chrome verwenden.
+          </p>
+          <code>{kartenFehler}</code>
+        </div>
       )}
+
+      {!eingebettet && (
+        <button className="panel-schalter" onClick={() => setPanelOffen((o) => !o)} aria-expanded={panelOffen}>
+          {panelOffen ? '✕ Schließen' : '☰ Ebenen & Werkzeuge'}
+        </button>
+      )}
+
+      {!eingebettet && panelOffen && <aside className="karte-panel">{werkzeuge}</aside>}
+      {eingebettet && panelZiel && createPortal(<div className="karte-werkzeuge">{werkzeuge}</div>, panelZiel)}
     </div>
   );
 }
 
 // ---------- Teilkomponenten ----------
+
+function Abschnitt({ titel, offen = false, children }: { titel: string; offen?: boolean; children: ReactNode }) {
+  return (
+    <details className="werkzeug-abschnitt" open={offen}>
+      <summary>{titel}</summary>
+      <div className="werkzeug-inhalt">{children}</div>
+    </details>
+  );
+}
 
 function EbenenSchalter({ label, an, onAendern }: { label: string; an: boolean; onAendern: (an: boolean) => void }) {
   return (

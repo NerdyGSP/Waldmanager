@@ -4,7 +4,10 @@ import { fehlertext } from '../lib/fehler';
 import { gemerktesRevier, revierMerken, useNutzerKontext, type Mitgliedschaft } from '../lib/useNutzerKontext';
 import { navigieren, usePfad } from '../lib/router';
 import { useWarteschlange } from '../lib/offline';
-import { Hinweis, Knopf } from '../components/ui';
+import { EingebettetKontext, Hinweis, Knopf } from '../components/ui';
+import { Symbol } from '../components/symbole';
+import { useBreit } from '../lib/useBreit';
+import type { NutzerKontext } from '../lib/useNutzerKontext';
 import { Logo } from './AuthScreen';
 import { CodeEinloesen, Einstellungen } from './Einstellungen';
 import { Freigaben } from './module/Freigaben';
@@ -35,6 +38,7 @@ export function Home({ session }: { session: Session }) {
   const [revierId, setRevierId] = useState<string | null>(gemerktesRevier());
   const pfad = usePfad();
   const offen = useWarteschlange();
+  const breit = useBreit();
 
   // Gültiges Revier wählen, sobald die Mitgliedschaften geladen sind
   useEffect(() => {
@@ -69,6 +73,23 @@ export function Home({ session }: { session: Session }) {
         neuLaden: kontext.neuLaden,
       }
     : null;
+
+  // Browseransicht: Seitenleiste mit Navigation und Modulinhalt, rechts dauerhaft die Karte
+  if (breit && revierKontext) {
+    return (
+      <DesktopLayout
+        modul={modul ?? 'karte'}
+        unterpfad={pfad.slice(1)}
+        k={revierKontext}
+        kontext={kontext}
+        aktuell={aktuell}
+        revierId={revierId}
+        revierWechseln={revierWechseln}
+        offen={offen}
+        userId={session.user.id}
+      />
+    );
+  }
 
   return (
     <div className="app">
@@ -127,6 +148,104 @@ export function Home({ session }: { session: Session }) {
             revierWechseln={revierWechseln}
           />
         )}
+      </main>
+    </div>
+  );
+}
+
+const NAVIGATION = [
+  { pfad: 'karte', titel: 'Karte' },
+  { pfad: 'zaehlung', titel: 'Wildzählung' },
+  { pfad: 'erfassung', titel: 'Einzelerfassung' },
+  { pfad: 'abschuesse', titel: 'Abschüsse' },
+  { pfad: 'monitoring', titel: 'Monitoring' },
+  { pfad: 'zonen', titel: 'Zonen' },
+  { pfad: 'freigaben', titel: 'Freigaben' },
+  { pfad: 'einstellungen', titel: 'Einstellungen' },
+];
+
+function DesktopLayout({
+  modul,
+  unterpfad,
+  k,
+  kontext,
+  aktuell,
+  revierId,
+  revierWechseln,
+  offen,
+  userId,
+}: {
+  modul: string;
+  unterpfad: string[];
+  k: RevierKontext;
+  kontext: NutzerKontext;
+  aktuell: Mitgliedschaft | null;
+  revierId: string | null;
+  revierWechseln: (id: string) => void;
+  offen: number;
+  userId: string;
+}) {
+  const [panelEl, setPanelEl] = useState<HTMLDivElement | null>(null);
+  const titel = NAVIGATION.find((n) => n.pfad === modul)?.titel ?? '';
+
+  return (
+    <div className="desk">
+      <aside className="desk-seite">
+        <div className="desk-kopf">
+          <div className="desk-marke">
+            <Logo />
+            <span>Hegewerk</span>
+            {offen > 0 && (
+              <span className="warteschlange" title="Noch nicht übertragene Erfassungen">
+                {offen} offline
+              </span>
+            )}
+          </div>
+          {kontext.mitgliedschaften.length > 1 ? (
+            <select className="desk-revier" aria-label="Aktuelles Revier" value={revierId ?? ''} onChange={(e) => revierWechseln(e.target.value)}>
+              {kontext.mitgliedschaften.map((m) => (
+                <option key={m.revier.id} value={m.revier.id}>
+                  {m.revier.name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <div className="desk-revier-name">{k.revierName}</div>
+          )}
+          <h1>{titel}</h1>
+        </div>
+
+        <nav className="desk-nav" aria-label="Module">
+          {NAVIGATION.map((n) => (
+            <button key={n.pfad} aria-current={modul === n.pfad} onClick={() => navigieren(`/${n.pfad}`)}>
+              <Symbol name={n.pfad} />
+              <span>{n.titel}</span>
+            </button>
+          ))}
+        </nav>
+
+        <div className="desk-panel" ref={setPanelEl}>
+          <EingebettetKontext.Provider value={true}>
+            {kontext.fehler && <Hinweis art="fehler">{fehlertext(kontext.fehler)}</Hinweis>}
+            {modul === 'karte' ? null : modul === 'einstellungen' ? (
+              <Einstellungen userId={userId} kontext={kontext} aktuell={aktuell} revierWechseln={revierWechseln} />
+            ) : (
+              <ModulInhalt key={`${k.revierId}-${modul}`} modul={modul} unterpfad={unterpfad} k={k} />
+            )}
+          </EingebettetKontext.Provider>
+        </div>
+      </aside>
+
+      <main className="desk-karte">
+        <Suspense fallback={<div className="laden">Karte wird geladen …</div>}>
+          <Karte
+            key={k.revierId}
+            k={k}
+            eingebettet
+            panelZiel={modul === 'karte' ? panelEl : null}
+            aktualisierung={`${modul}/${unterpfad.join('/')}`}
+          />
+        </Suspense>
       </main>
     </div>
   );
