@@ -1,0 +1,280 @@
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { supabase } from '../../lib/supabase';
+import { fehlertext } from '../../lib/fehler';
+import { GESCHLECHTER, useMitglieder, useWildarten, useZonen, wildartName } from '../../lib/stammdaten';
+import { aktuellesJagdjahr, datumZeitDE, letzteJagdjahre, lokalDatumZeit } from '../../lib/zeit';
+import { aktuellePosition, punktEWKT } from '../../lib/geo';
+import type { Enums } from '../../lib/database.types';
+import { Auswahl, Feld, Gruppe, Hinweis, Knopf, Leer, Seite, Segmente, Zeile } from '../../components/ui';
+import type { RevierKontext } from './kontext';
+
+type Abschuss = {
+  id: string;
+  erlegt_am: string;
+  wildart_id: string;
+  geschlecht: Enums<'geschlecht'>;
+  altersklasse: string | null;
+  gewicht_kg: number | null;
+  zone_id: string | null;
+  erleger_id: string | null;
+  erfasst_von: string | null;
+  bemerkung: string | null;
+};
+
+export function Abschuesse({ k }: { k: RevierKontext }) {
+  const wildarten = useWildarten();
+  const { zonen } = useZonen(k.revierId);
+  const mitglieder = useMitglieder(k.revierId);
+  const [jahr, setJahr] = useState(aktuellesJagdjahr());
+  const [liste, setListe] = useState<Abschuss[]>([]);
+  const [bearbeiten, setBearbeiten] = useState<Abschuss | 'neu' | null>(null);
+  const [fehler, setFehler] = useState<string | null>(null);
+
+  const laden = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('abschuesse')
+      .select('id, erlegt_am, wildart_id, geschlecht, altersklasse, gewicht_kg, zone_id, erleger_id, erfasst_von, bemerkung')
+      .eq('revier_id', k.revierId)
+      .is('geloescht_am', null)
+      .gte('erlegt_am', `${jahr.von}T00:00:00`)
+      .lte('erlegt_am', `${jahr.bis}T23:59:59`)
+      .order('erlegt_am', { ascending: false });
+    if (error) setFehler(fehlertext(error));
+    setListe(data ?? []);
+  }, [k.revierId, jahr]);
+
+  useEffect(() => {
+    void laden();
+  }, [laden]);
+
+  const strecke = useMemo(() => {
+    const m = new Map<string, { gesamt: number; m: number; w: number }>();
+    for (const a of liste) {
+      const s = m.get(a.wildart_id) ?? { gesamt: 0, m: 0, w: 0 };
+      s.gesamt++;
+      if (a.geschlecht === 'maennlich') s.m++;
+      if (a.geschlecht === 'weiblich') s.w++;
+      m.set(a.wildart_id, s);
+    }
+    return [...m.entries()].sort((a, b) => b[1].gesamt - a[1].gesamt);
+  }, [liste]);
+
+  const name = (id: string | null) => mitglieder.find((m) => m.user_id === id)?.name ?? '–';
+  const zone = (id: string | null) => zonen.find((z) => z.id === id)?.name;
+
+  if (bearbeiten) {
+    return (
+      <AbschussFormular
+        k={k}
+        vorlage={bearbeiten === 'neu' ? null : bearbeiten}
+        onFertig={async () => {
+          setBearbeiten(null);
+          await laden();
+        }}
+      />
+    );
+  }
+
+  return (
+    <Seite
+      titel="Abschüsse"
+      untertitel={`Jagdjahr ${jahr.label} · ${liste.length} Stück`}
+      aktion={<Knopf onClick={() => setBearbeiten('neu')}>+ Abschuss</Knopf>}
+    >
+      <label className="filter">
+        <span>Jagdjahr</span>
+        <select value={jahr.start} onChange={(e) => setJahr(letzteJagdjahre().find((j) => j.start === Number(e.target.value)) ?? jahr)}>
+          {letzteJagdjahre().map((j) => (
+            <option key={j.start} value={j.start}>
+              {j.label}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      {fehler && <Hinweis art="fehler">{fehler}</Hinweis>}
+
+      {strecke.length > 0 && (
+        <Gruppe titel="Strecke">
+          {strecke.map(([id, s]) => (
+            <Zeile key={id} label={wildartName(wildarten, id)} wert={`${s.gesamt} (♂ ${s.m} · ♀ ${s.w})`} />
+          ))}
+        </Gruppe>
+      )}
+
+      <Gruppe titel="Einzelne Abschüsse">
+        {liste.length === 0 && <Zeile label="Keine Abschüsse in diesem Jagdjahr" />}
+        {liste.map((a) => (
+          <button key={a.id} className="zeile zeile-knopf" onClick={() => setBearbeiten(a)}>
+            <span className="zeile-label">
+              {wildartName(wildarten, a.wildart_id)} {GESCHLECHTER.find((g) => g.wert === a.geschlecht)?.kurz}
+              {a.altersklasse ? ` · ${a.altersklasse}` : ''}
+              <small>
+                {datumZeitDE(a.erlegt_am)} · {name(a.erleger_id)}
+                {zone(a.zone_id) ? ` · ${zone(a.zone_id)}` : ''}
+                {a.gewicht_kg ? ` · ${a.gewicht_kg.toLocaleString('de-DE')} kg` : ''}
+              </small>
+            </span>
+            <span className="zeile-pfeil" aria-hidden="true">
+              ›
+            </span>
+          </button>
+        ))}
+      </Gruppe>
+    </Seite>
+  );
+}
+
+function AbschussFormular({ k, vorlage, onFertig }: { k: RevierKontext; vorlage: Abschuss | null; onFertig: () => Promise<void> }) {
+  const wildarten = useWildarten();
+  const { zonen } = useZonen(k.revierId);
+  const mitglieder = useMitglieder(k.revierId);
+  const [wildartId, setWildartId] = useState(vorlage?.wildart_id ?? 'rehwild');
+  const [geschlecht, setGeschlecht] = useState<Enums<'geschlecht'>>(vorlage?.geschlecht ?? 'unbekannt');
+  const [altersklasse, setAltersklasse] = useState(vorlage?.altersklasse ?? '');
+  const [zeitpunkt, setZeitpunkt] = useState(vorlage ? lokalDatumZeit(new Date(vorlage.erlegt_am)) : lokalDatumZeit());
+  const [gewicht, setGewicht] = useState(vorlage?.gewicht_kg ? String(vorlage.gewicht_kg).replace('.', ',') : '');
+  const [zoneId, setZoneId] = useState(vorlage?.zone_id ?? '');
+  const [erlegerId, setErlegerId] = useState(vorlage?.erleger_id ?? k.userId);
+  const [bemerkung, setBemerkung] = useState(vorlage?.bemerkung ?? '');
+  const [position, setPosition] = useState<{ lon: number; lat: number } | null>(null);
+  const [ortStatus, setOrtStatus] = useState<string | null>(null);
+  const [fehler, setFehler] = useState<string | null>(null);
+  const [speichert, setSpeichert] = useState(false);
+
+  const klassen = wildarten.find((w) => w.id === wildartId)?.altersklassen ?? [];
+  const darfLoeschen = vorlage && (k.istInhaber || vorlage.erfasst_von === k.userId);
+
+  async function ortUebernehmen() {
+    setOrtStatus('Position wird bestimmt …');
+    const p = await aktuellePosition();
+    if (!p) {
+      setOrtStatus('Position nicht verfügbar – bitte Ortungsfreigabe prüfen.');
+      return;
+    }
+    setPosition({ lon: p.lon, lat: p.lat });
+    const { data } = await supabase.rpc('zone_an_position', { p_revier_id: k.revierId, p_lon: p.lon, p_lat: p.lat });
+    if (data) setZoneId(data);
+    setOrtStatus(`Position übernommen (± ${p.genauigkeit} m)${data ? ', Zone automatisch gesetzt' : ''}`);
+  }
+
+  async function speichern(e: FormEvent) {
+    e.preventDefault();
+    setFehler(null);
+    const kg = gewicht.trim() ? Number(gewicht.replace(',', '.')) : null;
+    if (kg !== null && (!Number.isFinite(kg) || kg <= 0)) {
+      setFehler('Bitte ein gültiges Gewicht angeben.');
+      return;
+    }
+    setSpeichert(true);
+    const daten = {
+      revier_id: k.revierId,
+      wildart_id: wildartId,
+      geschlecht,
+      altersklasse: altersklasse || null,
+      erlegt_am: new Date(zeitpunkt).toISOString(),
+      gewicht_kg: kg,
+      zone_id: zoneId || null,
+      erleger_id: erlegerId || null,
+      bemerkung: bemerkung.trim() || null,
+      ...(position ? { geom: punktEWKT(position.lon, position.lat) } : {}),
+    };
+    const { error } = vorlage
+      ? await supabase.from('abschuesse').update(daten).eq('id', vorlage.id)
+      : await supabase.from('abschuesse').insert(daten);
+    setSpeichert(false);
+    if (error) setFehler(fehlertext(error));
+    else await onFertig();
+  }
+
+  async function loeschen() {
+    if (!vorlage || !window.confirm('Diesen Abschuss löschen?')) return;
+    const { error } = await supabase.from('abschuesse').delete().eq('id', vorlage.id);
+    if (error) setFehler(fehlertext(error));
+    else await onFertig();
+  }
+
+  return (
+    <Seite titel={vorlage ? 'Abschuss bearbeiten' : 'Abschuss erfassen'} zurueck={() => void onFertig()}>
+      <form onSubmit={speichern}>
+        <Gruppe>
+          <Auswahl
+            label="Wildart"
+            value={wildartId}
+            onChange={(e) => {
+              setWildartId(e.target.value);
+              setAltersklasse('');
+            }}
+          >
+            {wildarten.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.name}
+              </option>
+            ))}
+          </Auswahl>
+          <div className="zeile">
+            <span className="zeile-label">Geschlecht</span>
+            <Segmente
+              label="Geschlecht"
+              wert={geschlecht}
+              onAendern={setGeschlecht}
+              optionen={GESCHLECHTER.map((g) => ({ wert: g.wert, label: g.label }))}
+            />
+          </div>
+          {klassen.length > 0 ? (
+            <Auswahl label="Altersklasse" value={altersklasse} onChange={(e) => setAltersklasse(e.target.value)}>
+              <option value="">–</option>
+              {klassen.map((a) => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
+            </Auswahl>
+          ) : (
+            <Feld label="Altersklasse" placeholder="optional" value={altersklasse} onChange={(e) => setAltersklasse(e.target.value)} />
+          )}
+          <Feld label="Erlegt am" type="datetime-local" required value={zeitpunkt} onChange={(e) => setZeitpunkt(e.target.value)} />
+          <Feld label="Gewicht (kg)" inputMode="decimal" placeholder="aufgebrochen, optional" value={gewicht} onChange={(e) => setGewicht(e.target.value)} />
+        </Gruppe>
+
+        <Gruppe>
+          <Auswahl label="Erleger" value={erlegerId} onChange={(e) => setErlegerId(e.target.value)}>
+            <option value="">–</option>
+            {mitglieder.map((m) => (
+              <option key={m.user_id} value={m.user_id}>
+                {m.name}
+              </option>
+            ))}
+          </Auswahl>
+          <Auswahl label="Zone" value={zoneId} onChange={(e) => setZoneId(e.target.value)}>
+            <option value="">–</option>
+            {zonen.map((z) => (
+              <option key={z.id} value={z.id}>
+                {z.name}
+              </option>
+            ))}
+          </Auswahl>
+          <Feld label="Bemerkung" value={bemerkung} onChange={(e) => setBemerkung(e.target.value)} />
+        </Gruppe>
+
+        <Knopf type="button" variante="sekundaer" onClick={ortUebernehmen}>
+          📍 Aktuelle Position als Erlegeort
+        </Knopf>
+        {ortStatus && <Leer>{ortStatus}</Leer>}
+
+        {fehler && <Hinweis art="fehler">{fehler}</Hinweis>}
+        <Knopf type="submit" disabled={speichert}>
+          {speichert ? 'Speichern …' : 'Speichern'}
+        </Knopf>
+        <Knopf type="button" variante="sekundaer" onClick={() => void onFertig()}>
+          Abbrechen
+        </Knopf>
+        {darfLoeschen && (
+          <Knopf type="button" variante="gefahr" onClick={loeschen}>
+            Abschuss löschen
+          </Knopf>
+        )}
+      </form>
+    </Seite>
+  );
+}

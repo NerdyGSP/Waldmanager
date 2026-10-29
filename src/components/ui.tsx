@@ -1,3 +1,4 @@
+import { navigieren } from '../lib/router';
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from 'react';
 
 export function Gruppe({ titel, fuss, children }: { titel?: string; fuss?: ReactNode; children: ReactNode }) {
@@ -58,6 +59,92 @@ export function Hinweis({ art = 'info', children }: { art?: 'info' | 'fehler' | 
       {children}
     </div>
   );
+}
+
+export function Seite({
+  titel,
+  untertitel,
+  aktion,
+  zurueck,
+  children,
+}: {
+  titel: string;
+  untertitel?: ReactNode;
+  aktion?: ReactNode;
+  zurueck?: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <div className="seite">
+      <div className="seite-kopf">
+        <button className="zurueck" onClick={zurueck ?? (() => navigieren('/'))} aria-label="Zurück">
+          ‹ Zurück
+        </button>
+        <div className="seite-titel">
+          <h1>{titel}</h1>
+          {untertitel && <p>{untertitel}</p>}
+        </div>
+        {aktion && <div className="seite-aktion">{aktion}</div>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+export function Zaehler({
+  wert,
+  onAendern,
+  min = 0,
+  label,
+}: {
+  wert: number;
+  onAendern: (neu: number) => void;
+  min?: number;
+  label: string;
+}) {
+  return (
+    <div className="zaehler" role="group" aria-label={label}>
+      <button type="button" onClick={() => onAendern(Math.max(min, wert - 1))} disabled={wert <= min} aria-label={`${label} verringern`}>
+        −
+      </button>
+      <output aria-live="polite">{wert}</output>
+      <button type="button" onClick={() => onAendern(wert + 1)} aria-label={`${label} erhöhen`}>
+        +
+      </button>
+    </div>
+  );
+}
+
+export function Segmente<T extends string>({
+  optionen,
+  wert,
+  onAendern,
+  label,
+}: {
+  optionen: Array<{ wert: T; label: string }>;
+  wert: T;
+  onAendern: (neu: T) => void;
+  label: string;
+}) {
+  return (
+    <div className="segmente" role="radiogroup" aria-label={label}>
+      {optionen.map((o) => (
+        <button
+          key={o.wert}
+          type="button"
+          role="radio"
+          aria-checked={o.wert === wert}
+          onClick={() => onAendern(o.wert)}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export function Leer({ children }: { children: ReactNode }) {
+  return <p className="leer">{children}</p>;
 }
 
 export function CodeAnzeige({ code, beschreibung }: { code: string; beschreibung: ReactNode }) {

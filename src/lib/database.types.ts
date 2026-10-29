@@ -554,18 +554,21 @@ export type Database = {
       }
       wildarten: {
         Row: {
+          altersklassen: string[]
           gruppe: string
           id: string
           name: string
           sortierung: number
         }
         Insert: {
+          altersklassen?: string[]
           gruppe: string
           id: string
           name: string
           sortierung?: number
         }
         Update: {
+          altersklassen?: string[]
           gruppe?: string
           id?: string
           name?: string
@@ -786,6 +789,16 @@ export type Database = {
           revier_name: string
           rolle: string
         }[]
+      }
+      grenze_setzen: { Args: { p_geojson: Json; p_revier_id: string }; Returns: number }
+      karte_daten: { Args: { p_revier_id: string; p_tage?: number }; Returns: Json }
+      zone_an_position: {
+        Args: { p_lat: number; p_lon: number; p_revier_id: string }
+        Returns: string
+      }
+      zone_geometrie_setzen: {
+        Args: { p_geojson: Json; p_zone_id: string }
+        Returns: undefined
       }
       quervergleich: {
         Args: { p_bis: string; p_revier_id: string; p_von: string }

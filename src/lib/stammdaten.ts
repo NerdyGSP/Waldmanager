@@ -1,0 +1,86 @@
+import { useCallback, useEffect, useState } from 'react';
+import { supabase } from './supabase';
+import type { Enums, Tables } from './database.types';
+
+export type Wildart = Pick<Tables<'wildarten'>, 'id' | 'name' | 'gruppe' | 'sortierung' | 'altersklassen'>;
+export type Zone = { id: string; name: string; farbe: string | null; sortierung: number; hatGeometrie: boolean };
+export type Mitglied = { user_id: string; name: string; rolle: Enums<'revier_rolle'> };
+
+let wildartenCache: Wildart[] | null = null;
+
+export function useWildarten(): Wildart[] {
+  const [liste, setListe] = useState<Wildart[]>(wildartenCache ?? []);
+  useEffect(() => {
+    if (wildartenCache) return;
+    void supabase
+      .from('wildarten')
+      .select('id, name, gruppe, sortierung, altersklassen')
+      .order('sortierung')
+      .then(({ data }) => {
+        wildartenCache = data ?? [];
+        setListe(wildartenCache);
+      });
+  }, []);
+  return liste;
+}
+
+export function wildartName(liste: Wildart[], id: string): string {
+  return liste.find((w) => w.id === id)?.name ?? id;
+}
+
+export function useZonen(revierId: string) {
+  const [zonen, setZonen] = useState<Zone[]>([]);
+  const [laedt, setLaedt] = useState(true);
+
+  const laden = useCallback(async () => {
+    const { data } = await supabase
+      .from('zonen')
+      .select('id, name, farbe, sortierung, geom')
+      .eq('revier_id', revierId)
+      .is('geloescht_am', null)
+      .order('sortierung')
+      .order('name');
+    setZonen(
+      (data ?? []).map((z) => ({
+        id: z.id,
+        name: z.name,
+        farbe: z.farbe,
+        sortierung: z.sortierung,
+        hatGeometrie: z.geom !== null,
+      })),
+    );
+    setLaedt(false);
+  }, [revierId]);
+
+  useEffect(() => {
+    void laden();
+  }, [laden]);
+
+  return { zonen, laedt, laden };
+}
+
+export function useMitglieder(revierId: string): Mitglied[] {
+  const [liste, setListe] = useState<Mitglied[]>([]);
+  useEffect(() => {
+    void supabase
+      .from('revier_mitglieder')
+      .select('user_id, rolle, profiles(name)')
+      .eq('revier_id', revierId)
+      .then(({ data }) =>
+        setListe(
+          (data ?? [])
+            .map((m) => ({ user_id: m.user_id, rolle: m.rolle, name: m.profiles?.name ?? '?' }))
+            .sort((a, b) => a.name.localeCompare(b.name, 'de')),
+        ),
+      );
+  }, [revierId]);
+  return liste;
+}
+
+export const GESCHLECHTER: Array<{ wert: Enums<'geschlecht'>; label: string; kurz: string }> = [
+  { wert: 'maennlich', label: 'männlich', kurz: '♂' },
+  { wert: 'weiblich', label: 'weiblich', kurz: '♀' },
+  { wert: 'unbekannt', label: 'unbekannt', kurz: '?' },
+];
+
+export const ZONENFARBEN = ['#2f5d3a', '#b5651d', '#1f6fb2', '#8e44ad', '#c0392b', '#16a085', '#d4a017', '#5d6d7e'];
