@@ -175,6 +175,22 @@ function Assistent({ k }: { k: RevierKontext }) {
   const [versand, setVersand] = useState<Array<{ id: string; ok: boolean; fehler?: string }> | null>(null);
   const [angelegteTn, setAngelegteTn] = useState<Teilnehmer[]>([]);
   const dateiRef = useRef<HTMLInputElement>(null);
+  const [mitglieder, setMitglieder] = useState<Array<{ user_id: string; name: string; email: string }>>([]);
+  useEffect(() => {
+    void supabase
+      .from('revier_mitglieder')
+      .select('user_id, profiles(name, email)')
+      .eq('revier_id', k.revierId)
+      .then(({ data }) =>
+        setMitglieder(
+          (data ?? [])
+            .map((m) => ({ user_id: m.user_id, name: m.profiles?.name ?? '', email: m.profiles?.email ?? '' }))
+            .filter((m) => m.name && m.email)
+            .sort((a, b) => a.name.localeCompare(b.name, 'de')),
+        ),
+      );
+  }, [k.revierId]);
+  const schonDa = (email: string) => teilnehmer.some((t) => t.email.toLowerCase() === email.toLowerCase());
 
   const aktive = teilnehmer.filter((t) => t.aktiv);
   const ungueltig = (t: TeilnehmerEntwurf) => !emailGueltig(t.email) || !t.name;
@@ -341,6 +357,33 @@ function Assistent({ k }: { k: RevierKontext }) {
               </Knopf>
             </div>
           </Gruppe>
+          {mitglieder.length > 0 && (
+            <Gruppe titel="Reviermitglieder" fuss="Bereits im Revier angemeldete Jäger übernehmen.">
+              <div className="bj-ja-nein">
+                <span>{mitglieder.filter((m) => !schonDa(m.email)).length} noch nicht übernommen</span>
+                <Knopf
+                  type="button"
+                  variante="sekundaer"
+                  disabled={mitglieder.every((m) => schonDa(m.email))}
+                  onClick={() => setTeilnehmer((a) => [...a, ...mitglieder.filter((m) => !a.some((t) => t.email.toLowerCase() === m.email.toLowerCase())).map((m) => neuerEntwurf(m.name, m.email))])}
+                >
+                  Alle übernehmen
+                </Knopf>
+              </div>
+              {mitglieder.map((m) => (
+                <div key={m.user_id} className="bj-zeile">
+                  <span>
+                    {m.name}
+                    <br />
+                    <small>{m.email}</small>
+                  </span>
+                  <Knopf type="button" variante="ghost" disabled={schonDa(m.email)} onClick={() => setTeilnehmer((a) => [...a, neuerEntwurf(m.name, m.email)])}>
+                    {schonDa(m.email) ? 'Übernommen' : 'Hinzufügen'}
+                  </Knopf>
+                </div>
+              ))}
+            </Gruppe>
+          )}
           {teilnehmer.length > 0 && (
             <Gruppe titel="Vorschau">
               {teilnehmer.map((t) => (
