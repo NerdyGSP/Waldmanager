@@ -20,6 +20,7 @@ import { Wildschaeden } from './module/Wildschaeden';
 import { Aufgaben } from './module/Aufgaben';
 import { Begehungsscheine } from './module/Begehungsscheine';
 import { Datenimport } from './module/Datenimport';
+import { BewegungsjagdListe, BewegungsjagdVollbild } from './bewegungsjagd/Bewegungsjagd';
 import type { RevierKontext } from './module/kontext';
 
 // Die Karte ist groß (MapLibre) und wird erst bei Bedarf geladen
@@ -34,6 +35,7 @@ const MODULE = [
   { pfad: 'abschuesse', titel: 'Abschüsse', text: 'Strecke mit Wildart, Geschlecht, Altersklasse', symbol: '🎯' },
   { pfad: 'wildschaeden', titel: 'Wildschäden', text: 'Schäden erfassen, Anmeldefrist im Blick', symbol: '🌾' },
   { pfad: 'aufgaben', titel: 'Aufgaben', text: 'Revierarbeiten planen und verteilen', symbol: '✅' },
+  { pfad: 'bewegungsjagd', titel: 'Bewegungsjagd', text: 'Einladen, Zu- und Absagen, Stände zuweisen', symbol: '🦌' },
   { pfad: 'begehungsscheine', titel: 'Begehungsscheine', text: 'Gastjäger-Scheine ausstellen und prüfen', symbol: '📄' },
   { pfad: 'monitoring', titel: 'Monitoring', text: 'Statistik und Quervergleich im Hegering', symbol: '📈' },
   { pfad: 'zonen', titel: 'Zonen', text: 'Erfassungszonen anlegen und ordnen', symbol: '▦' },
@@ -85,6 +87,11 @@ export function Home({ session }: { session: Session }) {
   // Abgedocktes Monitoring: eigenes Fenster ohne Seitenleiste und Karte
   if (revierKontext && modul === 'monitoring' && pfad[1] === 'fenster') {
     return <MonitoringFenster k={revierKontext} kontext={kontext} revierId={revierId} revierWechseln={revierWechseln} />;
+  }
+
+  // Bewegungsjagd (Assistent/Auswertung): Vollbild ohne Seitenleiste und Navigation
+  if (revierKontext && modul === 'bewegungsjagd' && pfad[1]) {
+    return <BewegungsjagdVollbild key={`${revierKontext.revierId}-${pfad[1]}`} k={revierKontext} id={pfad[1]} />;
   }
 
   // Browseransicht: Seitenleiste mit Navigation und Modulinhalt, rechts dauerhaft die Karte
@@ -173,6 +180,7 @@ const NAVIGATION = [
   { pfad: 'abschuesse', titel: 'Abschüsse' },
   { pfad: 'wildschaeden', titel: 'Wildschäden' },
   { pfad: 'aufgaben', titel: 'Aufgaben' },
+  { pfad: 'bewegungsjagd', titel: 'Bewegungsjagd' },
   { pfad: 'begehungsscheine', titel: 'Begehungsscheine' },
   { pfad: 'monitoring', titel: 'Monitoring' },
   { pfad: 'zonen', titel: 'Zonen' },
@@ -324,6 +332,8 @@ function ModulInhalt({ modul, unterpfad, k, breit = false }: { modul: string; un
       return <Wildschaeden k={k} />;
     case 'aufgaben':
       return <Aufgaben k={k} />;
+    case 'bewegungsjagd':
+      return <BewegungsjagdListe k={k} />;
     case 'begehungsscheine':
       return <Begehungsscheine k={k} />;
     case 'import':

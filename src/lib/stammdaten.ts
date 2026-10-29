@@ -128,6 +128,7 @@ export const EINRICHTUNGSTYPEN: Array<{ wert: Enums<'einrichtung_typ'>; label: s
   { wert: 'wildacker', label: 'Wildacker', farbe: '#4caf50' },
   { wert: 'wildkamera', label: 'Wildkamera', farbe: '#1f6fb2' },
   { wert: 'falle', label: 'Falle', farbe: '#7f4f9e' },
+  { wert: 'drueckjagdbock', label: 'Drückjagdbock', farbe: '#c0392b' },
   { wert: 'sonstiges', label: 'Sonstiges', farbe: '#5d6d7e' },
 ];
 

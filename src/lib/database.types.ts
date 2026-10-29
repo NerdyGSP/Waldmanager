@@ -807,6 +807,7 @@ export type Database = {
         Row: {
           aktualisiert_am: string
           beschreibung: string | null
+          bewegungsjagd_id: string | null
           einrichtung_id: string | null
           erledigt_am: string | null
           erstellt_am: string
@@ -822,6 +823,7 @@ export type Database = {
         Insert: {
           aktualisiert_am?: string
           beschreibung?: string | null
+          bewegungsjagd_id?: string | null
           einrichtung_id?: string | null
           erledigt_am?: string | null
           erstellt_am?: string
@@ -837,6 +839,7 @@ export type Database = {
         Update: {
           aktualisiert_am?: string
           beschreibung?: string | null
+          bewegungsjagd_id?: string | null
           einrichtung_id?: string | null
           erledigt_am?: string | null
           erstellt_am?: string
@@ -848,6 +851,137 @@ export type Database = {
           status?: string
           titel?: string
           zugewiesen_an?: string | null
+        }
+        Relationships: []
+      }
+      bewegungsjagd_teilnehmer: {
+        Row: {
+          aktiv: boolean
+          anschrift: string | null
+          antwort_am: string | null
+          auto_vorhanden: boolean | null
+          bewegungsjagd_id: string
+          einladungscode: string
+          email: string
+          erstellt_am: string
+          hat_hornblaeser: boolean | null
+          hat_hund: boolean | null
+          id: string
+          mail_fehler: string | null
+          mail_gesendet_am: string | null
+          mail_status: string | null
+          mitfahrplaetze: number | null
+          name: string
+          schuesseltreiben_teilnahme: boolean | null
+          status: string
+          user_id: string | null
+          zugeordnete_einrichtung_id: string | null
+        }
+        Insert: {
+          aktiv?: boolean
+          anschrift?: string | null
+          antwort_am?: string | null
+          auto_vorhanden?: boolean | null
+          bewegungsjagd_id: string
+          einladungscode?: string
+          email: string
+          erstellt_am?: string
+          hat_hornblaeser?: boolean | null
+          hat_hund?: boolean | null
+          id?: string
+          mail_fehler?: string | null
+          mail_gesendet_am?: string | null
+          mail_status?: string | null
+          mitfahrplaetze?: number | null
+          name: string
+          schuesseltreiben_teilnahme?: boolean | null
+          status?: string
+          user_id?: string | null
+          zugeordnete_einrichtung_id?: string | null
+        }
+        Update: {
+          aktiv?: boolean
+          anschrift?: string | null
+          antwort_am?: string | null
+          auto_vorhanden?: boolean | null
+          bewegungsjagd_id?: string
+          einladungscode?: string
+          email?: string
+          erstellt_am?: string
+          hat_hornblaeser?: boolean | null
+          hat_hund?: boolean | null
+          id?: string
+          mail_fehler?: string | null
+          mail_gesendet_am?: string | null
+          mail_status?: string | null
+          mitfahrplaetze?: number | null
+          name?: string
+          schuesseltreiben_teilnahme?: boolean | null
+          status?: string
+          user_id?: string | null
+          zugeordnete_einrichtung_id?: string | null
+        }
+        Relationships: []
+      }
+      bewegungsjagden: {
+        Row: {
+          abschlusskommentar: string | null
+          aktualisiert_am: string
+          art: string
+          datum: string
+          einladungstext: string | null
+          erstellt_am: string
+          erstellt_von: string | null
+          geloescht_am: string | null
+          hegebeitrag_aktiv: boolean
+          hegebeitrag_betrag: number | null
+          id: string
+          revier_id: string
+          schuesseltreiben: boolean
+          schuesseltreiben_adresse: string | null
+          schuesseltreiben_anmeldung_pflicht: boolean
+          status: string
+          titel: string
+          treffpunkt: unknown
+          treffpunkt_lat: number | null
+          treffpunkt_lng: number | null
+          uhrzeit: string | null
+        }
+        Insert: {
+          abschlusskommentar?: string | null
+          art?: string
+          datum: string
+          einladungstext?: string | null
+          geloescht_am?: string | null
+          hegebeitrag_aktiv?: boolean
+          hegebeitrag_betrag?: number | null
+          id?: string
+          revier_id: string
+          schuesseltreiben?: boolean
+          schuesseltreiben_adresse?: string | null
+          schuesseltreiben_anmeldung_pflicht?: boolean
+          status?: string
+          titel: string
+          treffpunkt?: unknown
+          uhrzeit?: string | null
+        }
+        Update: {
+          abschlusskommentar?: string | null
+          art?: string
+          datum?: string
+          einladungstext?: string | null
+          geloescht_am?: string | null
+          hegebeitrag_aktiv?: boolean
+          hegebeitrag_betrag?: number | null
+          id?: string
+          revier_id?: string
+          schuesseltreiben?: boolean
+          schuesseltreiben_adresse?: string | null
+          schuesseltreiben_anmeldung_pflicht?: boolean
+          status?: string
+          titel?: string
+          treffpunkt?: unknown
+          uhrzeit?: string | null
         }
         Relationships: []
       }
@@ -982,6 +1116,23 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      bj_absagen_loeschen: { Args: { p_code: string; p_jagd: string }; Returns: boolean }
+      bj_antworten: {
+        Args: {
+          p_anschrift: string
+          p_auto: boolean
+          p_code: string
+          p_hornblaeser: boolean
+          p_hund: boolean
+          p_jagd: string
+          p_name: string
+          p_plaetze: number
+          p_schuesseltreiben: boolean
+          p_zusage: boolean
+        }
+        Returns: boolean
+      }
+      bj_laden: { Args: { p_code: string; p_jagd: string }; Returns: Json }
       einladung_einloesen: { Args: { p_code: string }; Returns: string }
       einladung_erstellen: {
         Args: {
@@ -1044,6 +1195,7 @@ export type Database = {
         | "wildkamera"
         | "falle"
         | "sonstiges"
+        | "drueckjagdbock"
       geschlecht: "maennlich" | "weiblich" | "unbekannt"
       revier_rolle: "inhaber" | "mitjaeger"
       sitzung_status: "offen" | "abgeschlossen"

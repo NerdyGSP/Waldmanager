@@ -14,6 +14,7 @@ export const EINRICHTUNGS_PFADE: Record<Typ, string> = {
   wildacker: 'M12 21v-9M12 12.5C12 8 8.8 5.5 4.5 5.5 4.5 10 7 12.5 12 12.5ZM12 15c0-3.4 2.4-5.5 7-5.5 0 3.6-2.6 5.5-7 5.5Z',
   wildkamera: 'M3.5 8h4l1.8-3h5.4l1.8 3h4v11h-17zM12 10.8a3.2 3.2 0 1 0 0 6.4 3.2 3.2 0 0 0 0-6.4z',
   falle: 'M3 11h18v8H3zM3 11l3-5h12l3 5M8 11v8M12 11v8M16 11v8',
+  drueckjagdbock: 'M12 5a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM12 2v6M12 16v6M2 12h6M16 12h6',
   sonstiges: 'M7 21V4M7 5h11l-2.5 4 2.5 4H7',
 };
 
