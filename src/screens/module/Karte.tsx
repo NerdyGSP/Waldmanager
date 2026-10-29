@@ -7,11 +7,13 @@ import {
   NavigationControl,
   Popup,
   ScaleControl,
+  setWorkerUrl,
   type GeoJSONSource,
   type MapMouseEvent,
   type StyleSpecification,
 } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import kartenWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import type { Feature, FeatureCollection, Geometry, MultiPolygon, Polygon, Position } from 'geojson';
 import { supabase } from '../../lib/supabase';
 import { fehlertext } from '../../lib/fehler';
@@ -21,6 +23,9 @@ import type { Enums, Json } from '../../lib/database.types';
 import type { RevierKontext } from './kontext';
 
 // ---------- Kartengrundlagen ----------
+
+// MapLibre 6 sucht seinen Web-Worker neben der Bibliothek; nach dem Bündeln liegt er als eigene Datei vor
+setWorkerUrl(kartenWorkerUrl);
 
 const LUFTBILD_URL =
   'https://opendata.lgln.niedersachsen.de/doorman/noauth/dop_wms?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap' +
@@ -163,7 +168,7 @@ export default function Karte({ k }: { k: RevierKontext }) {
       new GeolocateControl({ positionOptions: { enableHighAccuracy: true }, trackUserLocation: true }),
       'top-right',
     );
-    m.addControl(new ScaleControl({ unit: 'metric' }), 'bottom-left');
+    m.addControl(new ScaleControl({ unit: 'metric' }), 'bottom-right');
 
     m.on('load', () => {
       for (const id of ['grenze', 'zonen', 'einrichtungen', 'pirschwege', 'beobachtungen', 'abschuesse', 'zeichnung']) {
@@ -308,7 +313,9 @@ export default function Karte({ k }: { k: RevierKontext }) {
       ...daten.pirschwege.map((f) => f.geometry),
     ];
     const b = grenzen(geometrien);
-    if (b) m.fitBounds(b, { padding: 40, maxZoom: 16, duration: 0 });
+    // Auf breiten Bildschirmen liegt das Werkzeug-Panel links über der Karte
+    const links = window.innerWidth > 700 ? 360 : 30;
+    if (b) m.fitBounds(b, { padding: { top: 40, bottom: 60, left: links, right: 60 }, maxZoom: 16, duration: 0 });
     else
       navigator.geolocation?.getCurrentPosition(
         (p) => m.jumpTo({ center: [p.coords.longitude, p.coords.latitude], zoom: 14 }),

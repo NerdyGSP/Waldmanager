@@ -123,7 +123,8 @@ export function Monitoring({ k }: { k: RevierKontext }) {
             <Kennzahl wert={beobachtungen} label="Beobachtungen" />
             <Kennzahl wert={streckeSumme} label="Abschüsse" />
             <Kennzahl
-              wert={k.flaecheHa ? Math.round((streckeSumme / k.flaecheHa) * 1000) / 10 : null}
+              wert={k.flaecheHa ? (streckeSumme / k.flaecheHa) * 100 : null}
+              nachkomma={1}
               label="Abschüsse je 100 ha"
             />
           </div>
@@ -186,10 +187,12 @@ export function Monitoring({ k }: { k: RevierKontext }) {
   );
 }
 
-function Kennzahl({ wert, label }: { wert: number | null; label: string }) {
+function Kennzahl({ wert, label, nachkomma = 0 }: { wert: number | null; label: string; nachkomma?: number }) {
   return (
     <div className="kennzahl">
-      <strong>{wert === null ? '–' : wert.toLocaleString('de-DE')}</strong>
+      <strong>
+        {wert === null ? '–' : wert.toLocaleString('de-DE', { minimumFractionDigits: nachkomma, maximumFractionDigits: nachkomma })}
+      </strong>
       <span>{label}</span>
     </div>
   );
