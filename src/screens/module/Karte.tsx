@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ZonenInfo, type GewaehlteZone } from './ZonenInfo';
+import { WteSichtung, type WteSitzung, type WteZone } from './WteSichtung';
 import { createPortal } from 'react-dom';
 import {
   GeolocateControl,
@@ -20,7 +21,7 @@ import type { Feature, FeatureCollection, Geometry, MultiPolygon, Position } fro
 import { supabase } from '../../lib/supabase';
 import { fehlertext } from '../../lib/fehler';
 import { EINRICHTUNGSTYPEN, GESCHLECHTER, nameVergeben, useWildarten, useZonen, wildartName, ZONENFARBEN } from '../../lib/stammdaten';
-import { datumZeitDE } from '../../lib/zeit';
+import { datumDE, datumZeitDE } from '../../lib/zeit';
 import { aktuellesWetter, himmelsrichtung, linieEWKT, punktEWKT, type Wetter } from '../../lib/geo';
 import { navigieren } from '../../lib/router';
 import { EinrichtungsIcon, einrichtungsBild } from '../../lib/einrichtungsIcons';
@@ -98,7 +99,7 @@ const ISTHANDY = typeof screen !== 'undefined' && Math.min(screen.width, screen.
 
 const LEER: FeatureCollection = { type: 'FeatureCollection', features: [] };
 
-type KartenEbene = { id: string; name: string; farbe: string | null };
+type KartenEbene = { id: string; name: string; farbe: string | null; wte_aktiv?: boolean };
 
 type KartenDaten = {
   grenze: MultiPolygon | null;
@@ -194,6 +195,37 @@ export default function Karte({
     setPunkte([]);
     setNeueEinrichtung(null);
   };
+
+  // WTE-Modus (Wildtiererfassung): je Gerät gemerkt
+  const [wte, setWteState] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('hegewerk.karte.wte') === '1';
+    } catch {
+      return false;
+    }
+  });
+  const setWte = (an: boolean) => {
+    setWteState(an);
+    try {
+      localStorage.setItem('hegewerk.karte.wte', an ? '1' : '0');
+    } catch {
+      /* ohne Speicher gilt der Modus nur für diese Sitzung */
+    }
+    setWteMenue(false);
+    setWteZone(null);
+  };
+  const [wteMenue, setWteMenue] = useState(false);
+  const [wteZone, setWteZone] = useState<WteZone | null>(null);
+  const [wteSitzung, setWteSitzung] = useState<WteSitzung | null>(null);
+  const sitzungLaden = useCallback(async (): Promise<WteSitzung | null> => {
+    const { data } = await supabase.from('zaehlsitzungen').select('id, datum, ebene_id').eq('revier_id', k.revierId).eq('status', 'offen').is('geloescht_am', null).maybeSingle();
+    setWteSitzung(data ?? null);
+    return data ?? null;
+  }, [k.revierId]);
+  useEffect(() => {
+    if (wte && navigator.onLine) void sitzungLaden();
+  }, [wte, sitzungLaden]);
+  const wteEbenenIds = useMemo(() => (daten?.ebenen ?? []).filter((e) => e.wte_aktiv).map((e) => e.id), [daten]);
 
   // Filter für Heatmap und Abschüsse (gelten für alle drei Quellen)
   const [wildartFilter, setWildartFilter] = useState('');
@@ -451,7 +483,8 @@ export default function Karte({
   function zonenBeschriftungenAnzeigen() {
     for (const mk of zonenMarker.current) {
       const el = mk.getElement();
-      el.style.display = ebenen.zonen && !ausgeblendet.has(el.dataset.ebene ?? 'ohne') ? '' : 'none';
+      const ebene = el.dataset.ebene ?? 'ohne';
+      el.style.display = wte ? (wteEbenenIds.includes(ebene) ? '' : 'none') : ebenen.zonen && !ausgeblendet.has(ebene) ? '' : 'none';
     }
   }
 
@@ -485,21 +518,24 @@ export default function Karte({
     if (!m || !bereit) return;
     const sichtbar = (ebene: string, an: boolean) => m.setLayoutProperty(ebene, 'visibility', an ? 'visible' : 'none');
     // OSM bleibt als Hintergrund außerhalb des Reviers sichtbar
+    // Im WTE-Modus nur Grenze, Hintergrund und Zonen der WTE-Ebenen
     if (m.getLayer('luftbild')) sichtbar('luftbild', ebenen.luftbild);
-    sichtbar('grenze-linie', ebenen.grenze);
-    sichtbar('zonen-flaeche', ebenen.zonen);
-    sichtbar('zonen-linie', ebenen.zonen);
-    sichtbar('einrichtungen-punkt', ebenen.einrichtungen);
-    sichtbar('pirschwege-linie', ebenen.pirschwege);
-    sichtbar('heatmap', ebenen.heatmap);
-    sichtbar('abschuesse-punkt', ebenen.abschuesse);
+    sichtbar('grenze-linie', wte ? true : ebenen.grenze);
+    sichtbar('zonen-flaeche', wte ? true : ebenen.zonen);
+    sichtbar('zonen-linie', wte ? true : ebenen.zonen);
+    sichtbar('einrichtungen-punkt', !wte && ebenen.einrichtungen);
+    sichtbar('pirschwege-linie', !wte && ebenen.pirschwege);
+    sichtbar('heatmap', !wte && ebenen.heatmap);
+    sichtbar('abschuesse-punkt', !wte && ebenen.abschuesse);
     // Einzelne Zonenebenen ein-/ausblenden
-    const filter = ['!', ['in', ['get', 'ebene_id'], ['literal', [...ausgeblendet]]]] as unknown as Parameters<typeof m.setFilter>[1];
+    const filter = (wte
+      ? ['in', ['get', 'ebene_id'], ['literal', wteEbenenIds]]
+      : ['!', ['in', ['get', 'ebene_id'], ['literal', [...ausgeblendet]]]]) as unknown as Parameters<typeof m.setFilter>[1];
     m.setFilter('zonen-flaeche', filter);
     m.setFilter('zonen-linie', filter);
     zonenBeschriftungenAnzeigen();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ebenen, bereit, ausgeblendet]);
+  }, [ebenen, bereit, ausgeblendet, wte, wteEbenenIds]);
 
   // Reihenfolge und Transparenz der Ebenen
   useEffect(() => {
@@ -557,6 +593,17 @@ export default function Karte({
     const klick = (e: MapMouseEvent) => {
       const aktiv = modusRef.current;
       const pos: Position = [e.lngLat.lng, e.lngLat.lat];
+      if (wte && !aktiv) {
+        // WTE-Modus: Tippen auf eine WTE-Zone öffnet die Sichtungserfassung
+        const z = m.queryRenderedFeatures(e.point, { layers: ['zonen-flaeche'] })[0];
+        if (z) {
+          const p = z.properties ?? {};
+          setWteMenue(false);
+          setWteZone({ id: String(p.id), name: String(p.name ?? ''), ebeneId: p.ebene_id && p.ebene_id !== 'ohne' ? String(p.ebene_id) : null });
+          void sitzungLaden();
+        }
+        return;
+      }
       if (aktiv?.art === 'einrichtung') {
         setNeueEinrichtung(pos);
         return;
@@ -601,7 +648,7 @@ export default function Karte({
       m.off('click', klick);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bereit, modus, k.istInhaber, wildarten]);
+  }, [bereit, modus, k.istInhaber, wildarten, wte]);
 
   // Wind am Kartenmittelpunkt
   const windLaden = useCallback(async () => {
@@ -792,10 +839,13 @@ export default function Karte({
   const hatOhneEbene = (daten?.zonen ?? []).some((z) => z.properties?.ebene_id === 'ohne');
   const anzahlBeob = daten?.beobachtungen.length ?? 0;
 
+  const imBlock = (id: EbenenId) => id === 'heatmap' || id === 'abschuesse';
   const verschieben = (i: number, richtung: -1 | 1) =>
     setEinst((alt) => {
       const liste = [...alt.reihenfolge];
-      const j = i + richtung;
+      let j = i + richtung;
+      // Ebenen im Block „Heatmap & Abschüsse“ stehen nicht in der Liste und werden übersprungen
+      while (j >= 0 && j < liste.length && imBlock(liste[j]!)) j += richtung;
       if (j < 0 || j >= liste.length) return alt;
       [liste[i], liste[j]] = [liste[j]!, liste[i]!];
       return { ...alt, reihenfolge: liste };
@@ -826,13 +876,33 @@ export default function Karte({
           {meldung && <div className={`hinweis hinweis-${meldung.art}`}>{meldung.text}</div>}
 
           <Abschnitt titel="Heatmap & Abschüsse" offen>
-            <div className="segmente" role="radiogroup" aria-label="Quelle der Heatmap">
-              {(Object.keys(HEATNAMEN) as HeatQuelle[]).map((q) => (
-                <button key={q} type="button" role="radio" aria-checked={heatQuelle === q} className={heatQuelle === q ? 'an' : ''} onClick={() => setHeatQuelle(q)}>
-                  {HEATNAMEN[q]}
-                </button>
-              ))}
-            </div>
+            {(['heatmap', 'abschuesse'] as const).map((id) => (
+              <div key={id} className="ebenen-block">
+                <EbenenSchalter label={ebenenInfo[id].label} an={ebenenInfo[id].an} onAendern={ebenenInfo[id].setAn} />
+                {id === 'heatmap' && (
+                  <div className="segmente" role="radiogroup" aria-label="Quelle der Heatmap">
+                    {(Object.keys(HEATNAMEN) as HeatQuelle[]).map((q) => (
+                      <button key={q} type="button" role="radio" aria-checked={heatQuelle === q} onClick={() => setHeatQuelle(q)}>
+                        {HEATNAMEN[q]}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <label className="transparenz">
+                  <span>Transparenz</span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    step={5}
+                    value={Math.round((1 - einst.deckkraft[id]) * 100)}
+                    aria-label={`Transparenz ${ebenenInfo[id].name}`}
+                    onChange={(e) => setEinst((alt) => ({ ...alt, deckkraft: { ...alt.deckkraft, [id]: 1 - Number(e.target.value) / 100 } }))}
+                  />
+                  <output>{Math.round((1 - einst.deckkraft[id]) * 100)} %</output>
+                </label>
+              </div>
+            ))}
             <label className="transparenz">
               <span>Wildart</span>
               <select value={wildartFilter} onChange={(e) => setWildartFilter(e.target.value)} aria-label="Wildart filtern">
@@ -852,23 +922,25 @@ export default function Karte({
                 <option value={365}>Letzte 12 Monate</option>
               </select>
             </label>
-            <p className="leer" style={{ margin: 0 }}>Jeder Eintrag zählt einfach. Zählungen haben keinen genauen Ort und liegen in der Zone.</p>
+            <p className="leer" style={{ margin: 0 }}>Der Filter gilt für Heatmap und Abschüsse. Jeder Eintrag zählt einfach; Zählungen liegen in ihrer Zone.</p>
           </Abschnitt>
 
           <Abschnitt titel="Ebenen" offen>
           <p className="leer" style={{ margin: 0 }}>Oberste Ebene liegt über den anderen. Mit ▲ ▼ verschieben, mit dem Regler die Transparenz einstellen.</p>
           <ul className="ebenen-liste">
             {einst.reihenfolge.map((id, i) => {
+              if (imBlock(id)) return null;
               const info = ebenenInfo[id];
+              const sichtbareIds = einst.reihenfolge.filter((x) => !imBlock(x));
               return (
                 <li key={id}>
                   <div className="ebenen-kopf">
                     <EbenenSchalter label={info.label} an={info.an} gesperrt={info.gesperrt} onAendern={info.setAn} />
                     <span className="ebenen-schieber">
-                      <button type="button" aria-label={`${info.name} nach oben`} disabled={i === 0} onClick={() => verschieben(i, -1)}>
+                      <button type="button" aria-label={`${info.name} nach oben`} disabled={id === sichtbareIds[0]} onClick={() => verschieben(i, -1)}>
                         ▲
                       </button>
-                      <button type="button" aria-label={`${info.name} nach unten`} disabled={i === einst.reihenfolge.length - 1} onClick={() => verschieben(i, 1)}>
+                      <button type="button" aria-label={`${info.name} nach unten`} disabled={id === sichtbareIds[sichtbareIds.length - 1]} onClick={() => verschieben(i, 1)}>
                         ▼
                       </button>
                     </span>
@@ -1052,6 +1124,75 @@ export default function Karte({
           vergeben={einrichtungsNamen}
           onSpeichern={einrichtungSpeichern}
           onAbbrechen={() => setNeueEinrichtung(null)}
+        />
+      )}
+
+      {!zeichnet && (
+        <button type="button" className={`wte-knopf ${wte ? 'an' : ''}`} aria-pressed={wte} aria-haspopup="menu" aria-expanded={wteMenue} onClick={() => setWteMenue((o) => !o)}>
+          WTE
+        </button>
+      )}
+      {wteMenue && (
+        <div className="wte-menue" role="menu" aria-label="WTE">
+          {k.istInhaber && (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setWte(false);
+                setModus({ art: 'einrichtung' });
+              }}
+            >
+              🪜 Einrichtung anlegen
+            </button>
+          )}
+          <button type="button" role="menuitem" onClick={() => navigieren('/abschuesse/fang')}>
+            🪤 Fang melden
+          </button>
+          {wte ? (
+            <button type="button" role="menuitem" onClick={() => setWte(false)}>
+              ⏹ Wildtiererfassung beenden
+            </button>
+          ) : (
+            <button type="button" role="menuitem" onClick={() => setWte(true)}>
+              👁 Wildtiererfassung starten
+            </button>
+          )}
+        </div>
+      )}
+      {wte && (
+        <div className="wte-leiste" role="status">
+          <strong>WTE</strong>
+          <span>
+            {wteEbenenIds.length === 0
+              ? 'Keine Zonenebene als WTE markiert (Zonen → Ebenen)'
+              : wteSitzung
+                ? `Zählung vom ${datumDE(wteSitzung.datum)} läuft – Zone antippen`
+                : 'Keine laufende Zählung – Zone antippen startet eine'}
+          </span>
+          <button type="button" className="link" onClick={() => setWte(false)}>
+            Beenden
+          </button>
+        </div>
+      )}
+      {wte && meldung && !panelOffen && (
+        <div className={`wte-toast hinweis hinweis-${meldung.art}`} role="status" onAnimationEnd={() => setMeldung(null)}>
+          {meldung.text}
+        </div>
+      )}
+      {wte && wteZone && (
+        <WteSichtung
+          key={wteZone.id}
+          k={k}
+          zone={wteZone}
+          sitzung={wteSitzung}
+          ebenen={(daten?.ebenen ?? []).map((e) => ({ id: e.id, name: e.name }))}
+          onSchliessen={() => setWteZone(null)}
+          onSitzung={sitzungLaden}
+          onGespeichert={(text) => {
+            setWteZone(null);
+            setMeldung({ art: 'info', text });
+          }}
         />
       )}
 

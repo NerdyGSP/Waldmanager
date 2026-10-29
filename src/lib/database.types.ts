@@ -17,6 +17,7 @@ export type Database = {
     Tables: {
       abschuesse: {
         Row: {
+          art: string
           aktualisiert_am: string
           altersklasse: string | null
           bemerkung: string | null
@@ -35,6 +36,7 @@ export type Database = {
           zone_id: string | null
         }
         Insert: {
+          art?: string
           aktualisiert_am?: string
           altersklasse?: string | null
           bemerkung?: string | null
@@ -53,6 +55,7 @@ export type Database = {
           zone_id?: string | null
         }
         Update: {
+          art?: string
           aktualisiert_am?: string
           altersklasse?: string | null
           bemerkung?: string | null
@@ -775,6 +778,7 @@ export type Database = {
       }
       zonen_ebenen: {
         Row: {
+          wte_aktiv: boolean
           aktualisiert_am: string
           erstellt_am: string
           farbe: string | null
@@ -784,6 +788,7 @@ export type Database = {
           sortierung: number
         }
         Insert: {
+          wte_aktiv?: boolean
           aktualisiert_am?: string
           erstellt_am?: string
           farbe?: string | null
@@ -793,6 +798,7 @@ export type Database = {
           sortierung?: number
         }
         Update: {
+          wte_aktiv?: boolean
           aktualisiert_am?: string
           erstellt_am?: string
           farbe?: string | null

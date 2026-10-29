@@ -298,7 +298,7 @@ function Ebenen({
     await onGeaendert();
   }
 
-  async function aendern(ebene: ZonenEbene, werte: { name?: string; farbe?: string }) {
+  async function aendern(ebene: ZonenEbene, werte: { name?: string; farbe?: string; wte_aktiv?: boolean }) {
     setFehler(null);
     if (werte.name !== undefined) {
       if (!werte.name.trim()) return;
@@ -331,7 +331,7 @@ function Ebenen({
     <>
       <Gruppe
         titel="Zonenebenen"
-        fuss="Die Ebenenfarbe wird auf alle Zonen der Ebene angewendet; danach kannst du einzelne Zonen wieder abweichend einfärben. Mit Ebenen legst du unabhängige Zoneneinteilungen an, z. B. „Zählzonen“ und „Ansitzbereiche“. Auf der Karte lässt sich jede Ebene einzeln ein- und ausblenden, eine Zählung kann auf eine Ebene beschränkt werden."
+        fuss="Die Ebenenfarbe wird auf alle Zonen der Ebene angewendet; danach kannst du einzelne Zonen wieder abweichend einfärben. Mit „WTE“ markierte Ebenen sind im WTE-Modus der Karte (Wildtiererfassung) antippbar. Mit Ebenen legst du unabhängige Zoneneinteilungen an, z. B. „Zählzonen“ und „Ansitzbereiche“. Auf der Karte lässt sich jede Ebene einzeln ein- und ausblenden, eine Zählung kann auf eine Ebene beschränkt werden."
       >
         {ebenen.length === 0 && <Zeile label="Noch keine Ebenen angelegt" />}
         {ebenen.map((e) => (
@@ -352,6 +352,9 @@ function Ebenen({
             }
           >
             <span className="zeile-aktionen">
+              <label className="ebene" title="Zonen dieser Ebene sind im WTE-Modus der Karte antippbar">
+                <input type="checkbox" checked={e.wte_aktiv} onChange={(ev) => void aendern(e, { wte_aktiv: ev.target.checked })} /> WTE
+              </label>
               <button
                 className="link"
                 onClick={() => {

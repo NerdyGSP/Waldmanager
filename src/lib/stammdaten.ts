@@ -11,7 +11,7 @@ export type Zone = {
   hatGeometrie: boolean;
   ebeneId: string | null;
 };
-export type ZonenEbene = { id: string; name: string; farbe: string | null; sortierung: number };
+export type ZonenEbene = { id: string; name: string; farbe: string | null; sortierung: number; wte_aktiv: boolean };
 export type Mitglied = { user_id: string; name: string; rolle: Enums<'revier_rolle'> };
 
 let wildartenCache: Wildart[] | null = null;
@@ -73,7 +73,7 @@ export function useZonenEbenen(revierId: string) {
   const laden = useCallback(async () => {
     const { data } = await supabase
       .from('zonen_ebenen')
-      .select('id, name, farbe, sortierung')
+      .select('id, name, farbe, sortierung, wte_aktiv')
       .eq('revier_id', revierId)
       .order('sortierung')
       .order('name');

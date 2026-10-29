@@ -35,7 +35,7 @@ const MODULE = [
   { pfad: 'karte', titel: 'Karte', text: 'Reviergrenze, Zonen, Einrichtungen, Pirschwege, Wind, Heatmap', symbol: '🗺' },
   { pfad: 'zaehlung', titel: 'Wildzählung', text: 'Zählsitzung je Zone mit Gesamtübersicht und Historie', symbol: '🔢' },
   { pfad: 'erfassung', titel: 'Einzelerfassung', text: 'Beobachtungen unterwegs, auch ohne Netz', symbol: '👁' },
-  { pfad: 'abschuesse', titel: 'Abschüsse', text: 'Strecke mit Wildart, Geschlecht, Altersklasse', symbol: '🎯' },
+  { pfad: 'abschuesse', titel: 'Abschüsse & Fänge', text: 'Strecke und Fänge mit Wildart, Geschlecht, Altersklasse', symbol: '🎯' },
   { pfad: 'wildschaeden', titel: 'Wildschäden', text: 'Schäden erfassen, Anmeldefrist im Blick', symbol: '🌾' },
   { pfad: 'aufgaben', titel: 'Aufgaben', text: 'Revierarbeiten planen und verteilen', symbol: '✅' },
   { pfad: 'bewegungsjagd', titel: 'Bewegungsjagd', text: 'Einladen, Zu- und Absagen, Stände zuweisen', symbol: '🦌' },
@@ -190,7 +190,7 @@ const NAVIGATION = [
   { pfad: 'karte', titel: 'Karte' },
   { pfad: 'zaehlung', titel: 'Wildzählung' },
   { pfad: 'erfassung', titel: 'Einzelerfassung' },
-  { pfad: 'abschuesse', titel: 'Abschüsse' },
+  { pfad: 'abschuesse', titel: 'Abschüsse & Fänge' },
   { pfad: 'wildschaeden', titel: 'Wildschäden' },
   { pfad: 'aufgaben', titel: 'Aufgaben' },
   { pfad: 'bewegungsjagd', titel: 'Bewegungsjagd' },
@@ -374,7 +374,7 @@ function ModulInhalt({ modul, unterpfad, k, breit = false }: { modul: string; un
     case 'zonen':
       return <Zonen k={k} />;
     case 'abschuesse':
-      return <Abschuesse k={k} />;
+      return <Abschuesse k={k} unterpfad={unterpfad} />;
     case 'erfassung':
       return <Erfassung k={k} />;
     case 'zaehlung':

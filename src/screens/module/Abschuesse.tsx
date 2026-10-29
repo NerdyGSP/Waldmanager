@@ -20,21 +20,23 @@ type Abschuss = {
   erleger_id: string | null;
   erfasst_von: string | null;
   bemerkung: string | null;
+  art: string;
 };
 
-export function Abschuesse({ k }: { k: RevierKontext }) {
+export function Abschuesse({ k, unterpfad = [] }: { k: RevierKontext; unterpfad?: string[] }) {
   const wildarten = useWildarten();
   const { zonen } = useZonen(k.revierId);
   const mitglieder = useMitglieder(k.revierId);
   const [jahr, setJahr] = useState(aktuellesJagdjahr());
   const [liste, setListe] = useState<Abschuss[]>([]);
-  const [bearbeiten, setBearbeiten] = useState<Abschuss | 'neu' | null>(null);
+  const [bearbeiten, setBearbeiten] = useState<Abschuss | 'neu' | null>(unterpfad[0] === 'fang' ? 'neu' : null);
+  const startArt = unterpfad[0] === 'fang' ? 'fang' : 'abschuss';
   const [fehler, setFehler] = useState<string | null>(null);
 
   const laden = useCallback(async () => {
     const { data, error } = await supabase
       .from('abschuesse')
-      .select('id, erlegt_am, wildart_id, geschlecht, altersklasse, gewicht_kg, zone_id, erleger_id, erfasst_von, bemerkung')
+      .select('id, erlegt_am, wildart_id, geschlecht, altersklasse, gewicht_kg, zone_id, erleger_id, erfasst_von, bemerkung, art')
       .eq('revier_id', k.revierId)
       .is('geloescht_am', null)
       .gte('erlegt_am', `${jahr.von}T00:00:00`)
@@ -50,7 +52,7 @@ export function Abschuesse({ k }: { k: RevierKontext }) {
 
   const strecke = useMemo(() => {
     const m = new Map<string, { gesamt: number; m: number; w: number }>();
-    for (const a of liste) {
+    for (const a of liste.filter((x) => x.art === 'abschuss')) {
       const s = m.get(a.wildart_id) ?? { gesamt: 0, m: 0, w: 0 };
       s.gesamt++;
       if (a.geschlecht === 'maennlich') s.m++;
@@ -68,6 +70,7 @@ export function Abschuesse({ k }: { k: RevierKontext }) {
       <AbschussFormular
         k={k}
         vorlage={bearbeiten === 'neu' ? null : bearbeiten}
+        startArt={startArt}
         onFertig={async () => {
           setBearbeiten(null);
           await laden();
@@ -78,9 +81,9 @@ export function Abschuesse({ k }: { k: RevierKontext }) {
 
   return (
     <Seite
-      titel="Abschüsse"
-      untertitel={`Jagdjahr ${jahr.label} · ${liste.length} Stück`}
-      aktion={<Knopf onClick={() => setBearbeiten('neu')}>+ Abschuss</Knopf>}
+      titel="Abschüsse & Fänge"
+      untertitel={`Jagdjahr ${jahr.label} · ${liste.filter((x) => x.art === 'abschuss').length} Stück Strecke${liste.some((x) => x.art === 'fang') ? ` · ${liste.filter((x) => x.art === 'fang').length} Fänge` : ''}`}
+      aktion={<Knopf onClick={() => setBearbeiten('neu')}>+ Erfassen</Knopf>}
     >
       <label className="filter">
         <span>Jagdjahr</span>
@@ -103,12 +106,12 @@ export function Abschuesse({ k }: { k: RevierKontext }) {
         </Gruppe>
       )}
 
-      <Gruppe titel="Einzelne Abschüsse">
-        {liste.length === 0 && <Zeile label="Keine Abschüsse in diesem Jagdjahr" />}
+      <Gruppe titel="Einzeleinträge">
+        {liste.length === 0 && <Zeile label="Keine Einträge in diesem Jagdjahr" />}
         {liste.map((a) => (
           <button key={a.id} className="zeile zeile-knopf" onClick={() => setBearbeiten(a)}>
             <span className="zeile-label">
-              {wildartName(wildarten, a.wildart_id)} {GESCHLECHTER.find((g) => g.wert === a.geschlecht)?.kurz}
+              {a.art === 'fang' ? '🪤 ' : ''}{wildartName(wildarten, a.wildart_id)} {GESCHLECHTER.find((g) => g.wert === a.geschlecht)?.kurz}{a.art === 'fang' ? ' · Fang' : ''}
               {a.altersklasse ? ` · ${a.altersklasse}` : ''}
               <small>
                 {datumZeitDE(a.erlegt_am)} · {name(a.erleger_id)}
@@ -126,10 +129,11 @@ export function Abschuesse({ k }: { k: RevierKontext }) {
   );
 }
 
-function AbschussFormular({ k, vorlage, onFertig }: { k: RevierKontext; vorlage: Abschuss | null; onFertig: () => Promise<void> }) {
+function AbschussFormular({ k, vorlage, startArt, onFertig }: { k: RevierKontext; vorlage: Abschuss | null; startArt: string; onFertig: () => Promise<void> }) {
   const wildarten = useWildarten();
   const { zonen } = useZonen(k.revierId);
   const mitglieder = useMitglieder(k.revierId);
+  const [art, setArt] = useState(vorlage?.art ?? startArt);
   const [wildartId, setWildartId] = useState(vorlage?.wildart_id ?? 'rehwild');
   const [geschlecht, setGeschlecht] = useState<Enums<'geschlecht'>>(vorlage?.geschlecht ?? 'unbekannt');
   const [altersklasse, setAltersklasse] = useState(vorlage?.altersklasse ?? '');
@@ -170,6 +174,7 @@ function AbschussFormular({ k, vorlage, onFertig }: { k: RevierKontext; vorlage:
     setSpeichert(true);
     const daten = {
       revier_id: k.revierId,
+      art,
       wildart_id: wildartId,
       geschlecht,
       altersklasse: altersklasse || null,
@@ -196,8 +201,9 @@ function AbschussFormular({ k, vorlage, onFertig }: { k: RevierKontext; vorlage:
   }
 
   return (
-    <Seite titel={vorlage ? 'Abschuss bearbeiten' : 'Abschuss erfassen'} zurueck={() => void onFertig()}>
+    <Seite titel={`${art === 'fang' ? 'Fang' : 'Abschuss'} ${vorlage ? 'bearbeiten' : 'erfassen'}`} zurueck={() => void onFertig()}>
       <form onSubmit={speichern}>
+        <Segmente label="Art" wert={art} onAendern={setArt} optionen={[{ wert: 'abschuss', label: 'Abschuss' }, { wert: 'fang', label: 'Fang' }]} />
         <Gruppe>
           <Auswahl
             label="Wildart"
@@ -255,7 +261,7 @@ function AbschussFormular({ k, vorlage, onFertig }: { k: RevierKontext; vorlage:
         </Gruppe>
 
         <Knopf type="button" variante="sekundaer" onClick={ortUebernehmen}>
-          📍 Aktuelle Position als Erlegeort
+          📍 Aktuelle Position als {art === 'fang' ? 'Fangort' : 'Erlegeort'}
         </Knopf>
         <PositionWaehlen
           revierId={k.revierId}
