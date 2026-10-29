@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { fehlertext } from '../../lib/fehler';
 import { GESCHLECHTER, useWildarten, useZonen, wildartName } from '../../lib/stammdaten';
 import { aktuellePosition, punktEWKT, type Position } from '../../lib/geo';
+import { PositionWaehlen } from '../../components/PositionWaehlen';
 import { speichernOderMerken } from '../../lib/offline';
 import { datumZeitDE } from '../../lib/zeit';
 import type { Enums } from '../../lib/database.types';
@@ -187,8 +188,17 @@ export function Erfassung({ k }: { k: RevierKontext }) {
         {anzahl} × {wildartName(wildarten, wildartId)} erfassen
       </Knopf>
       <Knopf variante="sekundaer" onClick={ortBestimmen}>
-        📍 Position neu bestimmen
+        📍 Aktuelle Position verwenden
       </Knopf>
+      <PositionWaehlen
+        revierId={k.revierId}
+        wert={position}
+        onWaehlen={(p) => {
+          setPosition({ lon: p.lon, lat: p.lat, genauigkeit: 0 });
+          setOrtStatus('Position auf der Karte gewählt');
+          if (navigator.onLine) void supabase.rpc('zone_an_position', { p_revier_id: k.revierId, p_lon: p.lon, p_lat: p.lat }).then(({ data }) => data && setZoneId(data));
+        }}
+      />
 
       <Gruppe titel="Zuletzt erfasst">
         {liste.length === 0 && <Zeile label="Noch keine Beobachtungen" />}

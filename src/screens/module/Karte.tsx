@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ZonenInfo, type GewaehlteZone } from './ZonenInfo';
 import { createPortal } from 'react-dom';
 import {
@@ -19,7 +19,8 @@ import kartenWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import type { Feature, FeatureCollection, Geometry, MultiPolygon, Position } from 'geojson';
 import { supabase } from '../../lib/supabase';
 import { fehlertext } from '../../lib/fehler';
-import { EINRICHTUNGSTYPEN, nameVergeben, useWildarten, useZonen, wildartName, ZONENFARBEN } from '../../lib/stammdaten';
+import { EINRICHTUNGSTYPEN, GESCHLECHTER, nameVergeben, useWildarten, useZonen, wildartName, ZONENFARBEN } from '../../lib/stammdaten';
+import { datumZeitDE } from '../../lib/zeit';
 import { aktuellesWetter, himmelsrichtung, linieEWKT, punktEWKT, type Wetter } from '../../lib/geo';
 import { navigieren } from '../../lib/router';
 import { EinrichtungsIcon, einrichtungsBild } from '../../lib/einrichtungsIcons';
@@ -107,7 +108,12 @@ type KartenDaten = {
   pirschwege: Feature[];
   beobachtungen: Feature[];
   abschuesse: Feature[];
+  zaehlungen: Feature[];
 };
+
+const HEATNAMEN = { zaehlungen: 'Zählungen', beobachtungen: 'Beobachtungen', abschuesse: 'Abschüsse' } as const;
+type HeatQuelle = 'zaehlungen' | 'beobachtungen' | 'abschuesse';
+const WILDARTFARBEN = ['#c0392b', '#1f6fb2', '#1e8449', '#b9770e', '#8e44ad', '#16a085', '#d35400', '#5d6d7e', '#cb4335', '#2e4053'];
 
 type Ebenen = {
   luftbild: boolean;
@@ -189,6 +195,27 @@ export default function Karte({
     setNeueEinrichtung(null);
   };
 
+  // Filter für Heatmap und Abschüsse (gelten für alle drei Quellen)
+  const [wildartFilter, setWildartFilter] = useState('');
+  const [tageFilter, setTageFilter] = useState<30 | 90 | 365>(365);
+  const [heatQuelle, setHeatQuelle] = useState<HeatQuelle>('beobachtungen');
+  const gefiltert = useMemo(() => {
+    const grenzeZeit = Date.now() - tageFilter * 86400000;
+    const filtern = (l: Feature[] | undefined, farben = false): Feature[] =>
+      (l ?? [])
+        .filter((f) => (!wildartFilter || f.properties?.wildart_id === wildartFilter) && new Date(String(f.properties?.zeitpunkt ?? 0)).getTime() >= grenzeZeit)
+        .map((f) => {
+          if (!farben) return f;
+          const i = wildarten.findIndex((w) => w.id === f.properties?.wildart_id);
+          return { ...f, properties: { ...f.properties, farbe: WILDARTFARBEN[(i < 0 ? 0 : i) % WILDARTFARBEN.length] } };
+        });
+    return {
+      beobachtungen: filtern(daten?.beobachtungen),
+      abschuesse: filtern(daten?.abschuesse, true),
+      zaehlungen: filtern(daten?.zaehlungen),
+    };
+  }, [daten, wildartFilter, tageFilter, wildarten]);
+
   // Daten laden
   const laden = useCallback(async () => {
     const { data, error } = await supabase.rpc('karte_daten', { p_revier_id: k.revierId, p_tage: 365 });
@@ -205,6 +232,7 @@ export default function Karte({
       pirschwege: d.pirschwege ?? [],
       beobachtungen: d.beobachtungen ?? [],
       abschuesse: d.abschuesse ?? [],
+      zaehlungen: d.zaehlungen ?? [],
     });
   }, [k.revierId]);
 
@@ -250,7 +278,7 @@ export default function Karte({
       if (!m.hasImage(e.id)) m.addImage(e.id, einrichtungsBild('sonstiges', '#5d6d7e'), { pixelRatio: 2 });
     });
     m.on('load', () => {
-      for (const id of ['grenze', 'zonen', 'einrichtungen', 'pirschwege', 'beobachtungen', 'abschuesse', 'zeichnung']) {
+      for (const id of ['grenze', 'zonen', 'einrichtungen', 'pirschwege', 'beobachtungen', 'abschuesse', 'heatquelle', 'zeichnung']) {
         m.addSource(id, { type: 'geojson', data: LEER });
       }
       m.addLayer({
@@ -281,10 +309,10 @@ export default function Karte({
       m.addLayer({
         id: 'heatmap',
         type: 'heatmap',
-        source: 'beobachtungen',
+        source: 'heatquelle',
         layout: { visibility: 'none' },
         paint: {
-          'heatmap-weight': ['interpolate', ['linear'], ['get', 'anzahl'], 1, 0.4, 10, 1],
+          'heatmap-weight': 1,
           'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 10, 12, 16, 40],
           'heatmap-opacity': 0.75,
         },
@@ -301,7 +329,7 @@ export default function Karte({
         type: 'circle',
         source: 'abschuesse',
         layout: { visibility: 'none' },
-        paint: { 'circle-radius': 6, 'circle-color': '#c0392b', 'circle-stroke-color': '#fff', 'circle-stroke-width': 1.5 },
+        paint: { 'circle-radius': 7, 'circle-color': ['coalesce', ['get', 'farbe'], '#c0392b'], 'circle-stroke-color': '#fff', 'circle-stroke-width': 1.5 },
       });
       for (const t of EINRICHTUNGSTYPEN) m.addImage(`einr-${t.wert}`, einrichtungsBild(t.wert, t.farbe), { pixelRatio: 2 });
       m.addLayer({
@@ -372,8 +400,9 @@ export default function Karte({
     setzen('zonen', { type: 'FeatureCollection', features: daten.zonen });
     setzen('einrichtungen', { type: 'FeatureCollection', features: daten.einrichtungen });
     setzen('pirschwege', { type: 'FeatureCollection', features: daten.pirschwege });
-    setzen('beobachtungen', { type: 'FeatureCollection', features: daten.beobachtungen });
-    setzen('abschuesse', { type: 'FeatureCollection', features: daten.abschuesse });
+    setzen('beobachtungen', { type: 'FeatureCollection', features: gefiltert.beobachtungen });
+    setzen('abschuesse', { type: 'FeatureCollection', features: gefiltert.abschuesse });
+    setzen('heatquelle', { type: 'FeatureCollection', features: gefiltert[heatQuelle] });
     grenzeRef.current = daten.grenze;
 
     // Handy: Luftbild nur für die Reviergrenze (+ ca. 150 m Rand); Tablet/PC: für den gesamten Kartenausschnitt
@@ -417,7 +446,7 @@ export default function Karte({
     });
     zonenBeschriftungenAnzeigen();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [daten, bereit]);
+  }, [daten, bereit, gefiltert, heatQuelle]);
 
   function zonenBeschriftungenAnzeigen() {
     for (const mk of zonenMarker.current) {
@@ -544,7 +573,7 @@ export default function Karte({
         return;
       }
       if (aktiv) return;
-      const treffer = m.queryRenderedFeatures(e.point, { layers: ['einrichtungen-punkt', 'pirschwege-linie', 'zonen-flaeche'] });
+      const treffer = m.queryRenderedFeatures(e.point, { layers: ['einrichtungen-punkt', 'abschuesse-punkt', 'pirschwege-linie', 'zonen-flaeche'] });
       const f = treffer[0];
       if (!f) {
         setGewaehlteZone(null);
@@ -609,6 +638,10 @@ export default function Karte({
       loeschen = async () => {
         await supabase.from('einrichtungen').update({ geloescht_am: new Date().toISOString() }).eq('id', String(p.id));
       };
+    } else if (ebene === 'abschuesse-punkt') {
+      titel.textContent = `Abschuss: ${wildartName(wildarten, String(p.wildart_id ?? ''))}`;
+      const g = GESCHLECHTER.find((x) => x.wert === p.geschlecht)?.label ?? 'unbekannt';
+      text.textContent = `${datumZeitDE(String(p.erlegt_am ?? p.zeitpunkt ?? ''))} · ${g}`;
     } else if (ebene === 'pirschwege-linie') {
       titel.textContent = `Pirschweg: ${String(p.name ?? '')}`;
       text.textContent = `${Number(p.laenge_m ?? 0).toLocaleString('de-DE')} m${p.bemerkung ? ` · ${String(p.bemerkung)}` : ''}`;
@@ -777,11 +810,11 @@ export default function Karte({
     },
     zonen: { name: 'Zonen', label: 'Zonen', an: ebenen.zonen, setAn: (an) => setEbenen({ ...ebenen, zonen: an }) },
     grenze: { name: 'Reviergrenze', label: 'Reviergrenze', an: ebenen.grenze, setAn: (an) => setEbenen({ ...ebenen, grenze: an }) },
-    heatmap: { name: 'Heatmap', label: `Heatmap Beobachtungen (${anzahlBeob}, 12 Monate)`, an: ebenen.heatmap, setAn: (an) => setEbenen({ ...ebenen, heatmap: an }) },
+    heatmap: { name: 'Heatmap', label: `Heatmap ${HEATNAMEN[heatQuelle]} (${gefiltert[heatQuelle].length})`, an: ebenen.heatmap, setAn: (an) => setEbenen({ ...ebenen, heatmap: an }) },
     pirschwege: { name: 'Pirschwege', label: 'Pirschwege', an: ebenen.pirschwege, setAn: (an) => setEbenen({ ...ebenen, pirschwege: an }) },
     abschuesse: {
       name: 'Abschüsse',
-      label: `Abschüsse (${daten?.abschuesse.length ?? 0}, 12 Monate)`,
+      label: `Abschüsse (${gefiltert.abschuesse.length})`,
       an: ebenen.abschuesse,
       setAn: (an) => setEbenen({ ...ebenen, abschuesse: an }),
     },
@@ -791,6 +824,36 @@ export default function Karte({
   const werkzeuge = (
     <>
           {meldung && <div className={`hinweis hinweis-${meldung.art}`}>{meldung.text}</div>}
+
+          <Abschnitt titel="Heatmap & Abschüsse" offen>
+            <div className="segmente" role="radiogroup" aria-label="Quelle der Heatmap">
+              {(Object.keys(HEATNAMEN) as HeatQuelle[]).map((q) => (
+                <button key={q} type="button" role="radio" aria-checked={heatQuelle === q} className={heatQuelle === q ? 'an' : ''} onClick={() => setHeatQuelle(q)}>
+                  {HEATNAMEN[q]}
+                </button>
+              ))}
+            </div>
+            <label className="transparenz">
+              <span>Wildart</span>
+              <select value={wildartFilter} onChange={(e) => setWildartFilter(e.target.value)} aria-label="Wildart filtern">
+                <option value="">Alle Wildarten</option>
+                {wildarten.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="transparenz">
+              <span>Zeitraum</span>
+              <select value={tageFilter} onChange={(e) => setTageFilter(Number(e.target.value) as 30 | 90 | 365)} aria-label="Zeitraum filtern">
+                <option value={30}>Letzte 30 Tage</option>
+                <option value={90}>Letzte 90 Tage</option>
+                <option value={365}>Letzte 12 Monate</option>
+              </select>
+            </label>
+            <p className="leer" style={{ margin: 0 }}>Jeder Eintrag zählt einfach. Zählungen haben keinen genauen Ort und liegen in der Zone.</p>
+          </Abschnitt>
 
           <Abschnitt titel="Ebenen" offen>
           <p className="leer" style={{ margin: 0 }}>Oberste Ebene liegt über den anderen. Mit ▲ ▼ verschieben, mit dem Regler die Transparenz einstellen.</p>
@@ -930,7 +993,7 @@ export default function Karte({
           ) : (
             <p className="leer">Zeichnen und Importieren kann nur der Revierinhaber.</p>
           )}
-          <p className="leer">Heatmap und Abschüsse zeigen nur Erfassungen mit Position. Wind: Open-Meteo.</p>
+          <p className="leer">Heatmap und Abschüsse zeigen nur Erfassungen mit Position (Zählungen: Zone). Wind: Open-Meteo.</p>
           {wildarten.length > 0 && anzahlBeob > 0 && (
             <p className="leer">
               Häufigste Wildart: {wildartName(wildarten, haeufigste(daten?.beobachtungen ?? []))}

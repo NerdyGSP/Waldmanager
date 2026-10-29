@@ -814,3 +814,8 @@ button.kachel:active { transform: none; }
 .ma-tabelle td small { display: block; color: var(--color-text-muted); }
 .ma-tabelle td .link { margin-right: 10px; }
 @media print { .schein-fenster { position: static !important; transform: none !important; max-height: none !important; overflow: visible !important; box-shadow: none !important; border: 0 !important; width: auto !important; padding: 0 !important; } .schein-fenster-kopf { display: none !important; } }
+
+/* Aufgabenlisten */
+.liste-zeile { width: 100%; background: none; border: 0; border-bottom: 1px solid var(--color-border); color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.liste-zeile[aria-pressed='true'] { background: color-mix(in srgb, var(--color-accent, #e4572e) 10%, transparent); font-weight: 600; }
+.liste-aktionen { display: flex; gap: var(--space-2, 8px); flex-wrap: wrap; margin: 8px 0; }

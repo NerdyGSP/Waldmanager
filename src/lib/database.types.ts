@@ -803,11 +803,46 @@ export type Database = {
         }
         Relationships: []
       }
+      aufgabenlisten: {
+        Row: {
+          aktualisiert_am: string
+          bewegungsjagd_id: string | null
+          erstellt_am: string
+          erstellt_von: string | null
+          geloescht_am: string | null
+          id: string
+          name: string
+          revier_id: string
+          status: string
+        }
+        Insert: {
+          aktualisiert_am?: string
+          bewegungsjagd_id?: string | null
+          erstellt_am?: string
+          erstellt_von?: string | null
+          geloescht_am?: string | null
+          id?: string
+          name: string
+          revier_id: string
+          status?: string
+        }
+        Update: {
+          aktualisiert_am?: string
+          bewegungsjagd_id?: string | null
+          erstellt_am?: string
+          erstellt_von?: string | null
+          geloescht_am?: string | null
+          id?: string
+          name?: string
+          revier_id?: string
+          status?: string
+        }
+        Relationships: []
+      }
       aufgaben: {
         Row: {
           aktualisiert_am: string
           beschreibung: string | null
-          bewegungsjagd_id: string | null
           einrichtung_id: string | null
           erledigt_am: string | null
           erstellt_am: string
@@ -815,6 +850,7 @@ export type Database = {
           faellig_am: string | null
           geloescht_am: string | null
           id: string
+          liste_id: string | null
           revier_id: string
           status: string
           titel: string
@@ -823,7 +859,6 @@ export type Database = {
         Insert: {
           aktualisiert_am?: string
           beschreibung?: string | null
-          bewegungsjagd_id?: string | null
           einrichtung_id?: string | null
           erledigt_am?: string | null
           erstellt_am?: string
@@ -831,6 +866,7 @@ export type Database = {
           faellig_am?: string | null
           geloescht_am?: string | null
           id?: string
+          liste_id?: string | null
           revier_id: string
           status?: string
           titel: string
@@ -839,7 +875,6 @@ export type Database = {
         Update: {
           aktualisiert_am?: string
           beschreibung?: string | null
-          bewegungsjagd_id?: string | null
           einrichtung_id?: string | null
           erledigt_am?: string | null
           erstellt_am?: string
@@ -847,6 +882,7 @@ export type Database = {
           faellig_am?: string | null
           geloescht_am?: string | null
           id?: string
+          liste_id?: string | null
           revier_id?: string
           status?: string
           titel?: string

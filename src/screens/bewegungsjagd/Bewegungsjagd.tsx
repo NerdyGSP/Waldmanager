@@ -254,6 +254,7 @@ function Assistent({ k }: { k: RevierKontext }) {
       setSpeichert(false);
       return setFehler(fehlertext(error));
     }
+    await supabase.from('aufgabenlisten').insert({ revier_id: k.revierId, name: `Jagd: ${titel.trim()}`, bewegungsjagd_id: j.id, erstellt_von: k.userId });
     const { data: tn, error: e2 } = await supabase
       .from('bewegungsjagd_teilnehmer')
       .insert(teilnehmer.map((t) => ({ bewegungsjagd_id: j.id, name: t.name, email: t.email, aktiv: t.aktiv, zugeordnete_einrichtung_id: zuordnung[t.key] || null })))
@@ -532,11 +533,14 @@ function Auswertung({ k, id }: { k: RevierKontext; id: string }) {
   const mitglieder = useMitglieder(k.revierId);
 
   const laden = useCallback(async () => {
-    const [{ data: j, error }, { data: t }, { data: a }] = await Promise.all([
+    const [{ data: j, error }, { data: t }, { data: l }] = await Promise.all([
       supabase.from('bewegungsjagden').select('*').eq('id', id).eq('revier_id', k.revierId).maybeSingle(),
       supabase.from('bewegungsjagd_teilnehmer').select('*').eq('bewegungsjagd_id', id).order('name'),
-      supabase.from('aufgaben').select('id, titel, faellig_am, status, zugewiesen_an').eq('bewegungsjagd_id', id).is('geloescht_am', null).order('faellig_am', { nullsFirst: false }),
+      supabase.from('aufgabenlisten').select('id').eq('bewegungsjagd_id', id).is('geloescht_am', null).maybeSingle(),
     ]);
+    const { data: a } = l
+      ? await supabase.from('aufgaben').select('id, titel, faellig_am, status, zugewiesen_an').eq('liste_id', l.id).is('geloescht_am', null).order('faellig_am', { nullsFirst: false })
+      : { data: [] as Aufgabe[] };
     if (error) setFehler(fehlertext(error));
     else if (!j) setFehler('Diese Bewegungsjagd gibt es nicht (mehr).');
     setJagd(j);
@@ -589,9 +593,15 @@ function Auswertung({ k, id }: { k: RevierKontext; id: string }) {
   }
   async function aufgabeAnlegen() {
     if (!aufgabeTitel.trim()) return;
+    let { data: l } = await supabase.from('aufgabenlisten').select('id').eq('bewegungsjagd_id', id).is('geloescht_am', null).maybeSingle();
+    if (!l) {
+      const r = await supabase.from('aufgabenlisten').insert({ revier_id: k.revierId, name: `Jagd: ${jagd?.titel ?? 'Bewegungsjagd'}`, bewegungsjagd_id: id, erstellt_von: k.userId }).select('id').single();
+      if (r.error) return setFehler(fehlertext(r.error));
+      l = r.data;
+    }
     const { error } = await supabase.from('aufgaben').insert({
       revier_id: k.revierId,
-      bewegungsjagd_id: id,
+      liste_id: l.id,
       titel: aufgabeTitel.trim(),
       faellig_am: aufgabeFaellig || null,
       zugewiesen_an: aufgabeWer || null,

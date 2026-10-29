@@ -65,6 +65,16 @@ export default function BjKarte({
       else {
         m.addSource('bj-grenze', { type: 'geojson', data: daten });
         m.addLayer({ id: 'bj-grenze', type: 'line', source: 'bj-grenze', paint: { 'line-color': '#1e5c3a', 'line-width': 2.5 } });
+        // Ohne Marker auf die Reviergrenze zoomen (z. B. beim Positionswähler)
+        if (grenze && !gepasst.current && aktive.current.length === 0) {
+          const b = new LngLatBounds();
+          const walk = (c: unknown): void => {
+            if (Array.isArray(c) && typeof c[0] === 'number') b.extend([c[0] as number, c[1] as number]);
+            else if (Array.isArray(c)) c.forEach(walk);
+          };
+          walk((grenze as { coordinates?: unknown }).coordinates);
+          if (!b.isEmpty()) m.fitBounds(b, { padding: 30, maxZoom: 16, animate: false });
+        }
       }
     };
     if (m.isStyleLoaded()) zeichnen();

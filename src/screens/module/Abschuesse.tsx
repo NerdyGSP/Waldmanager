@@ -4,6 +4,7 @@ import { fehlertext } from '../../lib/fehler';
 import { GESCHLECHTER, useMitglieder, useWildarten, useZonen, wildartName } from '../../lib/stammdaten';
 import { aktuellesJagdjahr, datumZeitDE, letzteJagdjahre, lokalDatumZeit } from '../../lib/zeit';
 import { aktuellePosition, punktEWKT } from '../../lib/geo';
+import { PositionWaehlen } from '../../components/PositionWaehlen';
 import type { Enums } from '../../lib/database.types';
 import { Auswahl, Feld, Gruppe, Hinweis, Knopf, Leer, Seite, Segmente, Zeile, WildartOptionen } from '../../components/ui';
 import type { RevierKontext } from './kontext';
@@ -256,6 +257,16 @@ function AbschussFormular({ k, vorlage, onFertig }: { k: RevierKontext; vorlage:
         <Knopf type="button" variante="sekundaer" onClick={ortUebernehmen}>
           📍 Aktuelle Position als Erlegeort
         </Knopf>
+        <PositionWaehlen
+          revierId={k.revierId}
+          wert={position}
+          onWaehlen={async (p) => {
+            setPosition(p);
+            const { data } = await supabase.rpc('zone_an_position', { p_revier_id: k.revierId, p_lon: p.lon, p_lat: p.lat });
+            if (data) setZoneId(data);
+            setOrtStatus(`Erlegeort auf der Karte gewählt${data ? ', Zone automatisch gesetzt' : ''}`);
+          }}
+        />
         {ortStatus && <Leer>{ortStatus}</Leer>}
 
         {fehler && <Hinweis art="fehler">{fehler}</Hinweis>}
