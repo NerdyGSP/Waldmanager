@@ -3,7 +3,15 @@ import { supabase } from './supabase';
 import type { Enums, Tables } from './database.types';
 
 export type Wildart = Pick<Tables<'wildarten'>, 'id' | 'name' | 'gruppe' | 'sortierung' | 'altersklassen'>;
-export type Zone = { id: string; name: string; farbe: string | null; sortierung: number; hatGeometrie: boolean };
+export type Zone = {
+  id: string;
+  name: string;
+  farbe: string | null;
+  sortierung: number;
+  hatGeometrie: boolean;
+  ebeneId: string | null;
+};
+export type ZonenEbene = { id: string; name: string; farbe: string | null; sortierung: number };
 export type Mitglied = { user_id: string; name: string; rolle: Enums<'revier_rolle'> };
 
 let wildartenCache: Wildart[] | null = null;
@@ -35,7 +43,7 @@ export function useZonen(revierId: string) {
   const laden = useCallback(async () => {
     const { data } = await supabase
       .from('zonen')
-      .select('id, name, farbe, sortierung, geom')
+      .select('id, name, farbe, sortierung, geom, ebene_id')
       .eq('revier_id', revierId)
       .is('geloescht_am', null)
       .order('sortierung')
@@ -47,6 +55,7 @@ export function useZonen(revierId: string) {
         farbe: z.farbe,
         sortierung: z.sortierung,
         hatGeometrie: z.geom !== null,
+        ebeneId: z.ebene_id,
       })),
     );
     setLaedt(false);
@@ -57,6 +66,29 @@ export function useZonen(revierId: string) {
   }, [laden]);
 
   return { zonen, laedt, laden };
+}
+
+export function useZonenEbenen(revierId: string) {
+  const [ebenen, setEbenen] = useState<ZonenEbene[]>([]);
+  const laden = useCallback(async () => {
+    const { data } = await supabase
+      .from('zonen_ebenen')
+      .select('id, name, farbe, sortierung')
+      .eq('revier_id', revierId)
+      .order('sortierung')
+      .order('name');
+    setEbenen(data ?? []);
+  }, [revierId]);
+  useEffect(() => {
+    void laden();
+  }, [laden]);
+  return { ebenen, laden };
+}
+
+/** Prüft, ob ein Name (ohne Groß-/Kleinschreibung) schon vergeben ist */
+export function nameVergeben(namen: Array<string | null | undefined>, name: string, ausser?: string | null): boolean {
+  const n = name.trim().toLowerCase();
+  return namen.some((x) => x != null && x.trim().toLowerCase() === n && x !== ausser);
 }
 
 export function useMitglieder(revierId: string): Mitglied[] {

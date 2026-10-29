@@ -474,3 +474,16 @@ button.kachel:active { transform: scale(0.98); }
   .wind { top: 12px; left: 12px; right: auto; bottom: auto; padding: 6px 10px; font-size: 0.82rem; }
   .panel-schalter { bottom: 28px; padding: 9px 13px; font-size: 0.9rem; }
 }
+.farbwahl { width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%; overflow: hidden; background: none; cursor: pointer; flex: none; }
+.farbwahl::-webkit-color-swatch-wrapper { padding: 0; }
+.farbwahl::-webkit-color-swatch { border: 0; border-radius: 50%; }
+.farbwahl::-moz-color-swatch { border: 0; border-radius: 50%; }
+.unterebenen { display: grid; gap: 2px; padding-left: 28px; }
+.unterebenen .ebene { font-size: 0.86rem; }
+.ebene.gesperrt { color: var(--text-leise); cursor: default; }
+.feld-fehler { color: var(--gefahr); font-size: 0.8rem; }
+/* Zeilen mit Aktionen: Aktionen unter den Namen umbrechen */
+.zeile:has(> .zeile-aktionen) { flex-wrap: wrap; row-gap: 4px; }
+.zeile:has(> .zeile-aktionen) > .zeile-label { flex: 1 1 100%; }
+.zone-name { display: grid; grid-template-columns: auto 1fr; column-gap: 8px; align-items: center; }
+.zone-name small { grid-column: 2; padding-left: 0; width: auto; }

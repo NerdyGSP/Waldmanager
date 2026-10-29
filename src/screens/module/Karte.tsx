@@ -18,7 +18,7 @@ import kartenWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import type { Feature, FeatureCollection, Geometry, MultiPolygon, Polygon, Position } from 'geojson';
 import { supabase } from '../../lib/supabase';
 import { fehlertext } from '../../lib/fehler';
-import { useWildarten, useZonen, wildartName, ZONENFARBEN } from '../../lib/stammdaten';
+import { nameVergeben, useWildarten, useZonen, wildartName, ZONENFARBEN } from '../../lib/stammdaten';
 import { aktuellesWetter, himmelsrichtung, linieEWKT, punktEWKT, type Wetter } from '../../lib/geo';
 import type { Enums, Json } from '../../lib/database.types';
 import type { RevierKontext } from './kontext';
@@ -42,18 +42,8 @@ const STIL: StyleSpecification = {
       maxzoom: 19,
       attribution: '© OpenStreetMap-Mitwirkende',
     },
-    luftbild: {
-      type: 'raster',
-      tiles: [LUFTBILD_URL],
-      tileSize: 256,
-      maxzoom: 20,
-      attribution: 'Luftbild © LGLN',
-    },
   },
-  layers: [
-    { id: 'osm', type: 'raster', source: 'osm' },
-    { id: 'luftbild', type: 'raster', source: 'luftbild', layout: { visibility: 'none' } },
-  ],
+  layers: [{ id: 'osm', type: 'raster', source: 'osm' }],
 };
 
 const STANDARD_ZENTRUM: [number, number] = [9.47, 52.2]; // Raum Bad Münder
@@ -74,8 +64,11 @@ export const EINRICHTUNGSTYPEN: Array<{ wert: Enums<'einrichtung_typ'>; label: s
 
 const LEER: FeatureCollection = { type: 'FeatureCollection', features: [] };
 
+type KartenEbene = { id: string; name: string; farbe: string | null };
+
 type KartenDaten = {
   grenze: MultiPolygon | null;
+  ebenen: KartenEbene[];
   zonen: Feature[];
   einrichtungen: Feature[];
   pirschwege: Feature[];
@@ -141,6 +134,9 @@ export default function Karte({
   const [meldung, setMeldung] = useState<{ art: 'fehler' | 'erfolg' | 'info'; text: string } | null>(null);
   const [shpImport, setShpImport] = useState<Feature<Polygon | MultiPolygon>[] | null>(null);
   const aufzeichnung = useRef<number | null>(null);
+  const [ausgeblendet, setAusgeblendet] = useState<Set<string>>(new Set());
+  const [zielEbene, setZielEbene] = useState('');
+  const grenzeRef = useRef<MultiPolygon | null>(null);
 
   const setModus = (m: Modus) => {
     modusRef.current = m;
@@ -159,6 +155,7 @@ export default function Karte({
     const d = (data ?? {}) as unknown as Partial<KartenDaten>;
     setDaten({
       grenze: d.grenze ?? null,
+      ebenen: d.ebenen ?? [],
       zonen: d.zonen ?? [],
       einrichtungen: d.einrichtungen ?? [],
       pirschwege: d.pirschwege ?? [],
@@ -326,18 +323,47 @@ export default function Karte({
     setzen('pirschwege', { type: 'FeatureCollection', features: daten.pirschwege });
     setzen('beobachtungen', { type: 'FeatureCollection', features: daten.beobachtungen });
     setzen('abschuesse', { type: 'FeatureCollection', features: daten.abschuesse });
+    grenzeRef.current = daten.grenze;
+
+    // Luftbild nur für die Ausdehnung der Reviergrenze (+ ca. 150 m Rand) anfordern
+    if (m.getLayer('luftbild')) m.removeLayer('luftbild');
+    if (m.getSource('luftbild')) m.removeSource('luftbild');
+    const bb = daten.grenze ? grenzen([daten.grenze]) : null;
+    if (bb) {
+      const rand = 0.002;
+      m.addSource('luftbild', {
+        type: 'raster',
+        tiles: [LUFTBILD_URL],
+        tileSize: 256,
+        maxzoom: 20,
+        bounds: [bb.getWest() - rand, bb.getSouth() - rand, bb.getEast() + rand, bb.getNorth() + rand],
+        attribution: 'Luftbild © LGLN',
+      });
+      m.addLayer(
+        { id: 'luftbild', type: 'raster', source: 'luftbild', layout: { visibility: ebenen.luftbild ? 'visible' : 'none' } },
+        'zonen-flaeche',
+      );
+    }
 
     // Zonennamen als HTML-Beschriftung (kommt ohne Schrift-Server aus)
     for (const mk of zonenMarker.current) mk.remove();
     zonenMarker.current = daten.zonen.map((f) => {
       const el = document.createElement('div');
       el.className = 'zonen-beschriftung';
+      el.dataset.ebene = String(f.properties?.ebene_id ?? 'ohne');
       el.textContent = String(f.properties?.name ?? '');
       return new Marker({ element: el }).setLngLat(mittelpunkt(f.geometry)).addTo(m);
     });
-    for (const mk of zonenMarker.current) mk.getElement().style.display = ebenen.zonen ? '' : 'none';
+    zonenBeschriftungenAnzeigen();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [daten, bereit]);
+
+  function zonenBeschriftungenAnzeigen() {
+    for (const mk of zonenMarker.current) {
+      const el = mk.getElement();
+      el.style.display = ebenen.zonen && !ausgeblendet.has(el.dataset.ebene ?? 'ohne') ? '' : 'none';
+    }
+  }
 
   // Beim ersten Laden auf das Revier zoomen, sonst auf den eigenen Standort
   const gezoomt = useRef(false);
@@ -368,16 +394,21 @@ export default function Karte({
     const m = karte.current;
     if (!m || !bereit) return;
     const sichtbar = (ebene: string, an: boolean) => m.setLayoutProperty(ebene, 'visibility', an ? 'visible' : 'none');
-    sichtbar('luftbild', ebenen.luftbild);
-    sichtbar('osm', !ebenen.luftbild);
+    // OSM bleibt als Hintergrund außerhalb des Reviers sichtbar
+    if (m.getLayer('luftbild')) sichtbar('luftbild', ebenen.luftbild);
     sichtbar('zonen-flaeche', ebenen.zonen);
     sichtbar('zonen-linie', ebenen.zonen);
     sichtbar('einrichtungen-punkt', ebenen.einrichtungen);
     sichtbar('pirschwege-linie', ebenen.pirschwege);
     sichtbar('heatmap', ebenen.heatmap);
     sichtbar('abschuesse-punkt', ebenen.abschuesse);
-    for (const mk of zonenMarker.current) mk.getElement().style.display = ebenen.zonen ? '' : 'none';
-  }, [ebenen, bereit]);
+    // Einzelne Zonenebenen ein-/ausblenden
+    const filter = ['!', ['in', ['get', 'ebene_id'], ['literal', [...ausgeblendet]]]] as unknown as Parameters<typeof m.setFilter>[1];
+    m.setFilter('zonen-flaeche', filter);
+    m.setFilter('zonen-linie', filter);
+    zonenBeschriftungenAnzeigen();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ebenen, bereit, ausgeblendet]);
 
   // Zeichnung anzeigen
   useEffect(() => {
@@ -406,6 +437,13 @@ export default function Karte({
         return;
       }
       if (aktiv && aktiv.art !== 'aufzeichnung') {
+        const grenze = grenzeRef.current;
+        if (aktiv.art === 'zone' && grenze && !punktInFlaeche(pos, grenze)) {
+          // Zonen dürfen nicht über die Reviergrenze hinausgehen
+          setPunkte((alt) => [...alt, naechsterRandpunkt(pos, grenze)]);
+          setMeldung({ art: 'info', text: 'Punkt lag außerhalb und wurde auf die Reviergrenze gesetzt.' });
+          return;
+        }
         setPunkte((alt) => [...alt, pos]);
         return;
       }
@@ -506,25 +544,38 @@ export default function Karte({
           let name = modus.name;
           if (!zoneId) {
             // Neue Zone: erst benennen und anlegen, dann Fläche speichern
-            const eingabe = window.prompt('Name der neuen Zone:', `Zone ${zonen.length + 1}`)?.trim();
-            if (!eingabe) return;
+            let vorschlag = `Zone ${zonen.length + 1}`;
+            let eingabe: string | undefined;
+            for (;;) {
+              eingabe = window.prompt('Name der neuen Zone:', vorschlag)?.trim();
+              if (!eingabe) return;
+              if (!nameVergeben(zonen.map((z) => z.name), eingabe)) break;
+              window.alert(`Eine Zone „${eingabe}“ gibt es in diesem Revier bereits. Bitte einen anderen Namen wählen.`);
+              vorschlag = eingabe;
+            }
             name = eingabe;
+            const ziel = daten?.ebenen.find((e) => e.id === zielEbene);
             const { data: neu, error: anlegeFehler } = await supabase
               .from('zonen')
               .insert({
                 revier_id: k.revierId,
                 name,
+                ebene_id: ziel?.id ?? null,
                 sortierung: zonen.length,
-                farbe: ZONENFARBEN[zonen.length % ZONENFARBEN.length],
+                farbe: ziel?.farbe ?? ZONENFARBEN[zonen.length % ZONENFARBEN.length],
               })
               .select('id')
               .single();
             if (anlegeFehler) throw anlegeFehler;
             zoneId = neu.id;
           }
-          const { error } = await supabase.rpc('zone_geometrie_setzen', { p_zone_id: zoneId, p_geojson: geojson });
-          if (error) throw error;
-          setMeldung({ art: 'erfolg', text: `Zone „${name}“ gespeichert` });
+          const { data: ha, error } = await supabase.rpc('zone_geometrie_setzen', { p_zone_id: zoneId, p_geojson: geojson });
+          if (error) {
+            // Neu angelegte Zone ohne gültige Fläche wieder entfernen
+            if (!modus.zoneId) await supabase.from('zonen').delete().eq('id', zoneId);
+            throw error;
+          }
+          setMeldung({ art: 'erfolg', text: `Zone „${name}“ gespeichert · ${Number(ha).toLocaleString('de-DE')} ha (auf Reviergrenze zugeschnitten)` });
           await zonenLaden();
         }
       } else if (modus.art === 'pirschweg' || modus.art === 'aufzeichnung') {
@@ -571,6 +622,10 @@ export default function Karte({
 
   async function einrichtungSpeichern(typ: Enums<'einrichtung_typ'>, name: string, bemerkung: string) {
     if (!neueEinrichtung) return;
+    if (name.trim() && nameVergeben(einrichtungsNamen, name)) {
+      setMeldung({ art: 'fehler', text: `Eine Einrichtung „${name.trim()}“ gibt es in diesem Revier bereits.` });
+      return;
+    }
     const { error } = await supabase.from('einrichtungen').insert({
       revier_id: k.revierId,
       typ,
@@ -626,26 +681,46 @@ export default function Karte({
   async function shpAlsZonen(namensfeld: string) {
     if (!shpImport) return;
     let anzahl = 0;
+    const probleme: string[] = [];
+    const vergeben = zonen.map((z) => z.name);
+    const ziel = daten?.ebenen.find((e) => e.id === zielEbene);
     for (const [i, f] of shpImport.entries()) {
       const name = String(f.properties?.[namensfeld] ?? `Zone ${zonen.length + i + 1}`).trim() || `Zone ${zonen.length + i + 1}`;
+      if (nameVergeben(vergeben, name)) {
+        probleme.push(`„${name}“ existiert bereits`);
+        continue;
+      }
       const { data, error } = await supabase
         .from('zonen')
-        .insert({ revier_id: k.revierId, name, sortierung: zonen.length + i })
+        .insert({
+          revier_id: k.revierId,
+          name,
+          ebene_id: ziel?.id ?? null,
+          farbe: ziel?.farbe ?? ZONENFARBEN[(zonen.length + i) % ZONENFARBEN.length],
+          sortierung: zonen.length + i,
+        })
         .select('id')
         .single();
       if (error) {
-        setMeldung({ art: 'fehler', text: fehlertext(error) });
-        break;
+        probleme.push(`„${name}“: ${fehlertext(error)}`);
+        continue;
       }
       const geo = await supabase.rpc('zone_geometrie_setzen', { p_zone_id: data.id, p_geojson: f.geometry as unknown as Json });
       if (geo.error) {
-        setMeldung({ art: 'fehler', text: `${name}: ${fehlertext(geo.error)}` });
+        await supabase.from('zonen').delete().eq('id', data.id);
+        probleme.push(`„${name}“: ${fehlertext(geo.error)}`);
         continue;
       }
+      vergeben.push(name);
       anzahl++;
     }
     setShpImport(null);
-    if (anzahl) setMeldung({ art: 'erfolg', text: `${anzahl} Zonen aus Shapefile angelegt` });
+    setMeldung({
+      art: probleme.length ? 'fehler' : 'erfolg',
+      text:
+        `${anzahl} Zonen aus Shapefile angelegt (auf Reviergrenze zugeschnitten).` +
+        (probleme.length ? ` Nicht übernommen: ${probleme.join('; ')}` : ''),
+    });
     await zonenLaden();
     await laden();
   }
@@ -653,6 +728,9 @@ export default function Karte({
   // ---------- Darstellung ----------
 
   const zeichnet = modus && modus.art !== 'einrichtung';
+  const einrichtungsNamen = (daten?.einrichtungen ?? []).map((e) => (e.properties?.name as string | null) ?? null);
+  const kartenEbenen = daten?.ebenen ?? [];
+  const hatOhneEbene = (daten?.zonen ?? []).some((z) => z.properties?.ebene_id === 'ohne');
   const anzahlBeob = daten?.beobachtungen.length ?? 0;
 
   const werkzeuge = (
@@ -660,8 +738,35 @@ export default function Karte({
           {meldung && <div className={`hinweis hinweis-${meldung.art}`}>{meldung.text}</div>}
 
           <Abschnitt titel="Ebenen" offen>
-          <EbenenSchalter label="Luftbild (LGLN)" an={ebenen.luftbild} onAendern={(an) => setEbenen({ ...ebenen, luftbild: an })} />
+          <EbenenSchalter
+            label={daten?.grenze ? 'Luftbild (LGLN, nur Revierbereich)' : 'Luftbild – erst Reviergrenze zeichnen'}
+            an={ebenen.luftbild && !!daten?.grenze}
+            gesperrt={!daten?.grenze}
+            onAendern={(an) => setEbenen({ ...ebenen, luftbild: an })}
+          />
           <EbenenSchalter label="Zonen" an={ebenen.zonen} onAendern={(an) => setEbenen({ ...ebenen, zonen: an })} />
+          {ebenen.zonen && (kartenEbenen.length > 0) && (
+            <div className="unterebenen">
+              {[...kartenEbenen, ...(hatOhneEbene ? [{ id: 'ohne', name: 'Ohne Ebene', farbe: null }] : [])].map((e) => (
+                <label key={e.id} className="ebene">
+                  <input
+                    type="checkbox"
+                    checked={!ausgeblendet.has(e.id)}
+                    onChange={(ev) =>
+                      setAusgeblendet((alt) => {
+                        const neu = new Set(alt);
+                        if (ev.target.checked) neu.delete(e.id);
+                        else neu.add(e.id);
+                        return neu;
+                      })
+                    }
+                  />
+                  <i className="farbpunkt" style={{ background: e.farbe ?? 'var(--text-leise)' }} />
+                  {e.name}
+                </label>
+              ))}
+            </div>
+          )}
           <EbenenSchalter label="Einrichtungen" an={ebenen.einrichtungen} onAendern={(an) => setEbenen({ ...ebenen, einrichtungen: an })} />
           <EbenenSchalter label="Pirschwege" an={ebenen.pirschwege} onAendern={(an) => setEbenen({ ...ebenen, pirschwege: an })} />
           <EbenenSchalter
@@ -693,6 +798,19 @@ export default function Karte({
               <button className="knopf knopf-sekundaer" onClick={() => setModus({ art: 'grenze' })} disabled={!!modus}>
                 {daten?.grenze ? 'Reviergrenze neu zeichnen' : 'Reviergrenze zeichnen'}
               </button>
+              {kartenEbenen.length > 0 && (
+                <label className="ebene">
+                  Neue Zonen in Ebene
+                  <select value={zielEbene} onChange={(e) => setZielEbene(e.target.value)}>
+                    <option value="">Ohne Ebene</option>
+                    {kartenEbenen.map((e) => (
+                      <option key={e.id} value={e.id}>
+                        {e.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
               <button className="knopf knopf-sekundaer" onClick={() => setModus({ art: 'zone', zoneId: null, name: '' })} disabled={!!modus}>
                 Neue Zone zeichnen
               </button>
@@ -806,7 +924,11 @@ export default function Karte({
       )}
 
       {neueEinrichtung && (
-        <EinrichtungFormular onSpeichern={einrichtungSpeichern} onAbbrechen={() => setNeueEinrichtung(null)} />
+        <EinrichtungFormular
+          vergeben={einrichtungsNamen}
+          onSpeichern={einrichtungSpeichern}
+          onAbbrechen={() => setNeueEinrichtung(null)}
+        />
       )}
 
       {kartenFehler && (
@@ -843,19 +965,31 @@ function Abschnitt({ titel, offen = false, children }: { titel: string; offen?: 
   );
 }
 
-function EbenenSchalter({ label, an, onAendern }: { label: string; an: boolean; onAendern: (an: boolean) => void }) {
+function EbenenSchalter({
+  label,
+  an,
+  gesperrt = false,
+  onAendern,
+}: {
+  label: string;
+  an: boolean;
+  gesperrt?: boolean;
+  onAendern: (an: boolean) => void;
+}) {
   return (
-    <label className="ebene">
-      <input type="checkbox" checked={an} onChange={(e) => onAendern(e.target.checked)} />
+    <label className={`ebene ${gesperrt ? 'gesperrt' : ''}`}>
+      <input type="checkbox" checked={an} disabled={gesperrt} onChange={(e) => onAendern(e.target.checked)} />
       {label}
     </label>
   );
 }
 
 function EinrichtungFormular({
+  vergeben,
   onSpeichern,
   onAbbrechen,
 }: {
+  vergeben: Array<string | null>;
   onSpeichern: (typ: Enums<'einrichtung_typ'>, name: string, bemerkung: string) => Promise<void>;
   onAbbrechen: () => void;
 }) {
@@ -873,12 +1007,19 @@ function EinrichtungFormular({
         ))}
       </select>
       <input placeholder="Name, z. B. Eichenkanzel" value={name} onChange={(e) => setName(e.target.value)} />
+      {name.trim() && nameVergeben(vergeben, name) && (
+        <span className="feld-fehler">Eine Einrichtung „{name.trim()}“ gibt es bereits.</span>
+      )}
       <input placeholder="Bemerkung (optional)" value={bemerkung} onChange={(e) => setBemerkung(e.target.value)} />
       <div className="karte-dialog-knoepfe">
         <button className="knopf knopf-sekundaer klein" onClick={onAbbrechen}>
           Abbrechen
         </button>
-        <button className="knopf knopf-primaer klein" onClick={() => void onSpeichern(typ, name, bemerkung)}>
+        <button
+          className="knopf knopf-primaer klein"
+          disabled={!!name.trim() && nameVergeben(vergeben, name)}
+          onClick={() => void onSpeichern(typ, name, bemerkung)}
+        >
           Speichern
         </button>
       </div>
@@ -962,6 +1103,43 @@ function mittelpunkt(g: Geometry): [number, number] {
   const x = k.reduce((a, p) => a + p[0]!, 0) / (k.length || 1);
   const y = k.reduce((a, p) => a + p[1]!, 0) / (k.length || 1);
   return [x, y];
+}
+
+function inRing(p: Position, ring: Position[]): boolean {
+  let innen = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = [ring[i]![0]!, ring[i]![1]!];
+    const [xj, yj] = [ring[j]![0]!, ring[j]![1]!];
+    if (yi > p[1]! !== yj > p[1]! && p[0]! < ((xj - xi) * (p[1]! - yi)) / (yj - yi) + xi) innen = !innen;
+  }
+  return innen;
+}
+
+function punktInFlaeche(p: Position, g: MultiPolygon): boolean {
+  return g.coordinates.some((poly) => inRing(p, poly[0] ?? []) && !poly.slice(1).some((loch) => inRing(p, loch)));
+}
+
+/** Nächster Punkt auf dem Rand (lokal metrisch genähert), minimal nach innen versetzt */
+function naechsterRandpunkt(p: Position, g: MultiPolygon): Position {
+  const kx = Math.cos((p[1]! * Math.PI) / 180);
+  let bester: Position = p;
+  let bestD = Infinity;
+  for (const poly of g.coordinates)
+    for (const ring of poly)
+      for (let i = 0; i < ring.length - 1; i++) {
+        const a = ring[i]!;
+        const b = ring[i + 1]!;
+        const ax = a[0]! * kx, ay = a[1]!, bx = b[0]! * kx, by = b[1]!, px = p[0]! * kx, py = p[1]!;
+        const dx = bx - ax, dy = by - ay;
+        const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy || 1)));
+        const qx = ax + t * dx, qy = ay + t * dy;
+        const d = (qx - px) ** 2 + (qy - py) ** 2;
+        if (d < bestD) {
+          bestD = d;
+          bester = [qx / kx, qy];
+        }
+      }
+  return bester;
 }
 
 function abstandM(a: Position, b: Position): number {

@@ -9,6 +9,9 @@ const bekannte: Array<[RegExp, string]> = [
   [/database error saving new user/i, 'Registrierung fehlgeschlagen. Bitte prüfe den Einladungscode und die E-Mail-Adresse.'],
   [/delete on table "hegeringe" violates foreign key/i, 'Dem Hegering sind noch Reviere zugeordnet. Bitte diese zuerst löschen.'],
   [/insert or update on table "reviere" violates foreign key/i, 'Der gewählte Hegering existiert nicht mehr. Bitte die Seite neu laden und erneut auswählen.'],
+  [/zonen_name_eindeutig/i, 'Eine Zone mit diesem Namen gibt es in diesem Revier bereits. Bitte einen anderen Namen wählen.'],
+  [/einrichtungen_name_eindeutig/i, 'Eine Einrichtung mit diesem Namen gibt es in diesem Revier bereits. Bitte einen anderen Namen wählen.'],
+  [/zonen_ebenen_name_eindeutig/i, 'Eine Zonenebene mit diesem Namen gibt es in diesem Revier bereits.'],
   [/duplicate key value/i, 'Ein Eintrag mit diesem Namen existiert bereits.'],
   [/failed to fetch|network/i, 'Keine Verbindung zum Server. Bitte prüfe die Internetverbindung.'],
 ];

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { supabase } from '../../lib/supabase';
 import { fehlertext } from '../../lib/fehler';
-import { GESCHLECHTER, useWildarten, useZonen, wildartName, type Wildart, type Zone } from '../../lib/stammdaten';
+import { GESCHLECHTER, useWildarten, useZonen, useZonenEbenen, wildartName, type Wildart, type Zone } from '../../lib/stammdaten';
 import { aktuellePosition, aktuellesWetter, wetterText, type Wetter } from '../../lib/geo';
 import { speichernOderMerken } from '../../lib/offline';
 import { datumDE, heuteISO, mondphase } from '../../lib/zeit';
@@ -20,6 +20,7 @@ type Sitzung = {
   mondphase: string | null;
   bemerkung: string | null;
   erstellt_von: string | null;
+  ebene_id: string | null;
 };
 
 type Zaehlzeile = {
@@ -44,7 +45,7 @@ function SitzungsListe({ k }: { k: RevierKontext }) {
   useEffect(() => {
     void supabase
       .from('zaehlsitzungen')
-      .select('id, datum, beginn, ende, status, wetter, mondphase, bemerkung, erstellt_von, zaehlungen(anzahl, geloescht_am)')
+      .select('id, datum, beginn, ende, status, wetter, mondphase, bemerkung, erstellt_von, ebene_id, zaehlungen(anzahl, geloescht_am)')
       .eq('revier_id', k.revierId)
       .is('geloescht_am', null)
       .order('datum', { ascending: false })
@@ -105,6 +106,8 @@ function SitzungsZeile({ s }: { s: Sitzung & { summe: number } }) {
 }
 
 function NeueSitzung({ k, onAbbrechen }: { k: RevierKontext; onAbbrechen: () => void }) {
+  const { ebenen } = useZonenEbenen(k.revierId);
+  const [ebeneId, setEbeneId] = useState('');
   const [datum, setDatum] = useState(heuteISO());
   const [bemerkung, setBemerkung] = useState('');
   const [wetter, setWetter] = useState<Wetter | null>(null);
@@ -137,6 +140,7 @@ function NeueSitzung({ k, onAbbrechen }: { k: RevierKontext; onAbbrechen: () => 
         mondphase: `${mond.name} (${mond.beleuchtung} %)`,
         wetter: wetter ? (wetter as unknown as Json) : null,
         bemerkung: bemerkung.trim() || null,
+        ebene_id: ebeneId || null,
       })
       .select('id')
       .single();
@@ -152,6 +156,16 @@ function NeueSitzung({ k, onAbbrechen }: { k: RevierKontext; onAbbrechen: () => 
       <form onSubmit={starten}>
         <Gruppe>
           <Feld label="Datum" type="date" required value={datum} onChange={(e) => setDatum(e.target.value)} />
+          {ebenen.length > 0 && (
+            <Auswahl label="Zonenebene" value={ebeneId} onChange={(e) => setEbeneId(e.target.value)}>
+              <option value="">Alle Zonen</option>
+              {ebenen.map((x) => (
+                <option key={x.id} value={x.id}>
+                  {x.name}
+                </option>
+              ))}
+            </Auswahl>
+          )}
           <Zeile label="Wetter" wert={wetterStatus} />
           <Zeile label="Mond" wert={`${mond.name}, ${mond.beleuchtung} % beleuchtet`} />
           <Feld label="Bemerkung" placeholder="z. B. Scheinwerferzählung" value={bemerkung} onChange={(e) => setBemerkung(e.target.value)} />
@@ -167,8 +181,13 @@ function NeueSitzung({ k, onAbbrechen }: { k: RevierKontext; onAbbrechen: () => 
 
 function SitzungAnsicht({ k, sitzungId }: { k: RevierKontext; sitzungId: string }) {
   const wildarten = useWildarten();
-  const { zonen } = useZonen(k.revierId);
+  const { zonen: alleZonen } = useZonen(k.revierId);
   const [sitzung, setSitzung] = useState<Sitzung | null>(null);
+  // Ist die Zählung auf eine Zonenebene beschränkt, nur deren Zonen anbieten
+  const zonen = useMemo(
+    () => (sitzung?.ebene_id ? alleZonen.filter((z) => z.ebeneId === sitzung.ebene_id) : alleZonen),
+    [alleZonen, sitzung?.ebene_id],
+  );
   const [zeilen, setZeilen] = useState<Zaehlzeile[]>([]);
   const [zoneId, setZoneId] = useState<string>('');
   const [uebersicht, setUebersicht] = useState(false);
@@ -179,7 +198,7 @@ function SitzungAnsicht({ k, sitzungId }: { k: RevierKontext; sitzungId: string 
     const [s, z] = await Promise.all([
       supabase
         .from('zaehlsitzungen')
-        .select('id, datum, beginn, ende, status, wetter, mondphase, bemerkung, erstellt_von')
+        .select('id, datum, beginn, ende, status, wetter, mondphase, bemerkung, erstellt_von, ebene_id')
         .eq('id', sitzungId)
         .maybeSingle(),
       supabase.from('zaehlungen').select('id, zone_id, wildart_id, geschlecht, anzahl').eq('sitzung_id', sitzungId).is('geloescht_am', null),
@@ -261,7 +280,7 @@ function SitzungAnsicht({ k, sitzungId }: { k: RevierKontext; sitzungId: string 
     return (
       <Seite titel={titel} untertitel={untertitel} zurueck={() => navigieren('/zaehlung')}>
         {fehler && <Hinweis art="fehler">{fehler}</Hinweis>}
-        <Gesamtuebersicht zeilen={zeilen} zonen={zonen} wildarten={wildarten} />
+        <Gesamtuebersicht zeilen={zeilen} zonen={alleZonen} wildarten={wildarten} />
         {sitzung.bemerkung && <Leer>Bemerkung: {sitzung.bemerkung}</Leer>}
         {sitzung.status === 'offen' ? (
           <>

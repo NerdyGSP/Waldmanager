@@ -578,6 +578,7 @@ export type Database = {
       }
       zaehlsitzungen: {
         Row: {
+          ebene_id: string | null
           aktualisiert_am: string
           beginn: string | null
           bemerkung: string | null
@@ -593,6 +594,7 @@ export type Database = {
           wetter: Json | null
         }
         Insert: {
+          ebene_id?: string | null
           aktualisiert_am?: string
           beginn?: string | null
           bemerkung?: string | null
@@ -608,6 +610,7 @@ export type Database = {
           wetter?: Json | null
         }
         Update: {
+          ebene_id?: string | null
           aktualisiert_am?: string
           beginn?: string | null
           bemerkung?: string | null
@@ -725,6 +728,7 @@ export type Database = {
       }
       zonen: {
         Row: {
+          ebene_id: string | null
           aktualisiert_am: string
           erstellt_am: string
           farbe: string | null
@@ -736,6 +740,7 @@ export type Database = {
           sortierung: number
         }
         Insert: {
+          ebene_id?: string | null
           aktualisiert_am?: string
           erstellt_am?: string
           farbe?: string | null
@@ -747,6 +752,7 @@ export type Database = {
           sortierung?: number
         }
         Update: {
+          ebene_id?: string | null
           aktualisiert_am?: string
           erstellt_am?: string
           farbe?: string | null
@@ -766,6 +772,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      zonen_ebenen: {
+        Row: {
+          aktualisiert_am: string
+          erstellt_am: string
+          farbe: string | null
+          id: string
+          name: string
+          revier_id: string
+          sortierung: number
+        }
+        Insert: {
+          aktualisiert_am?: string
+          erstellt_am?: string
+          farbe?: string | null
+          id?: string
+          name: string
+          revier_id: string
+          sortierung?: number
+        }
+        Update: {
+          aktualisiert_am?: string
+          erstellt_am?: string
+          farbe?: string | null
+          id?: string
+          name?: string
+          revier_id?: string
+          sortierung?: number
+        }
+        Relationships: []
       }
     }
     Views: {
@@ -798,7 +834,7 @@ export type Database = {
       }
       zone_geometrie_setzen: {
         Args: { p_geojson: Json; p_zone_id: string }
-        Returns: undefined
+        Returns: number
       }
       quervergleich: {
         Args: { p_bis: string; p_revier_id: string; p_von: string }
