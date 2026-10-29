@@ -1,7 +1,7 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { supabase } from '../../lib/supabase';
 import { fehlertext } from '../../lib/fehler';
-import { nameVergeben, useZonen, useZonenEbenen, ZONENFARBEN, type Zone, type ZonenEbene } from '../../lib/stammdaten';
+import { nameVergeben, useZonen, useZonenEbenen, zufallsFarben, ZONENFARBEN, type Zone, type ZonenEbene } from '../../lib/stammdaten';
 import { navigieren } from '../../lib/router';
 import { Auswahl, Farbwahl, Feld, Gruppe, Hinweis, Knopf, Leer, Seite, Zeile } from '../../components/ui';
 import type { RevierKontext } from './kontext';
@@ -10,6 +10,28 @@ export function Zonen({ k }: { k: RevierKontext }) {
   const { zonen, laedt, laden } = useZonen(k.revierId);
   const { ebenen, laden: ebenenLaden } = useZonenEbenen(k.revierId);
   const [fehler, setFehler] = useState<string | null>(null);
+  // eingeklappte Gruppen (je Gerät gemerkt)
+  const [zu, setZu] = useState<Set<string>>(() => {
+    try {
+      return new Set(JSON.parse(localStorage.getItem('hegewerk.zonen.zu') ?? '[]') as string[]);
+    } catch {
+      return new Set();
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem('hegewerk.zonen.zu', JSON.stringify([...zu]));
+    } catch {
+      /* nur für diese Sitzung */
+    }
+  }, [zu]);
+  const umschalten = (id: string) =>
+    setZu((alt) => {
+      const neu = new Set(alt);
+      if (neu.has(id)) neu.delete(id);
+      else neu.add(id);
+      return neu;
+    });
 
   // Zonen nach Ebene gruppieren; „Ohne Ebene“ zuletzt
   const gruppen = useMemo(() => {
@@ -21,6 +43,14 @@ export function Zonen({ k }: { k: RevierKontext }) {
     if (ohne.length || ebenen.length === 0) liste.push({ ebene: null, zonen: ohne });
     return liste;
   }, [zonen, ebenen]);
+
+  async function zufallsfarben(liste: Zone[]) {
+    const farben = zufallsFarben(liste.length);
+    const ergebnisse = await Promise.all(liste.map((z, i) => supabase.from('zonen').update({ farbe: farben[i]! }).eq('id', z.id)));
+    const fehl = ergebnisse.find((r) => r.error)?.error;
+    setFehler(fehl ? fehlertext(fehl) : null);
+    await laden();
+  }
 
   async function alleNeuLaden() {
     await Promise.all([laden(), ebenenLaden()]);
@@ -77,11 +107,36 @@ export function Zonen({ k }: { k: RevierKontext }) {
     <Seite titel="Zonen" untertitel="Erfassungszonen und individuelle Zonenebenen · Farbe je Zone über den Farbpunkt">
       {fehler && <Hinweis art="fehler">{fehler}</Hinweis>}
 
-      {gruppen.map(({ ebene, zonen: liste }) => (
-        <Gruppe
-          key={ebene?.id ?? 'ohne'}
-          titel={`${ebene ? ebene.name : ebenen.length ? 'Ohne Ebene' : 'Zonen'} · ${liste.length}`}
-        >
+      {gruppen.length > 1 && (
+        <div className="zonen-alle">
+          <button className="link" onClick={() => setZu(new Set())}>
+            Alle aufklappen
+          </button>
+          <button className="link" onClick={() => setZu(new Set(gruppen.map((g) => g.ebene?.id ?? 'ohne')))}>
+            Alle zuklappen
+          </button>
+        </div>
+      )}
+      {gruppen.map(({ ebene, zonen: liste }) => {
+        const gid = ebene?.id ?? 'ohne';
+        const offen = !zu.has(gid);
+        return (
+        <section className="gruppe" key={gid}>
+          <div className="gruppe-kopf">
+            <button className="gruppe-toggle" aria-expanded={offen} onClick={() => umschalten(gid)}>
+              <span aria-hidden="true">{offen ? '▾' : '▸'}</span>
+              {ebene && <i className="farbpunkt" style={{ background: ebene.farbe ?? 'var(--text-leise)' }} />}
+              <span className="gruppe-titel" style={{ margin: 0 }}>
+                {`${ebene ? ebene.name : ebenen.length ? 'Ohne Ebene' : 'Zonen'} · ${liste.length}`}
+              </span>
+            </button>
+            {k.istInhaber && liste.length > 0 && (
+              <button className="link" onClick={() => void zufallsfarben(liste)} title="Weist jeder Zone dieser Ebene eine andere, zufällige Farbe zu">
+                Zufallsfarben
+              </button>
+            )}
+          </div>
+          {offen && <div className="gruppe-inhalt">
           {!laedt && liste.length === 0 && <Zeile label="Noch keine Zonen in dieser Ebene" />}
           {liste.map((z, i) => (
             <Zeile
@@ -135,8 +190,10 @@ export function Zonen({ k }: { k: RevierKontext }) {
               )}
             </Zeile>
           ))}
-        </Gruppe>
-      ))}
+          </div>}
+        </section>
+        );
+      })}
 
       {k.istInhaber ? (
         <>

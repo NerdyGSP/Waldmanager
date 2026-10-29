@@ -130,3 +130,20 @@ export const EINRICHTUNGSTYPEN: Array<{ wert: Enums<'einrichtung_typ'>; label: s
   { wert: 'falle', label: 'Falle', farbe: '#7f4f9e' },
   { wert: 'sonstiges', label: 'Sonstiges', farbe: '#5d6d7e' },
 ];
+
+// n gut unterscheidbare Zufallsfarben (Goldener Winkel, zufälliger Startton)
+export function zufallsFarben(n: number): string[] {
+  const start = Math.random() * 360;
+  return Array.from({ length: n }, (_, i) => {
+    const h = (start + i * 137.508) % 360;
+    const sat = (52 + ((i * 17) % 26)) / 100;
+    const l = (38 + ((i * 11) % 14)) / 100;
+    const a = sat * Math.min(l, 1 - l);
+    const f = (k: number) => {
+      const kk = (k + h / 30) % 12;
+      const c = l - a * Math.max(-1, Math.min(kk - 3, 9 - kk, 1));
+      return Math.round(c * 255).toString(16).padStart(2, '0');
+    };
+    return `#${f(0)}${f(8)}${f(4)}`;
+  });
+}

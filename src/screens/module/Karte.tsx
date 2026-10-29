@@ -22,6 +22,7 @@ import { fehlertext } from '../../lib/fehler';
 import { EINRICHTUNGSTYPEN, nameVergeben, useWildarten, useZonen, wildartName, ZONENFARBEN } from '../../lib/stammdaten';
 import { aktuellesWetter, himmelsrichtung, linieEWKT, punktEWKT, type Wetter } from '../../lib/geo';
 import { navigieren } from '../../lib/router';
+import { EinrichtungsIcon, einrichtungsBild } from '../../lib/einrichtungsIcons';
 import type { Enums, Json } from '../../lib/database.types';
 import type { RevierKontext } from './kontext';
 
@@ -51,6 +52,49 @@ const STIL: StyleSpecification = {
 const STANDARD_ZENTRUM: [number, number] = [9.47, 52.2]; // Raum Bad Münder
 
 
+// Logische Kartenebenen: jede besteht aus einer oder mehreren MapLibre-Schichten
+type EbenenId = 'einrichtungen' | 'abschuesse' | 'pirschwege' | 'heatmap' | 'grenze' | 'zonen' | 'luftbild';
+const EBENEN_SCHICHTEN: Record<EbenenId, string[]> = {
+  luftbild: ['luftbild'],
+  zonen: ['zonen-flaeche', 'zonen-linie', 'zonen-auswahl'],
+  grenze: ['grenze-linie'],
+  heatmap: ['heatmap'],
+  pirschwege: ['pirschwege-linie'],
+  abschuesse: ['abschuesse-punkt'],
+  einrichtungen: ['einrichtungen-punkt'],
+};
+// oben → unten
+const STANDARD_REIHENFOLGE: EbenenId[] = ['einrichtungen', 'abschuesse', 'pirschwege', 'heatmap', 'grenze', 'zonen', 'luftbild'];
+const STANDARD_DECKKRAFT: Record<EbenenId, number> = {
+  einrichtungen: 1,
+  abschuesse: 1,
+  pirschwege: 1,
+  heatmap: 0.75,
+  grenze: 1,
+  zonen: 0.55,
+  luftbild: 1,
+};
+const EBENEN_SPEICHER = 'hegewerk.karte.ebenen';
+
+function ebenenEinstellungenLesen(): { reihenfolge: EbenenId[]; deckkraft: Record<EbenenId, number> } {
+  try {
+    const roh = JSON.parse(localStorage.getItem(EBENEN_SPEICHER) ?? 'null') as { reihenfolge?: string[]; deckkraft?: Record<string, number> } | null;
+    const reihenfolge = roh?.reihenfolge;
+    const gueltig = Array.isArray(reihenfolge) && reihenfolge.length === STANDARD_REIHENFOLGE.length && STANDARD_REIHENFOLGE.every((id) => reihenfolge.includes(id));
+    const deckkraft = { ...STANDARD_DECKKRAFT };
+    for (const id of STANDARD_REIHENFOLGE) {
+      const w = roh?.deckkraft?.[id];
+      if (typeof w === 'number' && w >= 0 && w <= 1) deckkraft[id] = w;
+    }
+    return { reihenfolge: gueltig ? (reihenfolge as EbenenId[]) : STANDARD_REIHENFOLGE, deckkraft };
+  } catch {
+    return { reihenfolge: STANDARD_REIHENFOLGE, deckkraft: { ...STANDARD_DECKKRAFT } };
+  }
+}
+
+// Handys laden das Luftbild nur für den Revierbereich, Tablets/PCs für den ganzen Kartenausschnitt
+const ISTHANDY = typeof screen !== 'undefined' && Math.min(screen.width, screen.height) < 600;
+
 const LEER: FeatureCollection = { type: 'FeatureCollection', features: [] };
 
 type KartenEbene = { id: string; name: string; farbe: string | null };
@@ -67,6 +111,7 @@ type KartenDaten = {
 
 type Ebenen = {
   luftbild: boolean;
+  grenze: boolean;
   zonen: boolean;
   einrichtungen: boolean;
   pirschwege: boolean;
@@ -107,6 +152,7 @@ export default function Karte({
   const [daten, setDaten] = useState<KartenDaten | null>(null);
   const [ebenen, setEbenen] = useState<Ebenen>({
     luftbild: false,
+    grenze: true,
     zonen: true,
     einrichtungen: true,
     pirschwege: true,
@@ -126,6 +172,14 @@ export default function Karte({
   const [zielEbene, setZielEbene] = useState('');
   const grenzeRef = useRef<MultiPolygon | null>(null);
   const luftbildSchluessel = useRef('');
+  const [einst, setEinst] = useState(ebenenEinstellungenLesen);
+  useEffect(() => {
+    try {
+      localStorage.setItem(EBENEN_SPEICHER, JSON.stringify(einst));
+    } catch {
+      /* ohne Speicher gilt die Einstellung nur für diese Sitzung */
+    }
+  }, [einst]);
   const [gewaehlteZone, setGewaehlteZone] = useState<GewaehlteZone | null>(null);
 
   const setModus = (m: Modus) => {
@@ -191,6 +245,10 @@ export default function Karte({
     );
     m.addControl(new ScaleControl({ unit: 'metric' }), 'bottom-right');
 
+    m.on('styleimagemissing', (e) => {
+      // Unbekannte Einrichtungsart: neutrales Symbol
+      if (!m.hasImage(e.id)) m.addImage(e.id, einrichtungsBild('sonstiges', '#5d6d7e'), { pixelRatio: 2 });
+    });
     m.on('load', () => {
       for (const id of ['grenze', 'zonen', 'einrichtungen', 'pirschwege', 'beobachtungen', 'abschuesse', 'zeichnung']) {
         m.addSource(id, { type: 'geojson', data: LEER });
@@ -245,20 +303,16 @@ export default function Karte({
         layout: { visibility: 'none' },
         paint: { 'circle-radius': 6, 'circle-color': '#c0392b', 'circle-stroke-color': '#fff', 'circle-stroke-width': 1.5 },
       });
+      for (const t of EINRICHTUNGSTYPEN) m.addImage(`einr-${t.wert}`, einrichtungsBild(t.wert, t.farbe), { pixelRatio: 2 });
       m.addLayer({
         id: 'einrichtungen-punkt',
-        type: 'circle',
+        type: 'symbol',
         source: 'einrichtungen',
-        paint: {
-          'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 4, 16, 9],
-          'circle-color': [
-            'match',
-            ['get', 'typ'],
-            ...EINRICHTUNGSTYPEN.flatMap((t) => [t.wert, t.farbe]),
-            '#5d6d7e',
-          ] as unknown as string,
-          'circle-stroke-color': '#fff',
-          'circle-stroke-width': 2,
+        layout: {
+          'icon-image': ['concat', 'einr-', ['get', 'typ']],
+          'icon-size': ['interpolate', ['linear'], ['zoom'], 10, 0.8, 16, 1.3],
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true,
         },
       });
       m.addLayer({
@@ -322,22 +376,27 @@ export default function Karte({
     setzen('abschuesse', { type: 'FeatureCollection', features: daten.abschuesse });
     grenzeRef.current = daten.grenze;
 
-    // Luftbild nur für die Ausdehnung der Reviergrenze (+ ca. 150 m Rand) anfordern
+    // Handy: Luftbild nur für die Reviergrenze (+ ca. 150 m Rand); Tablet/PC: für den gesamten Kartenausschnitt
     // Nur neu aufbauen, wenn sich die Ausdehnung wirklich geändert hat – sonst lädt der Browser alle Kacheln erneut
     const bb = daten.grenze ? grenzen([daten.grenze]) : null;
-    const schluessel = bb ? [bb.getWest(), bb.getSouth(), bb.getEast(), bb.getNorth()].map((v) => v.toFixed(5)).join(',') : '';
-    if (schluessel !== luftbildSchluessel.current || (bb && !m.getLayer('luftbild'))) {
+    const schluessel = ISTHANDY
+      ? bb
+        ? 'handy:' + [bb.getWest(), bb.getSouth(), bb.getEast(), bb.getNorth()].map((v) => v.toFixed(5)).join(',')
+        : ''
+      : 'voll';
+    if (schluessel !== luftbildSchluessel.current || ((bb || !ISTHANDY) && !m.getLayer('luftbild'))) {
       luftbildSchluessel.current = schluessel;
       if (m.getLayer('luftbild')) m.removeLayer('luftbild');
       if (m.getSource('luftbild')) m.removeSource('luftbild');
-      if (bb) {
+      if (bb || !ISTHANDY) {
         const rand = 0.002;
         m.addSource('luftbild', {
           type: 'raster',
           tiles: [LUFTBILD_URL],
           tileSize: 256,
-          maxzoom: 20,
-          bounds: [bb.getWest() - rand, bb.getSouth() - rand, bb.getEast() + rand, bb.getNorth() + rand],
+          // Handy: gröbere Auflösung spart Daten (Zoom 18 ≈ 0,4 m/Pixel); Tablet/PC bis zur Originalauflösung des Orthofotos
+          maxzoom: ISTHANDY ? 18 : 19,
+          ...(ISTHANDY && bb ? { bounds: [bb.getWest() - rand, bb.getSouth() - rand, bb.getEast() + rand, bb.getNorth() + rand] as [number, number, number, number] } : {}),
           attribution: 'Luftbild © LGLN',
         });
         m.addLayer(
@@ -398,6 +457,7 @@ export default function Karte({
     const sichtbar = (ebene: string, an: boolean) => m.setLayoutProperty(ebene, 'visibility', an ? 'visible' : 'none');
     // OSM bleibt als Hintergrund außerhalb des Reviers sichtbar
     if (m.getLayer('luftbild')) sichtbar('luftbild', ebenen.luftbild);
+    sichtbar('grenze-linie', ebenen.grenze);
     sichtbar('zonen-flaeche', ebenen.zonen);
     sichtbar('zonen-linie', ebenen.zonen);
     sichtbar('einrichtungen-punkt', ebenen.einrichtungen);
@@ -411,6 +471,31 @@ export default function Karte({
     zonenBeschriftungenAnzeigen();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ebenen, bereit, ausgeblendet]);
+
+  // Reihenfolge und Transparenz der Ebenen
+  useEffect(() => {
+    const m = karte.current;
+    if (!m || !bereit) return;
+    const d = einst.deckkraft;
+    const setze = (schicht: string, eigenschaft: string, wert: number) => {
+      if (m.getLayer(schicht)) (m.setPaintProperty as (s: string, e: string, w: number) => void)(schicht, eigenschaft, wert);
+    };
+    setze('luftbild', 'raster-opacity', d.luftbild);
+    setze('zonen-flaeche', 'fill-opacity', d.zonen * 0.4);
+    setze('zonen-linie', 'line-opacity', Math.min(1, d.zonen * 1.8));
+    setze('grenze-linie', 'line-opacity', d.grenze);
+    setze('heatmap', 'heatmap-opacity', d.heatmap);
+    setze('pirschwege-linie', 'line-opacity', d.pirschwege);
+    setze('abschuesse-punkt', 'circle-opacity', d.abschuesse);
+    setze('abschuesse-punkt', 'circle-stroke-opacity', d.abschuesse);
+    setze('einrichtungen-punkt', 'icon-opacity', d.einrichtungen);
+    for (const mk of zonenMarker.current) mk.getElement().style.opacity = String(Math.min(1, d.zonen * 1.8));
+    // von unten nach oben jeweils an die Spitze stellen; Zeichnung bleibt immer ganz oben
+    for (const id of [...einst.reihenfolge].reverse()) {
+      for (const schicht of EBENEN_SCHICHTEN[id]) if (m.getLayer(schicht)) m.moveLayer(schicht);
+    }
+    for (const schicht of ['zeichnung-flaeche', 'zeichnung-linie', 'zeichnung-punkte']) if (m.getLayer(schicht)) m.moveLayer(schicht);
+  }, [einst, bereit, daten]);
 
   // Ausgewählte Zone hervorheben
   useEffect(() => {
@@ -674,62 +759,107 @@ export default function Karte({
   const hatOhneEbene = (daten?.zonen ?? []).some((z) => z.properties?.ebene_id === 'ohne');
   const anzahlBeob = daten?.beobachtungen.length ?? 0;
 
+  const verschieben = (i: number, richtung: -1 | 1) =>
+    setEinst((alt) => {
+      const liste = [...alt.reihenfolge];
+      const j = i + richtung;
+      if (j < 0 || j >= liste.length) return alt;
+      [liste[i], liste[j]] = [liste[j]!, liste[i]!];
+      return { ...alt, reihenfolge: liste };
+    });
+  const ebenenInfo: Record<EbenenId, { name: string; label: string; an: boolean; gesperrt?: boolean; setAn: (an: boolean) => void }> = {
+    luftbild: {
+      name: 'Luftbild',
+      label: ISTHANDY ? (daten?.grenze ? 'Luftbild (LGLN, nur Revierbereich)' : 'Luftbild – erst Reviergrenze zeichnen') : 'Luftbild (LGLN)',
+      an: ebenen.luftbild && (!ISTHANDY || !!daten?.grenze),
+      gesperrt: ISTHANDY && !daten?.grenze,
+      setAn: (an) => setEbenen({ ...ebenen, luftbild: an }),
+    },
+    zonen: { name: 'Zonen', label: 'Zonen', an: ebenen.zonen, setAn: (an) => setEbenen({ ...ebenen, zonen: an }) },
+    grenze: { name: 'Reviergrenze', label: 'Reviergrenze', an: ebenen.grenze, setAn: (an) => setEbenen({ ...ebenen, grenze: an }) },
+    heatmap: { name: 'Heatmap', label: `Heatmap Beobachtungen (${anzahlBeob}, 12 Monate)`, an: ebenen.heatmap, setAn: (an) => setEbenen({ ...ebenen, heatmap: an }) },
+    pirschwege: { name: 'Pirschwege', label: 'Pirschwege', an: ebenen.pirschwege, setAn: (an) => setEbenen({ ...ebenen, pirschwege: an }) },
+    abschuesse: {
+      name: 'Abschüsse',
+      label: `Abschüsse (${daten?.abschuesse.length ?? 0}, 12 Monate)`,
+      an: ebenen.abschuesse,
+      setAn: (an) => setEbenen({ ...ebenen, abschuesse: an }),
+    },
+    einrichtungen: { name: 'Einrichtungen', label: 'Einrichtungen', an: ebenen.einrichtungen, setAn: (an) => setEbenen({ ...ebenen, einrichtungen: an }) },
+  };
+
   const werkzeuge = (
     <>
           {meldung && <div className={`hinweis hinweis-${meldung.art}`}>{meldung.text}</div>}
 
           <Abschnitt titel="Ebenen" offen>
-          <EbenenSchalter
-            label={daten?.grenze ? 'Luftbild (LGLN, nur Revierbereich)' : 'Luftbild – erst Reviergrenze zeichnen'}
-            an={ebenen.luftbild && !!daten?.grenze}
-            gesperrt={!daten?.grenze}
-            onAendern={(an) => setEbenen({ ...ebenen, luftbild: an })}
-          />
-          <EbenenSchalter label="Zonen" an={ebenen.zonen} onAendern={(an) => setEbenen({ ...ebenen, zonen: an })} />
-          {ebenen.zonen && (kartenEbenen.length > 0) && (
-            <div className="unterebenen">
-              {[...kartenEbenen, ...(hatOhneEbene ? [{ id: 'ohne', name: 'Ohne Ebene', farbe: null }] : [])].map((e) => (
-                <label key={e.id} className="ebene">
-                  <input
-                    type="checkbox"
-                    checked={!ausgeblendet.has(e.id)}
-                    onChange={(ev) =>
-                      setAusgeblendet((alt) => {
-                        const neu = new Set(alt);
-                        if (ev.target.checked) neu.delete(e.id);
-                        else neu.add(e.id);
-                        return neu;
-                      })
-                    }
-                  />
-                  <i className="farbpunkt" style={{ background: e.farbe ?? 'var(--text-leise)' }} />
-                  {e.name}
-                </label>
-              ))}
-            </div>
-          )}
-          <EbenenSchalter label="Einrichtungen" an={ebenen.einrichtungen} onAendern={(an) => setEbenen({ ...ebenen, einrichtungen: an })} />
-          <EbenenSchalter label="Pirschwege" an={ebenen.pirschwege} onAendern={(an) => setEbenen({ ...ebenen, pirschwege: an })} />
-          <EbenenSchalter
-            label={`Heatmap Beobachtungen (${anzahlBeob}, 12 Monate)`}
-            an={ebenen.heatmap}
-            onAendern={(an) => setEbenen({ ...ebenen, heatmap: an })}
-          />
-          <EbenenSchalter
-            label={`Abschüsse (${daten?.abschuesse.length ?? 0}, 12 Monate)`}
-            an={ebenen.abschuesse}
-            onAendern={(an) => setEbenen({ ...ebenen, abschuesse: an })}
-          />
-
-          {ebenen.einrichtungen && (
-            <div className="legende">
-              {EINRICHTUNGSTYPEN.filter((t) => daten?.einrichtungen.some((e) => e.properties?.typ === t.wert)).map((t) => (
-                <span key={t.wert}>
-                  <i style={{ background: t.farbe }} /> {t.label}
-                </span>
-              ))}
-            </div>
-          )}
+          <p className="leer" style={{ margin: 0 }}>Oberste Ebene liegt über den anderen. Mit ▲ ▼ verschieben, mit dem Regler die Transparenz einstellen.</p>
+          <ul className="ebenen-liste">
+            {einst.reihenfolge.map((id, i) => {
+              const info = ebenenInfo[id];
+              return (
+                <li key={id}>
+                  <div className="ebenen-kopf">
+                    <EbenenSchalter label={info.label} an={info.an} gesperrt={info.gesperrt} onAendern={info.setAn} />
+                    <span className="ebenen-schieber">
+                      <button type="button" aria-label={`${info.name} nach oben`} disabled={i === 0} onClick={() => verschieben(i, -1)}>
+                        ▲
+                      </button>
+                      <button type="button" aria-label={`${info.name} nach unten`} disabled={i === einst.reihenfolge.length - 1} onClick={() => verschieben(i, 1)}>
+                        ▼
+                      </button>
+                    </span>
+                  </div>
+                  <label className="transparenz">
+                    <span>Transparenz</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      step={5}
+                      value={Math.round((1 - einst.deckkraft[id]) * 100)}
+                      aria-label={`Transparenz ${info.name}`}
+                      onChange={(e) => setEinst((alt) => ({ ...alt, deckkraft: { ...alt.deckkraft, [id]: 1 - Number(e.target.value) / 100 } }))}
+                    />
+                    <output>{Math.round((1 - einst.deckkraft[id]) * 100)} %</output>
+                  </label>
+                  {id === 'zonen' && ebenen.zonen && kartenEbenen.length > 0 && (
+                    <div className="unterebenen">
+                      {[...kartenEbenen, ...(hatOhneEbene ? [{ id: 'ohne', name: 'Ohne Ebene', farbe: null }] : [])].map((e) => (
+                        <label key={e.id} className="ebene">
+                          <input
+                            type="checkbox"
+                            checked={!ausgeblendet.has(e.id)}
+                            onChange={(ev) =>
+                              setAusgeblendet((alt) => {
+                                const neu = new Set(alt);
+                                if (ev.target.checked) neu.delete(e.id);
+                                else neu.add(e.id);
+                                return neu;
+                              })
+                            }
+                          />
+                          <i className="farbpunkt" style={{ background: e.farbe ?? 'var(--text-leise)' }} />
+                          {e.name}
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                  {id === 'einrichtungen' && ebenen.einrichtungen && (
+                    <div className="legende">
+                      {EINRICHTUNGSTYPEN.filter((t) => daten?.einrichtungen.some((e) => e.properties?.typ === t.wert)).map((t) => (
+                        <span key={t.wert}>
+                          <EinrichtungsIcon typ={t.wert} farbe={t.farbe} groesse={18} /> {t.label}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+          {!ISTHANDY && <p className="leer" style={{ margin: 0 }}>Das Luftbild wird für den gesamten Kartenausschnitt geladen und auf dem Gerät zwischengespeichert.</p>}
+          {ISTHANDY && <p className="leer" style={{ margin: 0 }}>Mobil wird das Luftbild nur für den Revierbereich geladen und auf dem Gerät zwischengespeichert, um Daten zu sparen.</p>}
 
           </Abschnitt>
 

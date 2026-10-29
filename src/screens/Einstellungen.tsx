@@ -7,6 +7,7 @@ import { Feld, Gruppe, Hinweis, Knopf, PasswortFeld, Seite, Segmente, Zeile } fr
 import { useDarstellung, type Darstellung } from '../lib/darstellung';
 import { MitgliederPanel } from './MitgliederPanel';
 import { AdminPanel } from './AdminPanel';
+import { RevierdatenLoeschen } from './module/Revierdaten';
 
 const ROLLEN = { inhaber: 'Revierinhaber/-pächter', mitjaeger: 'Mitjäger' } as const;
 
@@ -30,12 +31,16 @@ export function Einstellungen({
     <Seite titel="Einstellungen">
       <Konto name={kontext.name} email={kontext.email} onGeaendert={() => nachAenderung()} />
       <DarstellungWahl />
+      <KartenSpeicher />
 
       {aktuell && (
         <>
           <Revier aktuell={aktuell} onGeaendert={() => nachAenderung()} />
           {aktuell.rolle === 'inhaber' ? (
-            <MitgliederPanel revierId={aktuell.revier.id} eigeneId={userId} />
+            <>
+              <MitgliederPanel revierId={aktuell.revier.id} eigeneId={userId} />
+              <RevierdatenLoeschen revierId={aktuell.revier.id} onGeaendert={() => nachAenderung()} />
+            </>
           ) : (
             <RevierVerlassen aktuell={aktuell} userId={userId} onVerlassen={() => nachAenderung()} />
           )}
@@ -293,6 +298,38 @@ function DarstellungWahl() {
           ]}
         />
       </div>
+    </Gruppe>
+  );
+}
+
+// Auf dem Gerät zwischengespeicherte Kartenkacheln (Luftbild, OpenStreetMap)
+function KartenSpeicher() {
+  const [anzahl, setAnzahl] = useState<number | null>(null);
+  const zaehlen = async () => {
+    try {
+      setAnzahl((await (await caches.open('hegewerk-karten-v1')).keys()).length);
+    } catch {
+      setAnzahl(null);
+    }
+  };
+  useEffect(() => {
+    void zaehlen();
+  }, []);
+  if (anzahl === null) return null;
+  return (
+    <Gruppe titel="Kartenspeicher" fuss="Kacheln werden auf diesem Gerät zwischengespeichert, damit sie nicht erneut geladen werden müssen (spart mobile Daten).">
+      <Zeile label={`${anzahl.toLocaleString('de-DE')} Kacheln gespeichert`}>
+        <Knopf
+          variante="sekundaer"
+          disabled={anzahl === 0}
+          onClick={async () => {
+            await caches.delete('hegewerk-karten-v1');
+            await zaehlen();
+          }}
+        >
+          Leeren
+        </Knopf>
+      </Zeile>
     </Gruppe>
   );
 }
