@@ -1,5 +1,5 @@
 import { navigieren } from '../lib/router';
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from 'react';
+import { useId, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from 'react';
 
 export function Gruppe({ titel, fuss, children }: { titel?: string; fuss?: ReactNode; children: ReactNode }) {
   return (
@@ -14,7 +14,9 @@ export function Gruppe({ titel, fuss, children }: { titel?: string; fuss?: React
 type FeldProps = InputHTMLAttributes<HTMLInputElement> & { label: string };
 
 export function Feld({ label, id, ...rest }: FeldProps) {
-  const feldId = id ?? `feld-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+  // Eindeutige ID je Feld, damit gleich benannte Felder (z. B. „Name“) sich nicht in die Quere kommen
+  const autoId = useId();
+  const feldId = id ?? autoId;
   return (
     <label className="zeile feld" htmlFor={feldId}>
       <span className="zeile-label">{label}</span>
@@ -23,10 +25,46 @@ export function Feld({ label, id, ...rest }: FeldProps) {
   );
 }
 
+type PasswortProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'type'> & { label: string };
+
+// Passwortfeld mit Umschalter zum Ein-/Ausblenden der Eingabe
+export function PasswortFeld({ label, id, ...rest }: PasswortProps) {
+  const autoId = useId();
+  const feldId = id ?? autoId;
+  const [sichtbar, setSichtbar] = useState(false);
+  return (
+    <div className="zeile feld passwort-feld">
+      <label className="zeile-label" htmlFor={feldId}>
+        {label}
+      </label>
+      <input id={feldId} type={sichtbar ? 'text' : 'password'} autoCapitalize="none" spellCheck={false} {...rest} />
+      <button
+        type="button"
+        className="auge"
+        onClick={() => setSichtbar((s) => !s)}
+        aria-label={sichtbar ? 'Passwort verbergen' : 'Passwort anzeigen'}
+        aria-pressed={sichtbar}
+      >
+        {sichtbar ? (
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3 3l18 18M10.6 10.6a2 2 0 002.8 2.8M9.9 5.1A9.8 9.8 0 0112 5c5 0 9 4.5 10 7-.4 1-1.3 2.4-2.6 3.7M6.6 6.6C4.4 8 2.8 10.1 2 12c1 2.5 5 7 10 7 1.6 0 3.1-.4 4.4-1.1" />
+          </svg>
+        ) : (
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M2 12c1-2.5 5-7 10-7s9 4.5 10 7c-1 2.5-5 7-10 7S3 14.5 2 12z" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+        )}
+      </button>
+    </div>
+  );
+}
+
 type AuswahlProps = SelectHTMLAttributes<HTMLSelectElement> & { label: string; children: ReactNode };
 
 export function Auswahl({ label, id, children, ...rest }: AuswahlProps) {
-  const feldId = id ?? `auswahl-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+  const autoId = useId();
+  const feldId = id ?? autoId;
   return (
     <label className="zeile feld" htmlFor={feldId}>
       <span className="zeile-label">{label}</span>

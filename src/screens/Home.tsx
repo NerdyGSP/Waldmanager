@@ -1,14 +1,12 @@
-import { lazy, Suspense, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase';
-import { codeFormatieren, fehlertext } from '../lib/fehler';
+import { fehlertext } from '../lib/fehler';
 import { gemerktesRevier, revierMerken, useNutzerKontext, type Mitgliedschaft } from '../lib/useNutzerKontext';
 import { navigieren, usePfad } from '../lib/router';
 import { useWarteschlange } from '../lib/offline';
-import { Feld, Gruppe, Hinweis, Knopf, Zeile } from '../components/ui';
+import { Hinweis, Knopf } from '../components/ui';
 import { Logo } from './AuthScreen';
-import { MitgliederPanel } from './MitgliederPanel';
-import { AdminPanel } from './AdminPanel';
+import { CodeEinloesen, Einstellungen } from './Einstellungen';
 import { Freigaben } from './module/Freigaben';
 import { Zonen } from './module/Zonen';
 import { Abschuesse } from './module/Abschuesse';
@@ -20,7 +18,7 @@ import type { RevierKontext } from './module/kontext';
 // Die Karte ist groß (MapLibre) und wird erst bei Bedarf geladen
 const Karte = lazy(() => import('./module/Karte'));
 
-const ROLLEN = { inhaber: 'Revierinhaber/-pächter', mitjaeger: 'Mitjäger' } as const;
+const ROLLEN = { inhaber: 'Inhaber/Pächter', mitjaeger: 'Mitjäger' } as const;
 
 const MODULE = [
   { pfad: 'karte', titel: 'Karte', text: 'Reviergrenze, Zonen, Einrichtungen, Pirschwege, Wind, Heatmap', symbol: '🗺' },
@@ -99,22 +97,31 @@ export function Home({ session }: { session: Session }) {
               {offen} offline
             </span>
           )}
-          <span className="nutzer-name">{kontext.name || kontext.email}</span>
-          <Knopf variante="sekundaer" onClick={() => supabase.auth.signOut()}>
-            Abmelden
-          </Knopf>
+          <button
+            className={`zahnrad ${modul === 'einstellungen' ? 'aktiv' : ''}`}
+            onClick={() => navigieren('/einstellungen')}
+            aria-label="Einstellungen"
+            title="Einstellungen"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z" />
+            </svg>
+          </button>
         </div>
       </header>
 
       <main className={modul === 'karte' ? 'inhalt inhalt-voll' : 'inhalt'}>
         {kontext.fehler && <Hinweis art="fehler">{fehlertext(kontext.fehler)}</Hinweis>}
 
-        {modul && revierKontext ? (
+        {modul === 'einstellungen' ? (
+          <Einstellungen userId={session.user.id} kontext={kontext} aktuell={aktuell} revierWechseln={revierWechseln} />
+        ) : modul && revierKontext ? (
           <ModulInhalt key={`${revierKontext.revierId}-${modul}`} modul={modul} unterpfad={pfad.slice(1)} k={revierKontext} />
         ) : (
           <Start
             aktuell={aktuell}
-            session={session}
+            name={kontext.name}
             istMasteradmin={kontext.istMasteradmin}
             neuLaden={kontext.neuLaden}
             revierWechseln={revierWechseln}
@@ -152,117 +159,64 @@ function ModulInhalt({ modul, unterpfad, k }: { modul: string; unterpfad: string
 
 function Start({
   aktuell,
-  session,
+  name,
   istMasteradmin,
   neuLaden,
   revierWechseln,
 }: {
   aktuell: Mitgliedschaft | null;
-  session: Session;
+  name: string;
   istMasteradmin: boolean;
   neuLaden: () => Promise<void>;
   revierWechseln: (id: string) => void;
 }) {
-  return (
-    <>
-      {aktuell ? (
-        <>
-          <section>
-            <div className="kacheln">
-              {MODULE.map((m) => (
-                <button key={m.pfad} className="kachel" onClick={() => navigieren(`/${m.pfad}`)}>
-                  <span className="kachel-symbol" aria-hidden="true">
-                    {m.symbol}
-                  </span>
-                  <strong>{m.titel}</strong>
-                  <span>{m.text}</span>
-                </button>
-              ))}
-            </div>
-          </section>
-
-          <Gruppe titel="Revier">
-            <Zeile label="Name" wert={aktuell.revier.name} />
-            <Zeile label="Hegering" wert={aktuell.revier.hegering ?? '–'} />
-            <Zeile
-              label="Fläche"
-              wert={aktuell.revier.flaeche_ha ? `${aktuell.revier.flaeche_ha.toLocaleString('de-DE')} ha` : 'nicht hinterlegt'}
-            />
-            <Zeile label="Deine Rolle" wert={ROLLEN[aktuell.rolle]} />
-          </Gruppe>
-
-          {aktuell.rolle === 'inhaber' && <MitgliederPanel revierId={aktuell.revier.id} eigeneId={session.user.id} />}
-        </>
-      ) : (
-        !istMasteradmin && (
-          <Hinweis>
-            Du bist noch keinem Revier zugeordnet. Löse unten einen Einladungscode ein, den du vom Revierinhaber bekommen
-            hast.
-          </Hinweis>
-        )
-      )}
-
-      <CodeEinloesen
-        onEingeloest={async (neueRevierId) => {
-          await neuLaden();
-          if (neueRevierId) revierWechseln(neueRevierId);
-        }}
-      />
-
-      {istMasteradmin && (
-        <AdminPanel
-          eigeneId={session.user.id}
-          onGeaendert={async (neueRevierId) => {
+  if (!aktuell) {
+    return (
+      <>
+        <Hinweis>
+          {istMasteradmin
+            ? 'Du bist noch keinem Revier zugeordnet. Reviere legst du in den Einstellungen im Bereich Masteradmin an.'
+            : 'Du bist noch keinem Revier zugeordnet. Löse einen Einladungscode ein, den du vom Revierinhaber bekommen hast.'}
+        </Hinweis>
+        <CodeEinloesen
+          onEingeloest={async (neueRevierId) => {
             await neuLaden();
             if (neueRevierId) revierWechseln(neueRevierId);
           }}
         />
-      )}
-    </>
-  );
-}
-
-function CodeEinloesen({ onEingeloest }: { onEingeloest: (revierId: string | null) => Promise<void> }) {
-  const [code, setCode] = useState('');
-  const [fehler, setFehler] = useState<string | null>(null);
-  const [erfolg, setErfolg] = useState(false);
-  const [laedt, setLaedt] = useState(false);
-
-  async function absenden(e: FormEvent) {
-    e.preventDefault();
-    setFehler(null);
-    setErfolg(false);
-    setLaedt(true);
-    const { data, error } = await supabase.rpc('einladung_einloesen', { p_code: code });
-    setLaedt(false);
-    if (error) {
-      setFehler(fehlertext(error));
-      return;
-    }
-    setCode('');
-    setErfolg(true);
-    await onEingeloest(data ?? null);
+        {istMasteradmin && (
+          <Knopf variante="sekundaer" onClick={() => navigieren('/einstellungen')}>
+            Zu den Einstellungen
+          </Knopf>
+        )}
+      </>
+    );
   }
 
   return (
-    <form onSubmit={absenden}>
-      <Gruppe titel="Einladungscode einlösen" fuss="Damit trittst du mit deinem bestehenden Account einem weiteren Revier bei.">
-        <Feld
-          label="Code"
-          placeholder="XXXX-XXXX"
-          autoCapitalize="characters"
-          autoComplete="off"
-          spellCheck={false}
-          required
-          value={code}
-          onChange={(e) => setCode(codeFormatieren(e.target.value))}
-        />
-      </Gruppe>
-      {fehler && <Hinweis art="fehler">{fehler}</Hinweis>}
-      {erfolg && <Hinweis art="erfolg">Code eingelöst.</Hinweis>}
-      <Knopf type="submit" variante="sekundaer" disabled={laedt || code.length < 9}>
-        Einlösen
-      </Knopf>
-    </form>
+    <>
+      <header className="start-kopf">
+        <h1>{aktuell.revier.name}</h1>
+        <p>
+          {[aktuell.revier.hegering, aktuell.revier.flaeche_ha ? `${aktuell.revier.flaeche_ha.toLocaleString('de-DE')} ha` : null, ROLLEN[aktuell.rolle]]
+            .filter(Boolean)
+            .join(' · ')}
+          {name ? ` · ${name}` : ''}
+        </p>
+      </header>
+      <section>
+        <div className="kacheln">
+          {MODULE.map((m) => (
+            <button key={m.pfad} className="kachel" onClick={() => navigieren(`/${m.pfad}`)}>
+              <span className="kachel-symbol" aria-hidden="true">
+                {m.symbol}
+              </span>
+              <strong>{m.titel}</strong>
+              <span>{m.text}</span>
+            </button>
+          ))}
+        </div>
+      </section>
+    </>
   );
 }

@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { supabase } from '../lib/supabase';
 import { codeFormatieren, fehlertext } from '../lib/fehler';
-import { Feld, Gruppe, Hinweis, Knopf } from '../components/ui';
+import { Feld, Gruppe, Hinweis, Knopf, PasswortFeld } from '../components/ui';
 
 type Modus = 'anmelden' | 'registrieren' | 'vergessen';
 
@@ -51,7 +51,7 @@ function Anmelden({ onVergessen }: { onVergessen: () => void }) {
     <form onSubmit={absenden}>
       <Gruppe>
         <Feld label="E-Mail" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
-        <Feld label="Passwort" type="password" autoComplete="current-password" required value={passwort} onChange={(e) => setPasswort(e.target.value)} />
+        <PasswortFeld label="Passwort" autoComplete="current-password" required value={passwort} onChange={(e) => setPasswort(e.target.value)} />
       </Gruppe>
       {fehler && <Hinweis art="fehler">{fehler}</Hinweis>}
       <Knopf type="submit" disabled={laedt}>
@@ -133,9 +133,8 @@ function Registrieren() {
       <Gruppe>
         <Feld label="Name" autoComplete="name" required value={name} onChange={(e) => setName(e.target.value)} />
         <Feld label="E-Mail" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
-        <Feld
+        <PasswortFeld
           label="Passwort"
-          type="password"
           autoComplete="new-password"
           required
           minLength={8}

@@ -17,7 +17,7 @@ import kartenWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import type { Feature, FeatureCollection, Geometry, MultiPolygon, Polygon, Position } from 'geojson';
 import { supabase } from '../../lib/supabase';
 import { fehlertext } from '../../lib/fehler';
-import { useWildarten, useZonen, wildartName } from '../../lib/stammdaten';
+import { useWildarten, useZonen, wildartName, ZONENFARBEN } from '../../lib/stammdaten';
 import { aktuellesWetter, himmelsrichtung, linieEWKT, punktEWKT, type Wetter } from '../../lib/geo';
 import type { Enums, Json } from '../../lib/database.types';
 import type { RevierKontext } from './kontext';
@@ -93,7 +93,7 @@ type Ebenen = {
 
 type Modus =
   | { art: 'grenze' }
-  | { art: 'zone'; zoneId: string; name: string }
+  | { art: 'zone'; zoneId: string | null; name: string }
   | { art: 'pirschweg' }
   | { art: 'aufzeichnung' }
   | { art: 'einrichtung' }
@@ -463,9 +463,29 @@ export default function Karte({ k }: { k: RevierKontext }) {
           setMeldung({ art: 'erfolg', text: `Reviergrenze gespeichert · ${Number(data).toLocaleString('de-DE')} ha` });
           await k.neuLaden();
         } else {
-          const { error } = await supabase.rpc('zone_geometrie_setzen', { p_zone_id: modus.zoneId, p_geojson: geojson });
+          let zoneId = modus.zoneId;
+          let name = modus.name;
+          if (!zoneId) {
+            // Neue Zone: erst benennen und anlegen, dann Fläche speichern
+            const eingabe = window.prompt('Name der neuen Zone:', `Zone ${zonen.length + 1}`)?.trim();
+            if (!eingabe) return;
+            name = eingabe;
+            const { data: neu, error: anlegeFehler } = await supabase
+              .from('zonen')
+              .insert({
+                revier_id: k.revierId,
+                name,
+                sortierung: zonen.length,
+                farbe: ZONENFARBEN[zonen.length % ZONENFARBEN.length],
+              })
+              .select('id')
+              .single();
+            if (anlegeFehler) throw anlegeFehler;
+            zoneId = neu.id;
+          }
+          const { error } = await supabase.rpc('zone_geometrie_setzen', { p_zone_id: zoneId, p_geojson: geojson });
           if (error) throw error;
-          setMeldung({ art: 'erfolg', text: `Fläche für „${modus.name}“ gespeichert` });
+          setMeldung({ art: 'erfolg', text: `Zone „${name}“ gespeichert` });
           await zonenLaden();
         }
       } else if (modus.art === 'pirschweg' || modus.art === 'aufzeichnung') {
@@ -619,7 +639,7 @@ export default function Karte({ k }: { k: RevierKontext }) {
         <div className="zeichen-leiste">
           <span>
             {modus.art === 'grenze' && 'Reviergrenze: Eckpunkte antippen'}
-            {modus.art === 'zone' && `Zone „${modus.name}“: Eckpunkte antippen`}
+            {modus.art === 'zone' && (modus.zoneId ? `Zone „${modus.name}“: Eckpunkte antippen` : 'Neue Zone: Eckpunkte antippen')}
             {modus.art === 'pirschweg' && 'Pirschweg: Wegpunkte antippen'}
             {modus.art === 'aufzeichnung' && `GPS-Aufzeichnung: ${punkte.length} Punkte`}
           </span>
@@ -685,23 +705,29 @@ export default function Karte({ k }: { k: RevierKontext }) {
               <button className="knopf knopf-sekundaer" onClick={() => setModus({ art: 'grenze' })} disabled={!!modus}>
                 {daten?.grenze ? 'Reviergrenze neu zeichnen' : 'Reviergrenze zeichnen'}
               </button>
-              <select
-                className="karte-auswahl"
-                value=""
-                disabled={!!modus || zonen.length === 0}
-                onChange={(e) => {
-                  const z = zonen.find((x) => x.id === e.target.value);
-                  if (z) setModus({ art: 'zone', zoneId: z.id, name: z.name });
-                }}
-              >
-                <option value="">{zonen.length ? 'Fläche für Zone zeichnen …' : 'Erst Zonen anlegen'}</option>
-                {zonen.map((z) => (
-                  <option key={z.id} value={z.id}>
-                    {z.name}
-                    {z.hatGeometrie ? ' (neu zeichnen)' : ''}
-                  </option>
-                ))}
-              </select>
+              <button className="knopf knopf-sekundaer" onClick={() => setModus({ art: 'zone', zoneId: null, name: '' })} disabled={!!modus}>
+                Neue Zone zeichnen
+              </button>
+              {zonen.length > 0 && (
+                <select
+                  className="karte-auswahl"
+                  value=""
+                  disabled={!!modus}
+                  aria-label="Fläche einer bestehenden Zone zeichnen"
+                  onChange={(e) => {
+                    const z = zonen.find((x) => x.id === e.target.value);
+                    if (z) setModus({ art: 'zone', zoneId: z.id, name: z.name });
+                  }}
+                >
+                  <option value="">Fläche für bestehende Zone …</option>
+                  {zonen.map((z) => (
+                    <option key={z.id} value={z.id}>
+                      {z.name}
+                      {z.hatGeometrie ? ' (neu zeichnen)' : ' (noch ohne Fläche)'}
+                    </option>
+                  ))}
+                </select>
+              )}
               <button className="knopf knopf-sekundaer" onClick={() => setModus({ art: 'einrichtung' })} disabled={!!modus}>
                 Einrichtung setzen
               </button>

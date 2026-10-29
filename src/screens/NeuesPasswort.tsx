@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { supabase } from '../lib/supabase';
 import { fehlertext } from '../lib/fehler';
 import { useAuth } from '../auth/AuthProvider';
-import { Feld, Gruppe, Hinweis, Knopf } from '../components/ui';
+import { Gruppe, Hinweis, Knopf, PasswortFeld } from '../components/ui';
 
 export function NeuesPasswort() {
   const { passwortGesetzt } = useAuth();
@@ -30,9 +30,8 @@ export function NeuesPasswort() {
       </header>
       <form onSubmit={absenden}>
         <Gruppe>
-          <Feld
+          <PasswortFeld
             label="Passwort"
-            type="password"
             autoComplete="new-password"
             required
             minLength={8}
