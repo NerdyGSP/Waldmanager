@@ -5,7 +5,8 @@ import { csvLesen, datumLesen, geschlechtLesen, normalisieren, textAusDatei, uhr
 import { useWildarten, useZonen, ZONENFARBEN } from '../../lib/stammdaten';
 import { datumDE } from '../../lib/zeit';
 import type { Enums } from '../../lib/database.types';
-import { Gruppe, Hinweis, Knopf, Leer, Seite, Segmente, WildartOptionen } from '../../components/ui';
+import { Feld, Gruppe, Hinweis, Knopf, Leer, Seite, Segmente, WildartOptionen } from '../../components/ui';
+import { VorlageGruppe } from './ImportVorlage';
 import { Geoimport } from './Geoimport';
 import type { RevierKontext } from './kontext';
 
@@ -40,6 +41,9 @@ const VORLAGEN: Record<Typ, string> = {
 };
 
 const MAX_ZEILEN = 20000;
+const SUMMENKOPF = /^(summe|gesamt|total|insgesamt|σ)\b/i;
+const heute = () => new Date().toLocaleDateString('sv-SE');
+const ZONE_UEBERSPRINGEN = '__skip';
 
 type Zeile = {
   nr: number;
@@ -71,11 +75,15 @@ export function Datenimport({ k }: { k: RevierKontext }) {
   const [zuordnung, setZuordnung] = useState<Record<string, number>>({});
   const [artZuordnung, setArtZuordnung] = useState<Record<string, string>>({});
   const [zonenAnlegen, setZonenAnlegen] = useState(false);
+  const [zonenWahl, setZonenWahl] = useState<Record<string, string>>({});
+  const [datum, setDatum] = useState(heute);
   const [fehler, setFehler] = useState<string | null>(null);
   const [meldung, setMeldung] = useState<string | null>(null);
   const [laeuft, setLaeuft] = useState(false);
 
   const kopf = tabelle?.[0] ?? [];
+  // Matrixformat (Zeilen = Zonen, Spalten = Wildarten): mindestens zwei Spaltenköpfe sind Wildarten
+  const matrix = typ === 'zaehlung' && kopf.slice(1).filter((h) => wildartFinden(h, wildarten)).length >= 2;
 
   function neuStart(t: Typ) {
     setTyp(t);
@@ -83,6 +91,7 @@ export function Datenimport({ k }: { k: RevierKontext }) {
     setDateiname('');
     setZuordnung({});
     setArtZuordnung({});
+    setZonenWahl({});
     setFehler(null);
     setMeldung(null);
   }
@@ -123,6 +132,29 @@ export function Datenimport({ k }: { k: RevierKontext }) {
     const probleme: string[] = [];
     let nullzeilen = 0;
     if (!tabelle) return { ok, probleme, nullzeilen, fehlendePflicht: [] as string[] };
+    if (matrix) {
+      if (!datumLesen(datum)) return { ok, probleme, nullzeilen, fehlendePflicht: ['Datum der Zählung'] };
+      const spalten = tabelle[0]!.map((h, i) => ({ h: h.trim(), i })).filter((c) => c.i > 0 && c.h && !SUMMENKOPF.test(c.h));
+      for (const [i, z] of tabelle.slice(1).entries()) {
+        const zone = (z[0] ?? '').trim();
+        if (!zone || SUMMENKOPF.test(zone)) continue; // leere Zeilen und Summenzeilen
+        for (const c of spalten) {
+          const roh = (z[c.i] ?? '').trim();
+          if (!roh) continue; // leer = 0
+          const a = zahlLesen(roh);
+          if (a === null || a < 0 || !Number.isInteger(a)) {
+            probleme.push(`Zeile ${i + 2}, „${c.h}“: Anzahl „${roh}“ ungültig`);
+            continue;
+          }
+          if (a === 0) {
+            nullzeilen++;
+            continue;
+          }
+          ok.push({ nr: i + 2, datum, stunde: null, minute: null, wildartRoh: c.h, anzahl: a, geschlecht: 'unbekannt', altersklasse: null, gewicht: null, zoneRoh: zone, bemerkung: null });
+        }
+      }
+      return { ok, probleme, nullzeilen, fehlendePflicht: [] as string[] };
+    }
     const fehlendePflicht = FELDER[typ].filter((f) => f.pflicht && (zuordnung[f.schluessel] ?? -1) < 0).map((f) => f.label);
     if (fehlendePflicht.length) return { ok, probleme, nullzeilen, fehlendePflicht };
     for (const [i, z] of tabelle.slice(1).entries()) {
@@ -168,7 +200,7 @@ export function Datenimport({ k }: { k: RevierKontext }) {
     }
     return { ok, probleme, nullzeilen, fehlendePflicht };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tabelle, zuordnung, typ]);
+  }, [tabelle, zuordnung, typ, matrix, datum]);
 
   // Wildart-Werte: automatisch erkannt oder manuell zugeordnet
   const artWerte = useMemo(() => {
@@ -190,8 +222,12 @@ export function Datenimport({ k }: { k: RevierKontext }) {
     return [...m.entries()].map(([roh, anzahl]) => ({ roh, anzahl, vorhanden: zonen.some((x) => normalisieren(x.name) === normalisieren(roh)) }));
   }, [auswertung.ok, zonen]);
   const unbekannteZonen = zonenWerte.filter((z) => !z.vorhanden);
+  // Unbekannte Zonen: einer vorhandenen Zone zuordnen, neu anlegen, ohne Zone übernehmen (Liste) oder überspringen (Matrix)
+  const wahlFuer = (roh: string) => zonenWahl[roh] ?? (matrix ? ZONE_UEBERSPRINGEN : '');
+  const zoneUebersprungen = (roh: string) =>
+    !!roh && !zonen.some((x) => normalisieren(x.name) === normalisieren(roh)) && !zonenAnlegen && wahlFuer(roh) === ZONE_UEBERSPRINGEN;
 
-  const importierbar = auswertung.ok.filter((z) => artFuer(z.wildartRoh));
+  const importierbar = auswertung.ok.filter((z) => artFuer(z.wildartRoh) && !zoneUebersprungen(z.zoneRoh));
   const datumVon = importierbar.reduce((a, z) => (a === '' || z.datum < a ? z.datum : a), '');
   const datumBis = importierbar.reduce((a, z) => (z.datum > a ? z.datum : a), '');
 
@@ -203,7 +239,7 @@ export function Datenimport({ k }: { k: RevierKontext }) {
       // Zonen zuordnen (optional unbekannte neu anlegen)
       const zonenIds = new Map<string, string>(zonen.map((z) => [normalisieren(z.name), z.id]));
       if (zonenAnlegen) {
-        const neu = unbekannteZonen.map((z) => z.roh);
+        const neu = unbekannteZonen.filter((z) => !zonenWahl[z.roh] || zonenWahl[z.roh] === ZONE_UEBERSPRINGEN).map((z) => z.roh);
         for (const [i, name] of neu.entries()) {
           if (zonenIds.has(normalisieren(name))) continue;
           const { data, error } = await supabase
@@ -216,7 +252,13 @@ export function Datenimport({ k }: { k: RevierKontext }) {
         }
         await zonenLaden();
       }
-      const zoneId = (roh: string) => (roh ? (zonenIds.get(normalisieren(roh)) ?? null) : null);
+      const zoneId = (roh: string) => {
+        if (!roh) return null;
+        const gewaehlt = wahlFuer(roh);
+        const vorhanden = zonenIds.get(normalisieren(roh));
+        if (!vorhanden && gewaehlt && gewaehlt !== ZONE_UEBERSPRINGEN) return gewaehlt;
+        return vorhanden ?? null;
+      };
 
       if (typ === 'zaehlung') {
         const marke = `CSV-Import ${dateiname}`;
@@ -382,6 +424,7 @@ export function Datenimport({ k }: { k: RevierKontext }) {
             Trennzeichen (Semikolon, Komma, Tab) und Zeichensatz (UTF-8 oder Windows) werden automatisch erkannt. Datumsangaben wie 14.03.2021 oder
             2021-03-14 werden verstanden. Erste Zeile = Spaltenüberschriften.
           </Leer>
+          {typ === 'zaehlung' && <VorlageGruppe revierId={k.revierId} zonen={zonen} wildarten={wildarten} />}
           <Knopf
             variante="ghost"
             onClick={() => {
@@ -393,13 +436,19 @@ export function Datenimport({ k }: { k: RevierKontext }) {
               URL.revokeObjectURL(url);
             }}
           >
-            Vorlage herunterladen
+            {typ === 'zaehlung' ? 'Listenformat-Vorlage herunterladen' : 'Vorlage herunterladen'}
           </Knopf>
         </>
       )}
 
       {tabelle && (
         <>
+          {matrix && (
+            <Gruppe titel={`1. Zählung · ${dateiname}`} fuss={`Matrixformat erkannt: ${(tabelle.length - 1).toLocaleString('de-DE')} Zeilen (Zonen) × ${kopf.length - 1} Spalten. Summenzeilen und -spalten werden ignoriert, das Geschlecht wird als „unbekannt“ gespeichert.`}>
+              <Feld label="Datum der Zählung *" type="date" value={datum} onChange={(e) => setDatum(e.target.value)} />
+            </Gruppe>
+          )}
+          {!matrix && (
           <Gruppe titel={`1. Spalten zuordnen · ${dateiname}`} fuss={`${(tabelle.length - 1).toLocaleString('de-DE')} Datenzeilen gefunden`}>
             {felder.map((f) => (
               <label key={f.schluessel} className="zeile feld">
@@ -421,6 +470,7 @@ export function Datenimport({ k }: { k: RevierKontext }) {
               </label>
             ))}
           </Gruppe>
+          )}
 
           {auswertung.fehlendePflicht.length > 0 ? (
             <Hinweis art="fehler">Bitte noch zuordnen: {auswertung.fehlendePflicht.join(', ')}</Hinweis>
@@ -458,9 +508,26 @@ export function Datenimport({ k }: { k: RevierKontext }) {
                       <span className="zeile-label">
                         „{z.roh}“<small>{z.anzahl.toLocaleString('de-DE')} Zeilen</small>
                       </span>
-                      <span className={`badge ${z.vorhanden ? 'badge-gruen' : zonenAnlegen ? 'badge-orange' : ''}`}>
-                        {z.vorhanden ? 'vorhanden' : zonenAnlegen ? 'wird angelegt' : 'ohne Zone'}
-                      </span>
+                      {z.vorhanden ? (
+                        <span className="badge badge-gruen">vorhanden</span>
+                      ) : zonenAnlegen && !zonenWahl[z.roh] ? (
+                        <span className="badge badge-orange">wird angelegt</span>
+                      ) : (
+                        <select
+                          className="zeile-auswahl"
+                          aria-label={`Zone für ${z.roh}`}
+                          value={wahlFuer(z.roh)}
+                          onChange={(e) => setZonenWahl({ ...zonenWahl, [z.roh]: e.target.value })}
+                        >
+                          <option value={matrix ? ZONE_UEBERSPRINGEN : ''}>{matrix ? 'überspringen' : 'ohne Zone'}</option>
+                          {matrix && <option value="">ohne Zone importieren</option>}
+                          {zonen.map((x) => (
+                            <option key={x.id} value={x.id}>
+                              → {x.name}
+                            </option>
+                          ))}
+                        </select>
+                      )}
                     </div>
                   ))}
                   {unbekannteZonen.length > 0 && (
