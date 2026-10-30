@@ -127,12 +127,14 @@ function SitzungBearbeiten({ k, sitzung, onFertig }) {
     return (_jsxs(Seite, { titel: `Zählung ${datumDE(sitzung.datum)}`, untertitel: "Sitzungsdaten bearbeiten", zurueck: () => onFertig(false), children: [fehler && _jsx(Hinweis, { art: "fehler", children: fehler }), _jsx(SitzungsdatenFormular, { wert: wert, onAendern: setWert, mitte: mitte, datumAenderbar: true, autoVorbelegen: false }), _jsx(Knopf, { variante: "akzent", disabled: laeuft, onClick: () => void speichern(), children: laeuft ? 'Speichern …' : 'Speichern' })] }));
 }
 // Gezählte Fläche der Zählung: Modus, Strecke und Fläche – änderbar, auch nach dem Abschluss
-function FlaechenGruppe({ sitzung, onGeaendert, onRouten }) {
+function FlaechenGruppe({ sitzung, revierId, onGeaendert, onRouten }) {
     const [modus, setModus] = useState(sitzung.flaechenmodus === 'strecke' ? 'strecke' : 'zonen');
     const [breite, setBreite] = useState(sitzung.streifenbreite_m);
     const [vorschau, setVorschau] = useState(null);
     const [fehler, setFehler] = useState(null);
     const [laeuft, setLaeuft] = useState(false);
+    const [neuLadenZaehler, setNeuLadenZaehler] = useState(0);
+    const [routenListe, setRoutenListe] = useState([]);
     const geaendert = modus !== sitzung.flaechenmodus || breite !== sitzung.streifenbreite_m;
     const abgeschlossen = sitzung.status === 'abgeschlossen';
     useEffect(() => {
@@ -148,7 +150,42 @@ function FlaechenGruppe({ sitzung, onGeaendert, onRouten }) {
         return () => {
             aktiv = false;
         };
-    }, [sitzung.id, modus, breite, sitzung.status]);
+    }, [sitzung.id, modus, breite, sitzung.status, neuLadenZaehler]);
+    // Vorhandene WTE-Routen des Reviers (aus WTE-relevanten Ebenen), die dieser Zählung zugeordnet werden können
+    useEffect(() => {
+        if (modus !== 'strecke')
+            return;
+        let aktiv = true;
+        void supabase
+            .from('pirschwege')
+            .select('id, name, zaehlsitzung_id, routen_ebenen!inner(wte_aktiv), zaehlsitzungen(datum)')
+            .eq('revier_id', revierId)
+            .eq('typ', 'wte_route')
+            .eq('routen_ebenen.wte_aktiv', true)
+            .is('geloescht_am', null)
+            .order('name')
+            .then(({ data }) => {
+            if (!aktiv)
+                return;
+            setRoutenListe((data ?? []).map((r) => ({
+                id: r.id,
+                name: r.name,
+                zaehlsitzung_id: r.zaehlsitzung_id,
+                km: null,
+                datum: r.zaehlsitzungen?.datum ?? null,
+            })));
+        });
+        return () => {
+            aktiv = false;
+        };
+    }, [revierId, modus, neuLadenZaehler]);
+    async function routeZuordnen(id, an) {
+        setFehler(null);
+        const { error } = await supabase.from('pirschwege').update({ zaehlsitzung_id: an ? sitzung.id : null }).eq('id', id);
+        if (error)
+            setFehler(fehlertext(error));
+        setNeuLadenZaehler((n) => n + 1);
+    }
     useEffect(() => {
         if (vorschau && modus === 'strecke')
             onRouten?.(vorschau.routen);
@@ -166,7 +203,11 @@ function FlaechenGruppe({ sitzung, onGeaendert, onRouten }) {
     const fehltRoute = modus === 'strecke' && vorschau !== null && vorschau.routen === 0;
     const zahlDE = (n, nk = 1) => (n === null ? '–' : n.toLocaleString('de-DE', { minimumFractionDigits: nk, maximumFractionDigits: nk }));
     const gespeichert = abgeschlossen && !geaendert && sitzung.flaeche_ha !== null;
-    return (_jsxs(Gruppe, { titel: "Gez\u00E4hlte Fl\u00E4che", fuss: abgeschlossen ? 'Die Fläche wird beim Abschluss festgeschrieben. Ändern von Modus oder Breite berechnet sie neu.' : 'Wird beim Abschluss der Zählung festgeschrieben.', children: [_jsx(FlaechenmodusWahl, { modus: modus, breite: breite, onModus: setModus, onBreite: setBreite }), fehltRoute && (_jsx(Hinweis, { art: "warnung", children: "Dieser Z\u00E4hlung ist noch keine WTE-Route zugeordnet. Im Modus \u201EStrecke \u00D7 Breite\u201C l\u00E4sst sie sich so nicht abschlie\u00DFen. Zeichne, zeichne per GPS auf oder importiere eine WTE-Route \u00FCber das Men\u00FC \u201E+ NEU\u201C auf der Karte." })), _jsx(Zeile, { label: "Fl\u00E4che", wert: (gespeichert ? sitzung.flaeche_ha : vorschau?.flaeche_ha ?? null) === null
+    return (_jsxs(Gruppe, { titel: "Gez\u00E4hlte Fl\u00E4che", fuss: abgeschlossen ? 'Die Fläche wird beim Abschluss festgeschrieben. Ändern von Modus oder Breite berechnet sie neu.' : 'Wird beim Abschluss der Zählung festgeschrieben.', children: [_jsx(FlaechenmodusWahl, { modus: modus, breite: breite, onModus: setModus, onBreite: setBreite }), fehltRoute && (_jsx(Hinweis, { art: "warnung", children: "Dieser Z\u00E4hlung ist noch keine WTE-Route zugeordnet. Im Modus \u201EStrecke \u00D7 Breite\u201C l\u00E4sst sie sich so nicht abschlie\u00DFen. Ordne unten eine vorhandene WTE-Route zu oder zeichne, zeichne per GPS auf oder importiere eine \u00FCber das Men\u00FC \u201E+ NEU\u201C auf der Karte." })), modus === 'strecke' && !abgeschlossen && (_jsxs("div", { style: { padding: '4px var(--abstand) 8px' }, children: [_jsx("strong", { style: { fontSize: '0.9rem' }, children: "WTE-Routen dieser Z\u00E4hlung" }), routenListe.length === 0 ? (_jsx("p", { className: "gruppe-fuss", style: { margin: '4px 0 0' }, children: "Keine WTE-Routen in WTE-relevanten Ebenen vorhanden." })) : (_jsx("ul", { style: { listStyle: 'none', margin: '6px 0 0', padding: 0, display: 'grid', gap: 4 }, children: routenListe.map((r) => {
+                            const hier = r.zaehlsitzung_id === sitzung.id;
+                            const anderswo = !!r.zaehlsitzung_id && !hier;
+                            return (_jsx("li", { children: _jsxs("label", { style: { display: 'flex', gap: 8, alignItems: 'center', opacity: anderswo ? 0.6 : 1 }, children: [_jsx("input", { type: "checkbox", checked: hier, disabled: anderswo, onChange: (e) => void routeZuordnen(r.id, e.target.checked) }), _jsxs("span", { children: [r.name, anderswo && _jsxs("small", { style: { color: 'var(--text-leise)' }, children: [" \u00B7 geh\u00F6rt zur Z\u00E4hlung vom ", r.datum ? datumDE(r.datum) : 'früherer Zählung'] })] })] }) }, r.id));
+                        }) }))] })), _jsx(Zeile, { label: "Fl\u00E4che", wert: (gespeichert ? sitzung.flaeche_ha : vorschau?.flaeche_ha ?? null) === null
                     ? '–'
                     : `${zahlDE(gespeichert ? sitzung.flaeche_ha : vorschau?.flaeche_ha ?? null)} ha${modus === 'strecke' ? ` (${zahlDE(gespeichert ? sitzung.strecke_km : vorschau?.strecke_km ?? null, 2)} km × ${breite} m)` : ''}` }), !gespeichert && vorschau && _jsxs("p", { className: "gruppe-fuss", style: { margin: 0 }, children: ["Vorschau \u2013 ", modusText(modus, breite), "."] }), fehler && _jsx(Hinweis, { art: "fehler", children: fehler }), geaendert && (_jsx(Knopf, { variante: "sekundaer", disabled: laeuft || fehltRoute, onClick: () => void speichern(), children: laeuft ? 'Speichern …' : 'Flächenmodus speichern' }))] }));
 }
@@ -273,7 +314,7 @@ function SitzungAnsicht({ k, sitzungId }) {
             } }));
     }
     if (uebersicht) {
-        return (_jsxs(Seite, { titel: titel, untertitel: untertitel, zurueck: () => navigieren('/zaehlung'), children: [fehler && _jsx(Hinweis, { art: "fehler", children: fehler }), _jsx(AuditZeile, { tabelle: "zaehlsitzungen", id: sitzung.id, aktualisierung: sitzung.status }), _jsx(Gesamtuebersicht, { zeilen: zeilen, zonen: alleZonen, wildarten: wildarten }), _jsx(FlaechenGruppe, { sitzung: sitzung, onGeaendert: () => void laden(), onRouten: setRoutenAnzahl }), sitzung.bemerkung && _jsxs(Leer, { children: ["Bemerkung: ", sitzung.bemerkung] }), sitzung.status === 'offen' ? (_jsxs(_Fragment, { children: [_jsx(Knopf, { onClick: abschliessen, disabled: sitzung.flaechenmodus === 'strecke' && routenAnzahl === 0, children: "Z\u00E4hlung abschlie\u00DFen" }), _jsx(Knopf, { variante: "sekundaer", onClick: () => setUebersicht(false), children: "Weiter z\u00E4hlen" })] })) : (_jsxs(_Fragment, { children: [_jsx(Knopf, { variante: "akzent", onClick: () => setReport(true), children: "Report drucken" }), darfLoeschen && (_jsx(Knopf, { variante: "sekundaer", onClick: () => setBearbeiten(true), children: "Sitzungsdaten bearbeiten (Datum, Wetter, Zeiten)" })), _jsx(Knopf, { variante: "sekundaer", onClick: wiederOeffnen, children: "Z\u00E4hlung wieder \u00F6ffnen" })] })), report && (_jsx(ZaehlReport, { revierId: k.revierId, revierName: k.revierName, sitzung: sitzung, ebeneName: ebenen.find((x) => x.id === sitzung.ebene_id)?.name ?? null, zeilen: zeilen, zonen: alleZonen, wildarten: wildarten, onZu: () => setReport(false) })), darfLoeschen && (_jsx(Knopf, { variante: "gefahr", onClick: loeschen, children: "Z\u00E4hlung l\u00F6schen" }))] }));
+        return (_jsxs(Seite, { titel: titel, untertitel: untertitel, zurueck: () => navigieren('/zaehlung'), children: [fehler && _jsx(Hinweis, { art: "fehler", children: fehler }), _jsx(AuditZeile, { tabelle: "zaehlsitzungen", id: sitzung.id, aktualisierung: sitzung.status }), _jsx(Gesamtuebersicht, { zeilen: zeilen, zonen: alleZonen, wildarten: wildarten }), _jsx(FlaechenGruppe, { sitzung: sitzung, revierId: k.revierId, onGeaendert: () => void laden(), onRouten: setRoutenAnzahl }), sitzung.bemerkung && _jsxs(Leer, { children: ["Bemerkung: ", sitzung.bemerkung] }), sitzung.status === 'offen' ? (_jsxs(_Fragment, { children: [_jsx(Knopf, { onClick: abschliessen, disabled: sitzung.flaechenmodus === 'strecke' && routenAnzahl === 0, children: "Z\u00E4hlung abschlie\u00DFen" }), _jsx(Knopf, { variante: "sekundaer", onClick: () => setUebersicht(false), children: "Weiter z\u00E4hlen" })] })) : (_jsxs(_Fragment, { children: [_jsx(Knopf, { variante: "akzent", onClick: () => setReport(true), children: "Report drucken" }), darfLoeschen && (_jsx(Knopf, { variante: "sekundaer", onClick: () => setBearbeiten(true), children: "Sitzungsdaten bearbeiten (Datum, Wetter, Zeiten)" })), _jsx(Knopf, { variante: "sekundaer", onClick: wiederOeffnen, children: "Z\u00E4hlung wieder \u00F6ffnen" })] })), report && (_jsx(ZaehlReport, { revierId: k.revierId, revierName: k.revierName, sitzung: sitzung, ebeneName: ebenen.find((x) => x.id === sitzung.ebene_id)?.name ?? null, zeilen: zeilen, zonen: alleZonen, wildarten: wildarten, onZu: () => setReport(false) })), darfLoeschen && (_jsx(Knopf, { variante: "gefahr", onClick: loeschen, children: "Z\u00E4hlung l\u00F6schen" }))] }));
     }
     const zid = zoneId || null;
     const zoneZeilen = zeilen

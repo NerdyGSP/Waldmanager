@@ -232,12 +232,14 @@ function SitzungBearbeiten({ k, sitzung, onFertig }: { k: RevierKontext; sitzung
 }
 
 // Gezählte Fläche der Zählung: Modus, Strecke und Fläche – änderbar, auch nach dem Abschluss
-function FlaechenGruppe({ sitzung, onGeaendert, onRouten }: { sitzung: Sitzung; onGeaendert: () => void; onRouten?: (n: number) => void }) {
+function FlaechenGruppe({ sitzung, revierId, onGeaendert, onRouten }: { sitzung: Sitzung; revierId: string; onGeaendert: () => void; onRouten?: (n: number) => void }) {
   const [modus, setModus] = useState<Flaechenmodus>(sitzung.flaechenmodus === 'strecke' ? 'strecke' : 'zonen');
   const [breite, setBreite] = useState(sitzung.streifenbreite_m);
   const [vorschau, setVorschau] = useState<{ strecke_km: number | null; flaeche_ha: number | null; routen: number } | null>(null);
   const [fehler, setFehler] = useState<string | null>(null);
   const [laeuft, setLaeuft] = useState(false);
+  const [neuLadenZaehler, setNeuLadenZaehler] = useState(0);
+  const [routenListe, setRoutenListe] = useState<Array<{ id: string; name: string; zaehlsitzung_id: string | null; km: number | null; datum: string | null }>>([]);
   const geaendert = modus !== sitzung.flaechenmodus || breite !== sitzung.streifenbreite_m;
   const abgeschlossen = sitzung.status === 'abgeschlossen';
 
@@ -252,7 +254,43 @@ function FlaechenGruppe({ sitzung, onGeaendert, onRouten }: { sitzung: Sitzung; 
     return () => {
       aktiv = false;
     };
-  }, [sitzung.id, modus, breite, sitzung.status]);
+  }, [sitzung.id, modus, breite, sitzung.status, neuLadenZaehler]);
+
+  // Vorhandene WTE-Routen des Reviers (aus WTE-relevanten Ebenen), die dieser Zählung zugeordnet werden können
+  useEffect(() => {
+    if (modus !== 'strecke') return;
+    let aktiv = true;
+    void supabase
+      .from('pirschwege')
+      .select('id, name, zaehlsitzung_id, routen_ebenen!inner(wte_aktiv), zaehlsitzungen(datum)')
+      .eq('revier_id', revierId)
+      .eq('typ', 'wte_route')
+      .eq('routen_ebenen.wte_aktiv', true)
+      .is('geloescht_am', null)
+      .order('name')
+      .then(({ data }) => {
+        if (!aktiv) return;
+        setRoutenListe(
+          (data ?? []).map((r) => ({
+            id: r.id,
+            name: r.name,
+            zaehlsitzung_id: r.zaehlsitzung_id,
+            km: null,
+            datum: (r.zaehlsitzungen as { datum?: string } | null)?.datum ?? null,
+          })),
+        );
+      });
+    return () => {
+      aktiv = false;
+    };
+  }, [revierId, modus, neuLadenZaehler]);
+
+  async function routeZuordnen(id: string, an: boolean) {
+    setFehler(null);
+    const { error } = await supabase.from('pirschwege').update({ zaehlsitzung_id: an ? sitzung.id : null }).eq('id', id);
+    if (error) setFehler(fehlertext(error));
+    setNeuLadenZaehler((n) => n + 1);
+  }
 
   useEffect(() => {
     if (vorschau && modus === 'strecke') onRouten?.(vorschau.routen);
@@ -275,7 +313,33 @@ function FlaechenGruppe({ sitzung, onGeaendert, onRouten }: { sitzung: Sitzung; 
     <Gruppe titel="Gezählte Fläche" fuss={abgeschlossen ? 'Die Fläche wird beim Abschluss festgeschrieben. Ändern von Modus oder Breite berechnet sie neu.' : 'Wird beim Abschluss der Zählung festgeschrieben.'}>
       <FlaechenmodusWahl modus={modus} breite={breite} onModus={setModus} onBreite={setBreite} />
       {fehltRoute && (
-        <Hinweis art="warnung">Dieser Zählung ist noch keine WTE-Route zugeordnet. Im Modus „Strecke × Breite“ lässt sie sich so nicht abschließen. Zeichne, zeichne per GPS auf oder importiere eine WTE-Route über das Menü „+ NEU“ auf der Karte.</Hinweis>
+        <Hinweis art="warnung">Dieser Zählung ist noch keine WTE-Route zugeordnet. Im Modus „Strecke × Breite“ lässt sie sich so nicht abschließen. Ordne unten eine vorhandene WTE-Route zu oder zeichne, zeichne per GPS auf oder importiere eine über das Menü „+ NEU“ auf der Karte.</Hinweis>
+      )}
+      {modus === 'strecke' && !abgeschlossen && (
+        <div style={{ padding: '4px var(--abstand) 8px' }}>
+          <strong style={{ fontSize: '0.9rem' }}>WTE-Routen dieser Zählung</strong>
+          {routenListe.length === 0 ? (
+            <p className="gruppe-fuss" style={{ margin: '4px 0 0' }}>Keine WTE-Routen in WTE-relevanten Ebenen vorhanden.</p>
+          ) : (
+            <ul style={{ listStyle: 'none', margin: '6px 0 0', padding: 0, display: 'grid', gap: 4 }}>
+              {routenListe.map((r) => {
+                const hier = r.zaehlsitzung_id === sitzung.id;
+                const anderswo = !!r.zaehlsitzung_id && !hier;
+                return (
+                  <li key={r.id}>
+                    <label style={{ display: 'flex', gap: 8, alignItems: 'center', opacity: anderswo ? 0.6 : 1 }}>
+                      <input type="checkbox" checked={hier} disabled={anderswo} onChange={(e) => void routeZuordnen(r.id, e.target.checked)} />
+                      <span>
+                        {r.name}
+                        {anderswo && <small style={{ color: 'var(--text-leise)' }}> · gehört zur Zählung vom {r.datum ? datumDE(r.datum) : 'früherer Zählung'}</small>}
+                      </span>
+                    </label>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
       )}
       <Zeile
         label="Fläche"
@@ -417,7 +481,7 @@ function SitzungAnsicht({ k, sitzungId }: { k: RevierKontext; sitzungId: string 
         {fehler && <Hinweis art="fehler">{fehler}</Hinweis>}
         <AuditZeile tabelle="zaehlsitzungen" id={sitzung.id} aktualisierung={sitzung.status} />
         <Gesamtuebersicht zeilen={zeilen} zonen={alleZonen} wildarten={wildarten} />
-        <FlaechenGruppe sitzung={sitzung} onGeaendert={() => void laden()} onRouten={setRoutenAnzahl} />
+        <FlaechenGruppe sitzung={sitzung} revierId={k.revierId} onGeaendert={() => void laden()} onRouten={setRoutenAnzahl} />
         {sitzung.bemerkung && <Leer>Bemerkung: {sitzung.bemerkung}</Leer>}
         {sitzung.status === 'offen' ? (
           <>
