@@ -10,6 +10,7 @@ import { Balken, Verlauf, VerlaufMehrere, type Serie } from '../../components/di
 import { Symbol } from '../../components/symbole';
 import { useZaehlungGeaendert } from '../../lib/zaehlEreignis';
 import type { RevierKontext } from './kontext';
+import { JagdjahrReport } from './JagdjahrReport';
 
 type Vergleich = Database['public']['Functions']['quervergleich']['Returns'][number];
 type Sitzungssumme = { id: string; datum: string; arten: Record<string, number>; modus: string; breite: number; strecke: number | null; flaeche: number | null };
@@ -27,7 +28,7 @@ export function Monitoring({ k, breit = false, abgedockt = false }: { k: RevierK
   const voll = window.location.pathname.startsWith('/monitoring/voll');
   const wildarten = useWildarten();
   const [jahr, setJahr] = useState<Jagdjahr>(aktuellesJagdjahr());
-  const [ansicht, setAnsicht] = useState<'revier' | 'vergleich'>('revier');
+  const [ansicht, setAnsicht] = useState<'revier' | 'vergleich' | 'jagdjahre'>('revier');
   const [sitzungen, setSitzungen] = useState<Sitzungssumme[]>([]);
   const [strecke, setStrecke] = useState<Record<string, number>>({});
   const [beobachtungen, setBeobachtungen] = useState(0);
@@ -119,7 +120,7 @@ export function Monitoring({ k, breit = false, abgedockt = false }: { k: RevierK
   return (
     <Seite titel="Monitoring" untertitel={`Jagdjahr ${jahr.label}`} aktion={breit && !abgedockt ? <Anordnung voll={voll} /> : undefined}>
       <div className="filter-leiste">
-        <label className="filter">
+        {ansicht !== 'jagdjahre' && <label className="filter">
           <span>Jagdjahr</span>
           <select value={jahr.start} onChange={(e) => setJahr(letzteJagdjahre().find((j) => j.start === Number(e.target.value)) ?? jahr)}>
             {letzteJagdjahre().map((j) => (
@@ -128,13 +129,14 @@ export function Monitoring({ k, breit = false, abgedockt = false }: { k: RevierK
               </option>
             ))}
           </select>
-        </label>
+        </label>}
         <Segmente
           label="Ansicht"
           wert={ansicht}
           onAendern={setAnsicht}
           optionen={[
             { wert: 'revier', label: 'Mein Revier' },
+            { wert: 'jagdjahre', label: 'Jagdjahre' },
             { wert: 'vergleich', label: 'Quervergleich' },
           ]}
         />
@@ -142,7 +144,9 @@ export function Monitoring({ k, breit = false, abgedockt = false }: { k: RevierK
 
       {fehler && <Hinweis art="fehler">{fehler}</Hinweis>}
 
-      {ansicht === 'revier' ? (
+      {ansicht === 'jagdjahre' ? (
+        <JagdjahrReport k={k} />
+      ) : ansicht === 'revier' ? (
         <div className="monitoring-box">
           <div className="monitoring-raster">
           <div className="kennzahlen breit">

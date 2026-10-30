@@ -2053,6 +2053,10 @@ export type Database = {
         Args: { p_geojson: Json; p_revier_id: string }
         Returns: number
       }
+      jagdjahr_report: {
+        Args: { p_bis_jahr: number; p_revier_id: string; p_von_jahr: number }
+        Returns: Json
+      }
       karte_daten: {
         Args: { p_revier_id: string; p_tage?: number }
         Returns: Json
