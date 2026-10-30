@@ -95,8 +95,8 @@ export function Abschuesse({ k, unterpfad = [] }: { k: RevierKontext; unterpfad?
 
   return (
     <Seite
-      titel="Abschüsse & Fänge"
-      untertitel={`Jagdjahr ${jahr.label} · ${liste.filter(zaehltZurStrecke).length} Stück Strecke${liste.some((x) => x.art === 'fang') ? ` · ${liste.filter((x) => x.art === 'fang').length} Fangmeldungen` : ''}${liste.some((x) => x.art === 'fallwild') ? ` · ${liste.filter((x) => x.art === 'fallwild').length} Fallwild` : ''}`}
+      titel="Strecke"
+      untertitel={`Jagdjahr ${jahr.label} · ${liste.filter(zaehltZurStrecke).length} Stück (Abschüsse und Fänge)${liste.some((x) => x.art === 'fang') ? ` · ${liste.filter((x) => x.art === 'fang').length} Fangmeldungen` : ''}${liste.some((x) => x.art === 'fallwild') ? ` · ${liste.filter((x) => x.art === 'fallwild').length} Fallwild` : ''}`}
       aktion={<Knopf onClick={() => setBearbeiten('neu')}>+ Erfassen</Knopf>}
     >
       <label className="filter">

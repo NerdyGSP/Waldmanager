@@ -205,7 +205,7 @@ export function BjStrecke({
   return (
     <Gruppe
       titel={`Strecke: ${liste.length} Stück`}
-      fuss={offen ? 'Einträge landen direkt unter „Abschüsse & Fänge“, in der Statistik und im Jagdjahr-Report. Bis zum Abschluss der Jagd sind sie hier bearbeitbar.' : 'Nach dem Abschluss änderst du Einträge unter „Abschüsse & Fänge“.'}
+      fuss={offen ? 'Einträge landen direkt unter „Strecke“, in der Statistik und im Jagdjahr-Report. Bis zum Abschluss der Jagd sind sie hier bearbeitbar.' : 'Nach dem Abschluss änderst du Einträge unter „Strecke“.'}
     >
       {fehler && <Hinweis art="fehler">{fehler}</Hinweis>}
 

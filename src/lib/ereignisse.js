@@ -4,7 +4,7 @@ import { navigieren } from './router';
 export const EREIGNIS_GRUPPEN = [
     { id: 'einrichtungen', label: 'Einrichtungen', text: 'angelegt, verschoben, gelöscht', nurInhaber: false },
     { id: 'zaehlung', label: 'Wildzählung', text: 'Zählung gestartet oder abgeschlossen', nurInhaber: false },
-    { id: 'abschuesse', label: 'Abschüsse & Fänge', text: 'neue Abschüsse und Fänge, Fang in Falle', nurInhaber: false },
+    { id: 'abschuesse', label: 'Strecke', text: 'neue Abschüsse und Fänge, Fang in Falle', nurInhaber: false },
     { id: 'aufgaben', label: 'Aufgaben', text: 'zugewiesen, fällig, erledigt', nurInhaber: false },
     { id: 'karte', label: 'Zonen, Routen & Reviergrenze', text: 'angelegt oder ersetzt', nurInhaber: true },
     { id: 'wildschaeden', label: 'Wildschäden', text: 'gemeldet, mit Frist', nurInhaber: true },

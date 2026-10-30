@@ -907,8 +907,8 @@ function Auswertung({ k, id }: { k: RevierKontext; id: string }) {
             <strong>{strecke.length ? 'Strecke so übernehmen?' : 'Keine Strecke erfasst, trotzdem abschließen?'}</strong>
             <p style={{ margin: 0, color: 'var(--color-text-muted)', fontSize: '.9rem' }}>
               {strecke.length
-                ? `${streckeText(strecke, (w) => wildartName(wildarten, w))}. Die Einträge sind danach normale Abschüsse unter „Abschüsse & Fänge“.`
-                : 'Die Strecke lässt sich auch später unter „Abschüsse & Fänge“ eintragen.'}
+                ? `${streckeText(strecke, (w) => wildartName(wildarten, w))}. Die Einträge sind danach normale Abschüsse unter „Strecke“.`
+                : 'Die Strecke lässt sich auch später unter „Strecke“ eintragen.'}
             </p>
             <div className="bj-dialog-knoepfe">
               <Knopf variante="ghost" onClick={() => setStreckePruefung(false)}>Zurück</Knopf>
