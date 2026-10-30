@@ -2083,6 +2083,7 @@ export type Database = {
           ist_eigenes: boolean
           revier_id: string
           revier_name: string
+          strecke_zaehlungen: number
           wildart_id: string
           wildart_name: string
           zaehlsitzungen: number

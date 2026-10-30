@@ -553,7 +553,7 @@ function Quervergleich({ daten, hatFreigaben }: { daten: Vergleich[]; hatFreigab
       />
       <Leer>
         {anzahlReviere} {anzahlReviere === 1 ? 'Revier' : 'Reviere'} im Vergleich. Gezählt = höchster Wert einer
-        abgeschlossenen Zählung im Jagdjahr. Der Hegering-Durchschnitt ist flächengewichtet.
+        abgeschlossenen Zählung im Jagdjahr. Der Hegering-Durchschnitt ist flächengewichtet. Bezug ist die Revierfläche; „Strecke“ kennzeichnet Zählungen per Streckenzählung (Strecke × 400 m).
       </Leer>
       {nachArt.length === 0 && <Leer>Für diesen Zeitraum liegen keine freigegebenen Daten vor.</Leer>}
       {nachArt.map(([id, { name, zeilen }]) => {
@@ -577,7 +577,7 @@ function Quervergleich({ daten, hatFreigaben }: { daten: Vergleich[]; hatFreigab
                   wert: Number(kennzahl === 'zaehlung' ? z.gezaehlt_max_je_100ha : z.abschuesse_je_100ha) || 0,
                   zusatz:
                     kennzahl === 'zaehlung'
-                      ? ` · max. ${Number(z.gezaehlt_max).toLocaleString('de-DE')} Stück`
+                      ? ` · max. ${Number(z.gezaehlt_max).toLocaleString('de-DE')} Stück${Number(z.strecke_zaehlungen) > 0 ? ` · Strecke (${Number(z.strecke_zaehlungen)} von ${Number(z.zaehlsitzungen)} Zählungen)` : ''}`
                       : ` · ${Number(z.abschuesse).toLocaleString('de-DE')} Stück (♂ ${Number(z.abschuesse_maennlich).toLocaleString('de-DE')} / ♀ ${Number(z.abschuesse_weiblich).toLocaleString('de-DE')})`,
                 }))}
               />

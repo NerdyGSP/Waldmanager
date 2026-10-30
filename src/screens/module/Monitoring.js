@@ -271,7 +271,7 @@ function Quervergleich({ daten, hatFreigaben }) {
     return (_jsxs(_Fragment, { children: [_jsx(Segmente, { label: "Kennzahl", wert: kennzahl, onAendern: setKennzahl, optionen: [
                     { wert: 'zaehlung', label: 'Gezählt je 100 ha' },
                     { wert: 'abschuss', label: 'Abschüsse je 100 ha' },
-                ] }), _jsxs(Leer, { children: [anzahlReviere, " ", anzahlReviere === 1 ? 'Revier' : 'Reviere', " im Vergleich. Gez\u00E4hlt = h\u00F6chster Wert einer abgeschlossenen Z\u00E4hlung im Jagdjahr. Der Hegering-Durchschnitt ist fl\u00E4chengewichtet."] }), nachArt.length === 0 && _jsx(Leer, { children: "F\u00FCr diesen Zeitraum liegen keine freigegebenen Daten vor." }), nachArt.map(([id, { name, zeilen }]) => {
+                ] }), _jsxs(Leer, { children: [anzahlReviere, " ", anzahlReviere === 1 ? 'Revier' : 'Reviere', " im Vergleich. Gez\u00E4hlt = h\u00F6chster Wert einer abgeschlossenen Z\u00E4hlung im Jagdjahr. Der Hegering-Durchschnitt ist fl\u00E4chengewichtet. Bezug ist die Revierfl\u00E4che; \u201EStrecke\u201C kennzeichnet Z\u00E4hlungen per Streckenz\u00E4hlung (Strecke \u00D7 400 m)."] }), nachArt.length === 0 && _jsx(Leer, { children: "F\u00FCr diesen Zeitraum liegen keine freigegebenen Daten vor." }), nachArt.map(([id, { name, zeilen }]) => {
                 const ohneFlaeche = zeilen.some((z) => !z.ist_durchschnitt && !z.flaeche_ha);
                 return (_jsx(Gruppe, { titel: name, fuss: ohneFlaeche ? 'Reviere ohne hinterlegte Fläche fehlen im Wert je 100 ha.' : undefined, children: _jsx("div", { className: "diagramm-block", children: _jsx(Balken, { einheit: "", hervorheben: (s) => {
                                 const z = zeilen.find((x) => (x.revier_id ?? 'schnitt') === s);
@@ -281,7 +281,7 @@ function Quervergleich({ daten, hatFreigaben }) {
                                 label: z.revier_name,
                                 wert: Number(kennzahl === 'zaehlung' ? z.gezaehlt_max_je_100ha : z.abschuesse_je_100ha) || 0,
                                 zusatz: kennzahl === 'zaehlung'
-                                    ? ` · max. ${Number(z.gezaehlt_max).toLocaleString('de-DE')} Stück`
+                                    ? ` · max. ${Number(z.gezaehlt_max).toLocaleString('de-DE')} Stück${Number(z.strecke_zaehlungen) > 0 ? ` · Strecke (${Number(z.strecke_zaehlungen)} von ${Number(z.zaehlsitzungen)} Zählungen)` : ''}`
                                     : ` · ${Number(z.abschuesse).toLocaleString('de-DE')} Stück (♂ ${Number(z.abschuesse_maennlich).toLocaleString('de-DE')} / ♀ ${Number(z.abschuesse_weiblich).toLocaleString('de-DE')})`,
                             })) }) }) }, id));
             })] }));
