@@ -9,6 +9,7 @@ import { navigieren } from '../../lib/router';
 import type { Enums, Json } from '../../lib/database.types';
 import { Auswahl, Feld, Gruppe, Hinweis, Knopf, Leer, Seite, Zaehler, Zeile, useRadHorizontal, WildartOptionen } from '../../components/ui';
 import type { RevierKontext } from './kontext';
+import { ZaehlReport } from './ZaehlReport';
 
 type Sitzung = {
   id: string;
@@ -183,6 +184,8 @@ function SitzungAnsicht({ k, sitzungId }: { k: RevierKontext; sitzungId: string 
   const wildarten = useWildarten();
   const tabsRef = useRadHorizontal<HTMLDivElement>();
   const { zonen: alleZonen } = useZonen(k.revierId);
+  const { ebenen } = useZonenEbenen(k.revierId);
+  const [report, setReport] = useState(false);
   const [sitzung, setSitzung] = useState<Sitzung | null>(null);
   // Ist die Zählung auf eine Zonenebene beschränkt, nur deren Zonen anbieten
   const zonen = useMemo(
@@ -291,9 +294,25 @@ function SitzungAnsicht({ k, sitzungId }: { k: RevierKontext; sitzungId: string 
             </Knopf>
           </>
         ) : (
-          <Knopf variante="sekundaer" onClick={wiederOeffnen}>
-            Zählung wieder öffnen
-          </Knopf>
+          <>
+            <Knopf variante="akzent" onClick={() => setReport(true)}>
+              Report drucken
+            </Knopf>
+            <Knopf variante="sekundaer" onClick={wiederOeffnen}>
+              Zählung wieder öffnen
+            </Knopf>
+          </>
+        )}
+        {report && (
+          <ZaehlReport
+            revierName={k.revierName}
+            sitzung={sitzung}
+            ebeneName={ebenen.find((x) => x.id === sitzung.ebene_id)?.name ?? null}
+            zeilen={zeilen}
+            zonen={alleZonen}
+            wildarten={wildarten}
+            onZu={() => setReport(false)}
+          />
         )}
         {darfLoeschen && (
           <Knopf variante="gefahr" onClick={loeschen}>

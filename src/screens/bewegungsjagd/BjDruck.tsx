@@ -13,7 +13,7 @@ type Bock = { id: string; lng: number; lat: number; name: string | null };
 export type Stand = { id: string; lng: number; lat: number; name: string | null; typ: string; bemerkung?: string | null };
 
 // Gemeinsamer Rahmen: Vollbild-Ebene mit Werkzeugleiste, beim Drucken nur das Blatt
-function Druckrahmen({ querformat, onZu, leiste, children }: { querformat: boolean; onZu: () => void; leiste?: React.ReactNode; children: React.ReactNode }) {
+export function Druckrahmen({ querformat, onZu, leiste, children }: { querformat: boolean; onZu: () => void; leiste?: React.ReactNode; children: React.ReactNode }) {
   useEffect(() => {
     document.body.classList.add('bj-druckt');
     const stil = document.createElement('style');
