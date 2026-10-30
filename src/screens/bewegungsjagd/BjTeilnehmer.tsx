@@ -5,6 +5,7 @@ import { codeAnzeigen, navigationsLinks, type BjLadeErgebnis } from '../../lib/b
 import { datumDE } from '../../lib/zeit';
 import { Feld, Hinweis, Knopf, Gruppe, Segmente } from '../../components/ui';
 import type { BjMarker } from './BjKarte';
+import { TeilnehmerSelbstDruck } from './BjDruck';
 
 const BjKarte = lazy(() => import('./BjKarte'));
 
@@ -17,6 +18,7 @@ export function BjTeilnehmer({ jagdId }: { jagdId: string }) {
   const [schritt, setSchritt] = useState(0);
   const [fertig, setFertig] = useState<null | 'zusage' | 'absage'>(null);
   const [warnung, setWarnung] = useState(false);
+  const [druck, setDruck] = useState(false);
   const [name, setName] = useState('');
   const [anschrift, setAnschrift] = useState('');
   const [telefon, setTelefon] = useState('');
@@ -68,6 +70,33 @@ export function BjTeilnehmer({ jagdId }: { jagdId: string }) {
     return (
       <main className="bj-teiln">
         <Hinweis art="erfolg">{fertig === 'zusage' ? 'Danke! Deine Zusage ist gespeichert. Du kannst sie über den Link in der E-Mail jederzeit ändern.' : 'Deine Absage ist eingegangen und deine Daten wurden gelöscht.'}</Hinweis>
+        {fertig === 'zusage' && daten && (
+          <>
+            <Knopf variante="akzent" onClick={() => setDruck(true)}>Zusammenfassung drucken</Knopf>
+            {druck && (
+              <TeilnehmerSelbstDruck
+                jagd={{
+                  titel: daten.jagd.titel,
+                  art: daten.jagd.art,
+                  datum: daten.jagd.datum,
+                  uhrzeit: daten.jagd.uhrzeit,
+                  lng: daten.jagd.lng,
+                  lat: daten.jagd.lat,
+                  schuesseltreiben: daten.jagd.schuesseltreiben,
+                  schuesseltreiben_adresse: daten.jagd.schuesseltreiben_adresse,
+                  anmeldung_pflicht: daten.jagd.anmeldung_pflicht,
+                  hegebeitrag_aktiv: daten.jagd.hegebeitrag_aktiv,
+                  hegebeitrag_betrag: daten.jagd.hegebeitrag_betrag,
+                  einladungstext: daten.jagd.einladungstext,
+                }}
+                tn={{ name, anschrift, telefon, hund, horn, auto, plaetze: Number(plaetze) || 0, schuessel }}
+                stand={daten.stand ?? undefined}
+                boecke={daten.boecke}
+                onZu={() => setDruck(false)}
+              />
+            )}
+          </>
+        )}
       </main>
     );
   }
