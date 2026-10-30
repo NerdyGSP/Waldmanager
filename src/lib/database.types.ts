@@ -1214,7 +1214,7 @@ export type Database = {
         Returns: string
       }
       zone_geometrie_setzen: {
-        Args: { p_geojson: Json; p_zone_id: string }
+        Args: { p_geojson: Json; p_zone_id: string; p_zuschneiden?: boolean }
         Returns: number
       }
       quervergleich: {

@@ -21,7 +21,7 @@ import type { RevierKontext } from './kontext';
 
 const ZIELE: Array<{ wert: Ziel; titel: string; text: string; geometrie: string }> = [
   { wert: 'grenze', titel: 'Reviergrenze', text: 'Ersetzt die vorhandene Grenze des Reviers.', geometrie: 'Flächen' },
-  { wert: 'zonen', titel: 'Zonen', text: 'Legt je Fläche eine Zone an, zugeschnitten auf die Reviergrenze.', geometrie: 'Flächen' },
+  { wert: 'zonen', titel: 'Zonen', text: 'Legt je Fläche eine Zone an (ohne Zuschnitt auf die Reviergrenze).', geometrie: 'Flächen' },
   { wert: 'einrichtungen', titel: 'Einrichtungen', text: 'Hochsitze, Kirrungen u. a. als Punkte.', geometrie: 'Punkte' },
   { wert: 'pirschwege', titel: 'Pirschwege', text: 'Wege und Pfade als Linien.', geometrie: 'Linien' },
 ];
@@ -133,11 +133,10 @@ export function Geoimport({ k }: { k: RevierKontext }) {
         let anzahl = 0;
         const probleme: string[] = [];
         for (const [i, f] of passend.entries()) {
-          const name = nameVon(f, `Zone ${zonen.length + i + 1}`);
-          if (nameVergeben(vergeben, name)) {
-            probleme.push(`„${name}“ existiert bereits`);
-            continue;
-          }
+          // doppelte Namen (z. B. mehrere Flächen „Acker“) werden durchnummeriert statt übersprungen
+          const basis = nameVon(f, `Zone ${zonen.length + i + 1}`);
+          let name = basis;
+          for (let n = 2; nameVergeben(vergeben, name); n++) name = `${basis} (${n})`;
           const { data, error } = await supabase
             .from('zonen')
             .insert({
@@ -153,7 +152,7 @@ export function Geoimport({ k }: { k: RevierKontext }) {
             probleme.push(`„${name}“: ${fehlertext(error)}`);
             continue;
           }
-          const geo = await supabase.rpc('zone_geometrie_setzen', { p_zone_id: data.id, p_geojson: f.geometry as unknown as Json });
+          const geo = await supabase.rpc('zone_geometrie_setzen', { p_zone_id: data.id, p_geojson: f.geometry as unknown as Json, p_zuschneiden: false });
           if (geo.error) {
             await supabase.from('zonen').delete().eq('id', data.id);
             probleme.push(`„${name}“: ${fehlertext(geo.error)}`);
@@ -163,7 +162,7 @@ export function Geoimport({ k }: { k: RevierKontext }) {
           anzahl++;
         }
         await zonenLaden();
-        setMeldung(`${anzahl} von ${passend.length} Zonen angelegt (auf die Reviergrenze zugeschnitten).`);
+        setMeldung(`${anzahl} von ${passend.length} Zonen angelegt.`);
         if (probleme.length) setFehler(`Nicht übernommen: ${probleme.slice(0, 6).join('; ')}${probleme.length > 6 ? ` … und ${probleme.length - 6} weitere` : ''}`);
       } else if (ziel === 'einrichtungen') {
         const { data: vorhanden } = await supabase.from('einrichtungen').select('name').eq('revier_id', k.revierId).is('geloescht_am', null);

@@ -15,7 +15,7 @@ const ANZAHL_ZAEHLUNGEN = 12;
 const ANZAHL_SPALTEN = 6;
 
 /** Informationsfenster am unteren Kartenrand: letzte Zählungen einer Zone als Tabelle und als Verlauf je Wildart */
-export function ZonenInfo({ zone, onSchliessen }: { zone: GewaehlteZone; onSchliessen: () => void }) {
+export function ZonenInfo({ zone, onSchliessen, onBearbeiten }: { zone: GewaehlteZone; onSchliessen: () => void; onBearbeiten?: () => void }) {
   const wildarten = useWildarten();
   const [messungen, setMessungen] = useState<Messung[] | null>(null);
   const [fehler, setFehler] = useState<string | null>(null);
@@ -104,6 +104,11 @@ export function ZonenInfo({ zone, onSchliessen }: { zone: GewaehlteZone; onSchli
                 : 'Noch keine abgeschlossene Zählung'}
           </small>
         </div>
+        {onBearbeiten && (
+          <button className="knopf knopf-sekundaer klein" onClick={onBearbeiten}>
+            Punkte bearbeiten
+          </button>
+        )}
         <button className="knopf knopf-ghost klein" onClick={() => navigieren('/zaehlung')}>
           Zur Wildzählung
         </button>

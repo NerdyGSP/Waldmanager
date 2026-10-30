@@ -14,6 +14,7 @@ import {
   setWorkerUrl,
   type GeoJSONSource,
   type MapMouseEvent,
+  type MapTouchEvent,
   type StyleSpecification,
 } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -131,7 +132,7 @@ type Ebenen = {
 
 type Modus =
   | { art: 'grenze' }
-  | { art: 'zone'; zoneId: string | null; name: string }
+  | { art: 'zone'; zoneId: string | null; name: string; bearbeiten?: boolean }
   | { art: 'pirschweg' }
   | { art: 'aufzeichnung' }
   | { art: 'einrichtung' }
@@ -172,6 +173,11 @@ export default function Karte({
   const [modus, setModusState] = useState<Modus>(null);
   const modusRef = useRef<Modus>(null);
   const [punkte, setPunkte] = useState<Position[]>([]);
+  const punkteRef = useRef<Position[]>([]);
+  punkteRef.current = punkte;
+  // Zonenbearbeitung: markierter Eckpunkt sowie unveränderte Teilflächen/Löcher der Zone
+  const [gewaehlterPunkt, setGewaehlterPunkt] = useState<number | null>(null);
+  const zonenRest = useRef<{ teile: Position[][][]; loecher: Position[][] }>({ teile: [], loecher: [] });
   const [neueEinrichtung, setNeueEinrichtung] = useState<Position | null>(null);
   const [wind, setWind] = useState<Wetter | null>(null);
   const [wetterOffen, setWetterOffen] = useState(false);
@@ -216,6 +222,7 @@ export default function Karte({
     modusRef.current = m;
     setModusState(m);
     setPunkte([]);
+    setGewaehlterPunkt(null);
     setNeueEinrichtung(null);
   };
 
@@ -418,7 +425,7 @@ export default function Karte({
         type: 'circle',
         source: 'zeichnung',
         filter: ['==', ['geometry-type'], 'Point'],
-        paint: { 'circle-radius': 5, 'circle-color': '#fff', 'circle-stroke-color': '#1f6fb2', 'circle-stroke-width': 2 },
+        paint: { 'circle-radius': ['case', ['==', ['get', 'sel'], 1], 9, 6], 'circle-color': ['case', ['==', ['get', 'sel'], 1], '#1f6fb2', '#fff'], 'circle-stroke-color': '#1f6fb2', 'circle-stroke-width': 2 },
       });
 
       for (const ebene of ['einrichtungen-punkt', 'pirschwege-linie', 'zonen-flaeche']) {
@@ -600,7 +607,7 @@ export default function Karte({
   useEffect(() => {
     const m = karte.current;
     if (!m || !bereit) return;
-    const features: Feature[] = punkte.map((p) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: p }, properties: {} }));
+    const features: Feature[] = punkte.map((p, i) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: p }, properties: { sel: i === gewaehlterPunkt ? 1 : 0 } }));
     const istFlaeche = modus?.art === 'grenze' || modus?.art === 'zone';
     if (punkte.length >= 3 && istFlaeche) {
       features.push({ type: 'Feature', geometry: { type: 'Polygon', coordinates: [[...punkte, punkte[0]!]] }, properties: {} });
@@ -608,7 +615,7 @@ export default function Karte({
       features.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: punkte }, properties: {} });
     }
     (m.getSource('zeichnung') as GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features });
-  }, [punkte, modus, bereit]);
+  }, [punkte, modus, bereit, gewaehlterPunkt]);
 
   // Klicks: im Zeichenmodus Punkte setzen, sonst Details anzeigen
   useEffect(() => {
@@ -632,6 +639,7 @@ export default function Karte({
         setNeueEinrichtung(pos);
         return;
       }
+      if (aktiv?.art === 'zone' && aktiv.bearbeiten) return; // eigener Handler (Punkte ziehen/einfügen)
       if (aktiv && aktiv.art !== 'aufzeichnung') {
         const grenze = grenzeRef.current;
         if (aktiv.art === 'zone' && grenze && !punktInFlaeche(pos, grenze)) {
@@ -673,6 +681,129 @@ export default function Karte({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bereit, modus, k.istInhaber, wildarten, wte]);
+
+  // Zone bearbeiten: Eckpunkte ziehen, Linie antippen = Punkt einfügen, Punkt antippen = markieren
+  const bearbeitet = modus?.art === 'zone' && !!modus.bearbeiten;
+  useEffect(() => {
+    const m = karte.current;
+    if (!m || !bereit || !bearbeitet) return;
+    const TREFFER = 18;
+    let ziehen: number | null = null;
+    let bewegt = false;
+    let zuletztGezogen = 0;
+    const naechster = (pt: { x: number; y: number }): number | null => {
+      let best: number | null = null;
+      let bestD = TREFFER;
+      punkteRef.current.forEach((p, i) => {
+        const s = m.project(p as [number, number]);
+        const d = Math.hypot(s.x - pt.x, s.y - pt.y);
+        if (d < bestD) {
+          bestD = d;
+          best = i;
+        }
+      });
+      return best;
+    };
+    const runter = (e: MapMouseEvent | MapTouchEvent) => {
+      const i = naechster(e.point);
+      if (i === null) return;
+      e.preventDefault();
+      ziehen = i;
+      bewegt = false;
+      m.dragPan.disable();
+      setGewaehlterPunkt(i);
+    };
+    const bewegen = (e: MapMouseEvent | MapTouchEvent) => {
+      if (ziehen === null) return;
+      bewegt = true;
+      const pos: Position = [e.lngLat.lng, e.lngLat.lat];
+      const i = ziehen;
+      setPunkte((alt) => alt.map((p, j) => (j === i ? pos : p)));
+    };
+    const hoch = () => {
+      if (ziehen === null) return;
+      ziehen = null;
+      if (bewegt) zuletztGezogen = Date.now();
+      bewegt = false;
+      m.dragPan.enable();
+    };
+    const klick = (e: MapMouseEvent) => {
+      // das Click-Ereignis direkt nach dem Ziehen ignorieren
+      if (Date.now() - zuletztGezogen < 300) return;
+      if (naechster(e.point) !== null) return;
+      // nächstgelegene Kante suchen und dort einen Punkt einfügen
+      const pts = punkteRef.current.map((p) => m.project(p as [number, number]));
+      let bestI = -1;
+      let bestD = TREFFER;
+      let bestP = { x: 0, y: 0 };
+      for (let i = 0; i < pts.length; i++) {
+        const a = pts[i]!;
+        const b = pts[(i + 1) % pts.length]!;
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const l2 = dx * dx + dy * dy;
+        const t = l2 === 0 ? 0 : Math.max(0, Math.min(1, ((e.point.x - a.x) * dx + (e.point.y - a.y) * dy) / l2));
+        const px = a.x + t * dx;
+        const py = a.y + t * dy;
+        const d = Math.hypot(e.point.x - px, e.point.y - py);
+        if (d < bestD) {
+          bestD = d;
+          bestI = i;
+          bestP = { x: px, y: py };
+        }
+      }
+      if (bestI < 0) {
+        setGewaehlterPunkt(null);
+        return;
+      }
+      const ll = m.unproject([bestP.x, bestP.y]);
+      setPunkte((alt) => [...alt.slice(0, bestI + 1), [ll.lng, ll.lat] as Position, ...alt.slice(bestI + 1)]);
+      setGewaehlterPunkt(bestI + 1);
+    };
+    m.on('mousedown', runter);
+    m.on('touchstart', runter);
+    m.on('mousemove', bewegen);
+    m.on('touchmove', bewegen);
+    m.on('mouseup', hoch);
+    m.on('touchend', hoch);
+    m.on('click', klick);
+    return () => {
+      m.off('mousedown', runter);
+      m.off('touchstart', runter);
+      m.off('mousemove', bewegen);
+      m.off('touchmove', bewegen);
+      m.off('mouseup', hoch);
+      m.off('touchend', hoch);
+      m.off('click', klick);
+      m.dragPan.enable();
+    };
+  }, [bereit, bearbeitet]);
+
+  // Vorhandene Zone zur Bearbeitung der Eckpunkte laden (größte Teilfläche; weitere Teile und Löcher bleiben erhalten)
+  function zoneBearbeiten(zoneId: string, name: string) {
+    const f = daten?.zonen.find((z) => String(z.id ?? (z.properties as { id?: string } | null)?.id) === zoneId);
+    const g = f?.geometry;
+    if (!g || (g.type !== 'Polygon' && g.type !== 'MultiPolygon')) {
+      setMeldung({ art: 'fehler', text: 'Diese Zone hat noch keine Fläche.' });
+      return;
+    }
+    const teile: Position[][][] = g.type === 'Polygon' ? [g.coordinates] : g.coordinates;
+    const flaeche = (ring: Position[]) => {
+      const xs = ring.map((p) => p[0]!);
+      const ys = ring.map((p) => p[1]!);
+      return (Math.max(...xs) - Math.min(...xs)) * (Math.max(...ys) - Math.min(...ys));
+    };
+    let wahl = 0;
+    teile.forEach((t, i) => {
+      if (flaeche(t[0]!) > flaeche(teile[wahl]![0]!)) wahl = i;
+    });
+    const ring = teile[wahl]![0]!.slice(0, -1);
+    setModus({ art: 'zone', zoneId, name, bearbeiten: true });
+    zonenRest.current = { teile: teile.filter((_, i) => i !== wahl), loecher: teile[wahl]!.slice(1) };
+    setPunkte(ring);
+    setGewaehlteZone(null);
+    setMeldung({ art: 'info', text: 'Punkte ziehen · auf eine Linie tippen fügt einen Punkt ein · Punkt antippen und „Punkt löschen“.' });
+  }
 
   // Eigenen Standort verfolgen, solange die Windpfeile an sind
   useEffect(() => {
@@ -780,7 +911,14 @@ export default function Karte({
     try {
       if (modus.art === 'grenze' || modus.art === 'zone') {
         if (punkte.length < 3) throw new Error('Bitte mindestens drei Punkte setzen.');
-        const geojson = { type: 'Polygon', coordinates: [[...punkte, punkte[0]!]] } as unknown as Json;
+        const aussen = [...punkte, punkte[0]!];
+        const geojson = (
+          modus.art === 'zone' && modus.bearbeiten
+            ? zonenRest.current.teile.length
+              ? { type: 'MultiPolygon', coordinates: [[aussen, ...zonenRest.current.loecher], ...zonenRest.current.teile] }
+              : { type: 'Polygon', coordinates: [aussen, ...zonenRest.current.loecher] }
+            : { type: 'Polygon', coordinates: [aussen] }
+        ) as unknown as Json;
         if (modus.art === 'grenze') {
           const { data, error } = await supabase.rpc('grenze_setzen', { p_revier_id: k.revierId, p_geojson: geojson });
           if (error) throw error;
@@ -1177,13 +1315,27 @@ export default function Karte({
         <div className="zeichen-leiste">
           <span>
             {modus.art === 'grenze' && 'Reviergrenze: Eckpunkte antippen'}
-            {modus.art === 'zone' && (modus.zoneId ? `Zone „${modus.name}“: Eckpunkte antippen` : 'Neue Zone: Eckpunkte antippen')}
+            {modus.art === 'zone' && modus.bearbeiten && `Zone „${modus.name}“ bearbeiten: Punkte ziehen, Linie antippen = Punkt einfügen`}
+            {modus.art === 'zone' && !modus.bearbeiten && (modus.zoneId ? `Zone „${modus.name}“: Eckpunkte antippen` : 'Neue Zone: Eckpunkte antippen')}
             {modus.art === 'pirschweg' && 'Pirschweg: Wegpunkte antippen'}
             {modus.art === 'aufzeichnung' && `GPS-Aufzeichnung: ${punkte.length} Punkte`}
           </span>
-          <button className="knopf knopf-sekundaer klein" onClick={() => setPunkte((p) => p.slice(0, -1))} disabled={!punkte.length}>
-            ↶ Zurück
-          </button>
+          {modus.art === 'zone' && modus.bearbeiten ? (
+            <button
+              className="knopf knopf-sekundaer klein"
+              onClick={() => {
+                setPunkte((p) => p.filter((_, i) => i !== gewaehlterPunkt));
+                setGewaehlterPunkt(null);
+              }}
+              disabled={gewaehlterPunkt === null || punkte.length <= 3}
+            >
+              Punkt löschen
+            </button>
+          ) : (
+            <button className="knopf knopf-sekundaer klein" onClick={() => setPunkte((p) => p.slice(0, -1))} disabled={!punkte.length}>
+              ↶ Zurück
+            </button>
+          )}
           <button className="knopf knopf-primaer klein" onClick={zeichnungSpeichern}>
             Speichern
           </button>
@@ -1271,7 +1423,7 @@ export default function Karte({
         />
       )}
 
-      {gewaehlteZone && !modus && <ZonenInfo zone={gewaehlteZone} onSchliessen={() => setGewaehlteZone(null)} />}
+      {gewaehlteZone && !modus && <ZonenInfo zone={gewaehlteZone} onSchliessen={() => setGewaehlteZone(null)} onBearbeiten={k.istInhaber ? () => zoneBearbeiten(gewaehlteZone.id, gewaehlteZone.name) : undefined} />}
 
       {kartenFehler && (
         <div className="karte-fehler" role="alert">
