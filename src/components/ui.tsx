@@ -91,7 +91,7 @@ export function Knopf({ variante = 'primaer', className, ...rest }: KnopfProps) 
   return <button className={`knopf knopf-${variante} ${className ?? ''}`} {...rest} />;
 }
 
-export function Hinweis({ art = 'info', children }: { art?: 'info' | 'fehler' | 'erfolg'; children: ReactNode }) {
+export function Hinweis({ art = 'info', children }: { art?: 'info' | 'fehler' | 'erfolg' | 'warnung'; children: ReactNode }) {
   return (
     <div className={`hinweis hinweis-${art}`} role={art === 'fehler' ? 'alert' : 'status'}>
       {children}

@@ -6,6 +6,7 @@ import { aktuellesJagdjahr, datumZeitDE, letzteJagdjahre, lokalDatumZeit } from 
 import { aktuellePosition, punktEWKT } from '../../lib/geo';
 import { PositionWaehlen } from '../../components/PositionWaehlen';
 import type { Enums } from '../../lib/database.types';
+import { jagdzeitWarnung, useJagdzeiten } from '../../lib/jagdzeiten';
 import { Auswahl, Feld, Gruppe, Hinweis, Knopf, Leer, Seite, Segmente, Zeile, WildartOptionen } from '../../components/ui';
 import type { RevierKontext } from './kontext';
 import { Symbol } from '../../components/symbole';
@@ -157,6 +158,10 @@ function AbschussFormular({ k, vorlage, startArt, onFertig }: { k: RevierKontext
   const [geschlecht, setGeschlecht] = useState<Enums<'geschlecht'>>(vorlage?.geschlecht ?? 'unbekannt');
   const [altersklasse, setAltersklasse] = useState(vorlage?.altersklasse ?? '');
   const [zeitpunkt, setZeitpunkt] = useState(vorlage ? lokalDatumZeit(new Date(vorlage.erlegt_am)) : lokalDatumZeit());
+  // Nur Hinweis, keine Sperre: Wildart und Datum gegen die hinterlegten Jagdzeiten halten
+  const { zeilen: jagdzeiten } = useJagdzeiten(k.bundesland);
+  const jzWarnung =
+    art === 'fang' && ergebnis === 'leer' ? null : jagdzeitWarnung(jagdzeiten, wildartId, new Date(zeitpunkt.length >= 10 ? zeitpunkt : Date.now()));
   const [gewicht, setGewicht] = useState(vorlage?.gewicht_kg ? String(vorlage.gewicht_kg).replace('.', ',') : '');
   const [zoneId, setZoneId] = useState(vorlage?.zone_id ?? '');
   const [erlegerId, setErlegerId] = useState(vorlage?.erleger_id ?? k.userId);
@@ -343,6 +348,7 @@ function AbschussFormular({ k, vorlage, startArt, onFertig }: { k: RevierKontext
         />
         {ortStatus && <Leer>{ortStatus}</Leer>}
 
+        {jzWarnung && <Hinweis art={jzWarnung.art === 'warnung' ? 'warnung' : 'info'}>{jzWarnung.text} (Hinweis, kein Speicherverbot – verbindlich ist die Landesverordnung.)</Hinweis>}
         {fehler && <Hinweis art="fehler">{fehler}</Hinweis>}
         <Knopf type="submit" disabled={speichert}>
           {speichert ? 'Speichern …' : 'Speichern'}

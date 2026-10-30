@@ -529,6 +529,7 @@ export type Database = {
       reviere: {
         Row: {
           aktualisiert_am: string
+          bundesland: string
           erstellt_am: string
           flaeche_ha: number | null
           hegering_id: string
@@ -537,6 +538,7 @@ export type Database = {
         }
         Insert: {
           aktualisiert_am?: string
+          bundesland?: string
           erstellt_am?: string
           flaeche_ha?: number | null
           hegering_id: string
@@ -545,6 +547,7 @@ export type Database = {
         }
         Update: {
           aktualisiert_am?: string
+          bundesland?: string
           erstellt_am?: string
           flaeche_ha?: number | null
           hegering_id?: string
@@ -560,6 +563,26 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      jagdzeiten: {
+        Row: {
+          bundesland: string
+          ganzjaehrig: boolean
+          gueltig_ab: string
+          id: string
+          jagdzeit_bis: string | null
+          jagdzeit_von: string | null
+          klasse: string | null
+          quelle: string
+          quelle_url: string | null
+          schonzeit_text: string | null
+          sonderregel: string | null
+          sortierung: number
+          wildart_id: string
+        }
+        Insert: never
+        Update: never
+        Relationships: []
       }
       wildarten: {
         Row: {

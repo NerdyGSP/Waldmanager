@@ -14,6 +14,7 @@ import { Masteradmin } from './Masteradmin';
 import { useModulBreite } from '../lib/modulBreite';
 import { Segmente } from '../components/ui';
 import { Freigaben } from './module/Freigaben';
+import { Jagdzeiten } from './module/Jagdzeiten';
 import { Zonen } from './module/Zonen';
 import { Abschuesse } from './module/Abschuesse';
 import { Erfassung } from './module/Erfassung';
@@ -42,6 +43,7 @@ const MODULE = [
   { pfad: 'begehungsscheine', titel: 'Begehungsscheine', text: 'Gastjäger-Scheine ausstellen und prüfen', symbol: '📄' },
   { pfad: 'monitoring', titel: 'Monitoring', text: 'Statistik und Quervergleich im Hegering', symbol: '📈' },
   { pfad: 'zonen', titel: 'Zonen', text: 'Erfassungszonen anlegen und ordnen', symbol: '▦' },
+  { pfad: 'jagdzeiten', titel: 'Jagdzeiten', text: 'Was ist heute jagdbar? Zeiten und Sonderregeln je Wildart', symbol: '' },
   { pfad: 'freigaben', titel: 'Freigaben', text: 'Wildarten für den Quervergleich freigeben', symbol: '🤝' },
   { pfad: 'import', titel: 'Datenimport', text: 'Historische Zählungen und Abschüsse aus CSV', symbol: '⬆️' },
   { pfad: 'reviermanagement', titel: 'Reviermanagement', text: 'Revier, Mitglieder & Einladungen, Kartendaten', symbol: '🏡' },
@@ -89,6 +91,7 @@ export function Home({ session }: { session: Session }) {
         revierId: aktuell.revier.id,
         revierName: aktuell.revier.name,
         flaecheHa: aktuell.revier.flaeche_ha,
+        bundesland: aktuell.revier.bundesland,
         rolle: aktuell.rolle,
         istInhaber: aktuell.rolle === 'inhaber',
         userId: session.user.id,
@@ -197,6 +200,7 @@ const NAVIGATION = [
   { pfad: 'begehungsscheine', titel: 'Begehungsscheine' },
   { pfad: 'monitoring', titel: 'Monitoring' },
   { pfad: 'zonen', titel: 'Zonen' },
+  { pfad: 'jagdzeiten', titel: 'Jagdzeiten' },
   { pfad: 'freigaben', titel: 'Freigaben' },
   { pfad: 'import', titel: 'Datenimport' },
   { pfad: 'reviermanagement', titel: 'Reviermanagement' },
@@ -369,6 +373,8 @@ function Sonderseite({
 
 function ModulInhalt({ modul, unterpfad, k, breit = false }: { modul: string; unterpfad: string[]; k: RevierKontext; breit?: boolean }) {
   switch (modul) {
+    case 'jagdzeiten':
+      return <Jagdzeiten k={k} unterpfad={unterpfad} />;
     case 'freigaben':
       return <Freigaben k={k} />;
     case 'zonen':

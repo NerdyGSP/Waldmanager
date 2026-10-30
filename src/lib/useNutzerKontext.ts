@@ -9,6 +9,7 @@ export type Mitgliedschaft = {
     name: string;
     flaeche_ha: number | null;
     hegering: string | null;
+    bundesland: string;
   };
 };
 
@@ -37,7 +38,7 @@ export function useNutzerKontext(userId: string): NutzerKontext {
       supabase.from('masteradmins').select('user_id').eq('user_id', userId).maybeSingle(),
       supabase
         .from('revier_mitglieder')
-        .select('rolle, reviere(id, name, flaeche_ha, hegeringe(name))')
+        .select('rolle, reviere(id, name, flaeche_ha, bundesland, hegeringe(name))')
         .eq('user_id', userId),
     ]);
 
@@ -57,6 +58,7 @@ export function useNutzerKontext(userId: string): NutzerKontext {
             name: m.reviere!.name,
             flaeche_ha: m.reviere!.flaeche_ha,
             hegering: m.reviere!.hegeringe?.name ?? null,
+            bundesland: m.reviere!.bundesland,
           },
         }))
         .sort((a, b) => a.revier.name.localeCompare(b.revier.name, 'de')),

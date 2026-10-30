@@ -4,6 +4,7 @@ export type RevierKontext = {
   revierId: string;
   revierName: string;
   flaecheHa: number | null;
+  bundesland: string;
   rolle: Enums<'revier_rolle'>;
   istInhaber: boolean;
   userId: string;

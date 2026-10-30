@@ -883,3 +883,22 @@ button.kachel:active { transform: none; }
 .windpfeil-n { position: absolute; left: -11px; top: -11px; width: 22px; height: 22px; fill: #1e5c3a; stroke: #fff; stroke-width: 1.5; opacity: 0; animation: windpfeil linear infinite; }
 @keyframes windpfeil { 0% { transform: translateY(-14px); opacity: 0; } 15% { opacity: .95; } 80% { opacity: .8; } 100% { transform: translateY(-110px); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .windpfeil-n { animation: none; opacity: .9; transform: translateY(-40px); } }
+
+/* Jagd- & Schonzeiten */
+.jz-liste { display: grid; gap: 10px; }
+.jz-karte { display: grid; gap: 8px; text-align: left; padding: 12px 14px; background: var(--flaeche); border: 1px solid var(--color-border); border-radius: var(--radius); color: inherit; font: inherit; cursor: pointer; }
+.jz-karte small { color: var(--text-leise); }
+.jz-kopf { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.jz-status { font-size: 0.8rem; font-weight: 600; padding: 2px 10px; border-radius: 999px; border: 1px solid currentColor; }
+.jz-s-jagdbar { color: #1e5c3a; }
+.jz-s-schonzeit { color: #8a8a8e; }
+.jz-s-teilweise { color: #b26a00; }
+@media (prefers-color-scheme: dark) { .jz-s-jagdbar { color: #6fcf97; } .jz-s-teilweise { color: #f2b24c; } }
+.jz-balken { display: grid; grid-template-columns: repeat(12, 1fr); gap: 3px; }
+.jz-monat { text-align: center; font-size: 0.72rem; padding: 5px 0; border-radius: 4px; border: 2px solid transparent; }
+.jz-voll { background: #1e5c3a; color: #fff; }
+.jz-teil { background: #a9d3b8; color: #123d25; }
+.jz-zu { background: rgba(128,128,128,.22); color: var(--text-leise); }
+.jz-heute { border-color: var(--text, #111); font-weight: 700; }
+.hinweis-warnung { background: #fff3d6; color: #6b4600; border: 1px solid #f0c36d; }
+@media (prefers-color-scheme: dark) { .hinweis-warnung { background: #3a2c0c; color: #f5d58a; border-color: #7a5a14; } }

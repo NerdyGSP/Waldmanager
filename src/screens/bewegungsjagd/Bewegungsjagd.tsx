@@ -9,6 +9,8 @@ import { EINRICHTUNGSTYPEN, useMitglieder } from '../../lib/stammdaten';
 import { TeilnehmerInfoDruck, TeilnehmerListeDruck } from './BjDruck';
 import { codeAnzeigen, emailGueltig, JAGDARTEN, neuerEntwurf, teilnehmerCsv, type TeilnehmerEntwurf } from '../../lib/bewegungsjagd';
 import type { Tables } from '../../lib/database.types';
+import { statusAm, useJagdzeiten } from '../../lib/jagdzeiten';
+import { useWildarten } from '../../lib/stammdaten';
 import { Auswahl, Feld, Gruppe, Hinweis, Knopf, Leer, Segmente, Seite } from '../../components/ui';
 import type { RevierKontext } from '../module/kontext';
 import type { BjMarker } from './BjKarte';
@@ -122,6 +124,28 @@ export function BewegungsjagdVollbild({ k, id }: { k: RevierKontext; id: string 
 }
 
 const SCHRITTE = ['Grunddaten', 'Teilnehmer', 'Details', 'Stände', 'Einladen'];
+
+// Hinweis, wenn Schalenwild/Schwarzwild am gewählten Jagdtag ganz oder teilweise Schonzeit hat
+const BJ_ARTEN = ['rotwild', 'damwild', 'sikawild', 'rehwild', 'muffelwild', 'schwarzwild'];
+function SchonzeitHinweis({ bundesland, datum }: { bundesland: string; datum: string }) {
+  const { zeilen } = useJagdzeiten(bundesland);
+  const wildarten = useWildarten();
+  if (!zeilen || !datum) return null;
+  const tag = new Date(`${datum}T12:00:00`);
+  const zeilen_ = BJ_ARTEN.map((id) => {
+    const z = zeilen.filter((x) => x.wildart_id === id);
+    if (!z.length) return null;
+    const s = statusAm(z, tag);
+    const name = wildarten.find((w) => w.id === id)?.name ?? id;
+    return s.status === 'schonzeit' ? `${name}: Schonzeit` : s.status === 'teilweise' ? `${name}: Schonzeit für ${s.geschont.join(', ')}` : null;
+  }).filter(Boolean);
+  if (!zeilen_.length) return null;
+  return (
+    <Hinweis art="warnung">
+      Am {datumDE(datum)} gilt laut hinterlegten Zeiten ({bundesland}): {zeilen_.join(' · ')}. Nur Hinweis – verbindlich ist die Landesverordnung.
+    </Hinweis>
+  );
+}
 
 function Schritte({ aktuell }: { aktuell: number }) {
   return (
@@ -305,6 +329,7 @@ function Assistent({ k }: { k: RevierKontext }) {
           </Auswahl>
           <Feld label="Datum" type="date" min={heuteISO()} value={datum} onChange={(e) => setDatum(e.target.value)} />
           <Feld label="Uhrzeit" type="time" value={uhrzeit} onChange={(e) => setUhrzeit(e.target.value)} />
+          <SchonzeitHinweis bundesland={k.bundesland} datum={datum} />
           <div className="bj-ja-nein">
             <span>{treffpunkt ? `Treffpunkt: ${treffpunkt[1].toFixed(5)}, ${treffpunkt[0].toFixed(5)}` : 'Treffpunkt noch nicht gesetzt'}</span>
             <Knopf type="button" variante="sekundaer" onClick={() => setKarteOffen(true)}>

@@ -3,7 +3,8 @@ import { supabase } from '../lib/supabase';
 import { codeFormatieren, fehlertext } from '../lib/fehler';
 import { navigieren } from '../lib/router';
 import type { Mitgliedschaft, NutzerKontext } from '../lib/useNutzerKontext';
-import { Feld, Gruppe, Hinweis, Knopf, PasswortFeld, Seite, Segmente, Zeile } from '../components/ui';
+import { Auswahl, Feld, Gruppe, Hinweis, Knopf, PasswortFeld, Seite, Segmente, Zeile } from '../components/ui';
+import { BUNDESLAENDER } from '../lib/jagdzeiten';
 import { useDarstellung, type Darstellung } from '../lib/darstellung';
 import { MitgliederPanel } from './MitgliederPanel';
 import { RevierdatenLoeschen } from './module/Revierdaten';
@@ -163,6 +164,17 @@ function Revier({ aktuell, onGeaendert }: { aktuell: Mitgliedschaft; onGeaendert
     name.trim() !== aktuell.revier.name ||
     flaeche.trim() !== (aktuell.revier.flaeche_ha ? String(aktuell.revier.flaeche_ha).replace('.', ',') : '');
 
+  // Wirkt sofort auf das Modul „Jagd- & Schonzeiten“ und die Hinweise bei Abschüssen
+  async function bundeslandAendern(neu: string) {
+    setMeldung(null);
+    const { error } = await supabase.from('reviere').update({ bundesland: neu }).eq('id', aktuell.revier.id);
+    if (error) setMeldung({ art: 'fehler', text: fehlertext(error) });
+    else {
+      setMeldung({ art: 'erfolg', text: `Bundesland: ${neu}. Jagd- und Schonzeiten gelten jetzt für dieses Bundesland; Auswertungen des Vorjahres können abweichende Zeiten haben.` });
+      await onGeaendert();
+    }
+  }
+
   async function speichern(e: FormEvent) {
     e.preventDefault();
     setMeldung(null);
@@ -198,6 +210,17 @@ function Revier({ aktuell, onGeaendert }: { aktuell: Mitgliedschaft; onGeaendert
               wert={aktuell.revier.flaeche_ha ? `${aktuell.revier.flaeche_ha.toLocaleString('de-DE')} ha` : 'nicht hinterlegt'}
             />
           </>
+        )}
+        {istInhaber ? (
+          <Auswahl label="Bundesland" value={aktuell.revier.bundesland} onChange={(e) => void bundeslandAendern(e.target.value)}>
+            {BUNDESLAENDER.map((b) => (
+              <option key={b} value={b}>
+                {b}
+              </option>
+            ))}
+          </Auswahl>
+        ) : (
+          <Zeile label="Bundesland" wert={aktuell.revier.bundesland} />
         )}
         <Zeile label="Hegering" wert={aktuell.revier.hegering ?? '–'} />
         <Zeile label="Deine Rolle" wert={ROLLEN[aktuell.rolle]} />
