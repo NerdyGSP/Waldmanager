@@ -25,6 +25,9 @@ export function Einstellungen({
       </details>
       <DarstellungWahl />
       <KartenSpeicher />
+      <Gruppe titel="Lizenzen" fuss="Navigationsicons: Material Symbols (Google, Apache 2.0). Einrichtungssymbole: game-icons.net (Lorc, Delapouite u. a., CC BY 3.0).">
+        <Zeile label="Kartendaten © OpenStreetMap-Mitwirkende, Luftbild © LGLN" />
+      </Gruppe>
 
       <Knopf variante="gefahr" onClick={() => supabase.auth.signOut()}>
         Abmelden
