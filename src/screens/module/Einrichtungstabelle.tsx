@@ -5,12 +5,13 @@ import { navigieren } from '../../lib/router';
 import { datumDE } from '../../lib/zeit';
 import { EinrichtungsIcon } from '../../lib/einrichtungsIcons';
 import { EINRICHTUNGSTYPEN } from '../../lib/stammdaten';
+import { personText, useProfilNamen } from '../../lib/audit';
 import { Hinweis, Knopf, Leer } from '../../components/ui';
 import { EinrichtungSheet, type EinrichtungInfo } from './EinrichtungSheet';
 import type { RevierKontext } from './kontext';
 
-type Zeile = EinrichtungInfo & { erstellt: string; zone: string; zusatz: string };
-type Spalte = 'typ' | 'name' | 'zone' | 'koord' | 'bemerkung' | 'erstellt' | 'zusatz';
+type Zeile = EinrichtungInfo & { erstellt: string; zone: string; zusatz: string; erstelltVon: string | null; geaendertVon: string | null; geaendertAm: string };
+type Spalte = 'typ' | 'name' | 'zone' | 'koord' | 'bemerkung' | 'erstellt' | 'zusatz' | 'von' | 'geaendert';
 
 const typLabel = (t: string) => EINRICHTUNGSTYPEN.find((x) => x.wert === t)?.label ?? t;
 const typIndex = (t: string) => {
@@ -43,13 +44,13 @@ export function EinrichtungenVollbild({ k }: { k: RevierKontext }) {
       lat: e.geometry?.coordinates?.[1] ?? 0,
     }));
     const [erst, ebenen, zonen, fang, jagd] = await Promise.all([
-      supabase.from('einrichtungen').select('id, erstellt_am').eq('revier_id', k.revierId).is('geloescht_am', null),
+      supabase.from('einrichtungen').select('id, erstellt_am, erstellt_von, geaendert_von, aktualisiert_am').eq('revier_id', k.revierId).is('geloescht_am', null),
       supabase.from('zonen_ebenen').select('id, name').eq('revier_id', k.revierId),
       supabase.from('zonen').select('id, name, ebene_id').eq('revier_id', k.revierId).is('geloescht_am', null),
       supabase.from('abschuesse').select('einrichtung_id, erlegt_am, art').eq('revier_id', k.revierId).not('einrichtung_id', 'is', null).is('geloescht_am', null).order('erlegt_am', { ascending: false }),
       supabase.from('bewegungsjagd_teilnehmer').select('zugeordnete_einrichtung_id, bewegungsjagden(titel, datum)').not('zugeordnete_einrichtung_id', 'is', null),
     ]);
-    const erstMap = new Map((erst.data ?? []).map((e) => [e.id, e.erstellt_am]));
+    const erstMap = new Map((erst.data ?? []).map((e) => [e.id, e]));
     const ebeneName = new Map((ebenen.data ?? []).map((e) => [e.id, e.name]));
     const zoneMap = new Map((zonen.data ?? []).map((z) => [z.id, z.ebene_id ? `${z.name} (${ebeneName.get(z.ebene_id) ?? 'Ebene'})` : z.name]));
     const letzterFang = new Map<string, string>();
@@ -71,7 +72,10 @@ export function EinrichtungenVollbild({ k }: { k: RevierKontext }) {
     setZeilen(
       basis.map((e, i) => ({
         ...e,
-        erstellt: erstMap.get(e.id) ?? '',
+        erstellt: erstMap.get(e.id)?.erstellt_am ?? '',
+        erstelltVon: erstMap.get(e.id)?.erstellt_von ?? null,
+        geaendertVon: erstMap.get(e.id)?.geaendert_von ?? null,
+        geaendertAm: erstMap.get(e.id)?.aktualisiert_am ?? '',
         zone: (zonenIds[i] && zoneMap.get(zonenIds[i]!)) || '',
         zusatz:
           e.typ === 'falle' ? (letzterFang.has(e.id) ? `Letzter Fang: ${letzterFang.get(e.id)}` : 'Noch kein Fang')
@@ -84,6 +88,14 @@ export function EinrichtungenVollbild({ k }: { k: RevierKontext }) {
   useEffect(() => {
     void laden();
   }, [laden]);
+
+  const profile = useProfilNamen((zeilen ?? []).flatMap((z) => [z.erstelltVon, z.geaendertVon]));
+  const erstelltText = (z: Zeile) => personText(z.erstelltVon, z.erstellt, profile);
+  const geaendertText = (z: Zeile) => {
+    if (!z.geaendertAm || Math.abs(new Date(z.geaendertAm).getTime() - new Date(z.erstellt).getTime()) < 60_000) return '–';
+    return `${personText(z.geaendertVon, z.geaendertAm, profile)}, ${datumDE(z.geaendertAm.slice(0, 10))}`;
+  };
+
 
   const zaehler = useMemo(() => {
     const m = new Map<string, number>();
@@ -102,6 +114,8 @@ export function EinrichtungenVollbild({ k }: { k: RevierKontext }) {
         case 'bemerkung': return (z.bemerkung ?? '').toLocaleLowerCase('de');
         case 'erstellt': return z.erstellt;
         case 'zusatz': return z.zusatz.toLocaleLowerCase('de');
+        case 'von': return erstelltText(z).toLocaleLowerCase('de');
+        case 'geaendert': return z.geaendertAm;
       }
     };
     return (zeilen ?? [])
@@ -132,8 +146,8 @@ export function EinrichtungenVollbild({ k }: { k: RevierKontext }) {
 
   function csvExport() {
     const feld = (t: string) => `"${t.replace(/"/g, '""')}"`;
-    const kopfzeile = ['Typ', 'Name', 'Zone', 'Breitengrad', 'Längengrad', 'Bemerkung', 'Angelegt am', 'Zusatzinfo'];
-    const zeilenCsv = sichtbar.map((z) => [typLabel(z.typ), z.name ?? '', z.zone, z.lat.toFixed(6), z.lng.toFixed(6), z.bemerkung ?? '', z.erstellt ? datumDE(z.erstellt.slice(0, 10)) : '', z.zusatz]);
+    const kopfzeile = ['Typ', 'Name', 'Zone', 'Breitengrad', 'Längengrad', 'Bemerkung', 'Angelegt am', 'Zusatzinfo', 'Erstellt von', 'Zuletzt geändert'];
+    const zeilenCsv = sichtbar.map((z) => [typLabel(z.typ), z.name ?? '', z.zone, z.lat.toFixed(6), z.lng.toFixed(6), z.bemerkung ?? '', z.erstellt ? datumDE(z.erstellt.slice(0, 10)) : '', z.zusatz, erstelltText(z), geaendertText(z)]);
     const text = [kopfzeile, ...zeilenCsv].map((r) => r.map(feld).join(';')).join('\r\n');
     const url = URL.createObjectURL(new Blob(['﻿' + text], { type: 'text/csv;charset=utf-8' }));
     const a = document.createElement('a');
@@ -153,7 +167,6 @@ export function EinrichtungenVollbild({ k }: { k: RevierKontext }) {
   }
 
   const namen = (zeilen ?? []).map((z) => z.name);
-
   return (
     <div className="bj-vollbild">
       <header className="bj-vollbild-kopf">
@@ -196,6 +209,8 @@ export function EinrichtungenVollbild({ k }: { k: RevierKontext }) {
                   {kopf('bemerkung', 'Bemerkung')}
                   {kopf('erstellt', 'Angelegt am')}
                   {kopf('zusatz', 'Zusatzinfo')}
+                  {kopf('von', 'Erstellt von')}
+                  {kopf('geaendert', 'Zuletzt geändert')}
                   <th scope="col">Aktionen</th>
                 </tr>
               </thead>
@@ -214,6 +229,8 @@ export function EinrichtungenVollbild({ k }: { k: RevierKontext }) {
                     <td>{z.bemerkung ?? ''}</td>
                     <td>{z.erstellt ? datumDE(z.erstellt.slice(0, 10)) : '–'}</td>
                     <td>{z.zusatz}</td>
+                    <td>{erstelltText(z)}</td>
+                    <td>{geaendertText(z)}</td>
                     <td className="aktion">
                       <Knopf variante="ghost" onClick={() => aufKarte(z)}>
                         Auf Karte zeigen

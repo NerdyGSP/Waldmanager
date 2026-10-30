@@ -1,3 +1,4 @@
+import { AuditZeile } from '../../components/AuditZeile';
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { fehlertext } from '../../lib/fehler';
@@ -95,6 +96,7 @@ export function ZonenInfo({ zone, onSchliessen, onBearbeiten }: { zone: Gewaehlt
         <i className="farbpunkt" style={{ background: zone.farbe ?? 'var(--color-primary)' }} />
         <div>
           <strong>{zone.name}</strong>
+          <AuditZeile tabelle="zonen" id={zone.id} />
           <small>
             {zone.flaecheHa ? `${zone.flaecheHa.toLocaleString('de-DE')} ha · ` : ''}
             {messungen === null && !fehler

@@ -27,6 +27,7 @@ export type Database = {
           erstellt_am: string
           fang_ergebnis: string | null
           fang_zustand: string | null
+          geaendert_von: string | null
           geloescht_am: string | null
           geom: unknown
           geschlecht: Database["public"]["Enums"]["geschlecht"]
@@ -48,6 +49,7 @@ export type Database = {
           erstellt_am?: string
           fang_ergebnis?: string | null
           fang_zustand?: string | null
+          geaendert_von?: string | null
           geloescht_am?: string | null
           geom?: unknown
           geschlecht?: Database["public"]["Enums"]["geschlecht"]
@@ -69,6 +71,7 @@ export type Database = {
           erstellt_am?: string
           fang_ergebnis?: string | null
           fang_zustand?: string | null
+          geaendert_von?: string | null
           geloescht_am?: string | null
           geom?: unknown
           geschlecht?: Database["public"]["Enums"]["geschlecht"]
@@ -96,6 +99,13 @@ export type Database = {
           {
             foreignKeyName: "abschuesse_erleger_id_fkey"
             columns: ["erleger_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "abschuesse_geaendert_von_profil_fkey"
+            columns: ["geaendert_von"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -129,9 +139,11 @@ export type Database = {
           beschreibung: string | null
           einrichtung_id: string | null
           erledigt_am: string | null
+          erledigt_von: string | null
           erstellt_am: string
           erstellt_von: string | null
           faellig_am: string | null
+          geaendert_von: string | null
           geloescht_am: string | null
           id: string
           liste_id: string | null
@@ -145,9 +157,11 @@ export type Database = {
           beschreibung?: string | null
           einrichtung_id?: string | null
           erledigt_am?: string | null
+          erledigt_von?: string | null
           erstellt_am?: string
           erstellt_von?: string | null
           faellig_am?: string | null
+          geaendert_von?: string | null
           geloescht_am?: string | null
           id?: string
           liste_id?: string | null
@@ -161,9 +175,11 @@ export type Database = {
           beschreibung?: string | null
           einrichtung_id?: string | null
           erledigt_am?: string | null
+          erledigt_von?: string | null
           erstellt_am?: string
           erstellt_von?: string | null
           faellig_am?: string | null
+          geaendert_von?: string | null
           geloescht_am?: string | null
           id?: string
           liste_id?: string | null
@@ -178,6 +194,27 @@ export type Database = {
             columns: ["einrichtung_id"]
             isOneToOne: false
             referencedRelation: "einrichtungen"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aufgaben_erledigt_von_profil_fkey"
+            columns: ["erledigt_von"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aufgaben_erstellt_von_profil_fkey"
+            columns: ["erstellt_von"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aufgaben_geaendert_von_profil_fkey"
+            columns: ["geaendert_von"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -200,8 +237,11 @@ export type Database = {
         Row: {
           aktualisiert_am: string
           bewegungsjagd_id: string | null
+          erledigt_am: string | null
+          erledigt_von: string | null
           erstellt_am: string
           erstellt_von: string | null
+          geaendert_von: string | null
           geloescht_am: string | null
           id: string
           name: string
@@ -211,8 +251,11 @@ export type Database = {
         Insert: {
           aktualisiert_am?: string
           bewegungsjagd_id?: string | null
+          erledigt_am?: string | null
+          erledigt_von?: string | null
           erstellt_am?: string
           erstellt_von?: string | null
+          geaendert_von?: string | null
           geloescht_am?: string | null
           id?: string
           name: string
@@ -222,8 +265,11 @@ export type Database = {
         Update: {
           aktualisiert_am?: string
           bewegungsjagd_id?: string | null
+          erledigt_am?: string | null
+          erledigt_von?: string | null
           erstellt_am?: string
           erstellt_von?: string | null
+          geaendert_von?: string | null
           geloescht_am?: string | null
           id?: string
           name?: string
@@ -236,6 +282,27 @@ export type Database = {
             columns: ["bewegungsjagd_id"]
             isOneToOne: true
             referencedRelation: "bewegungsjagden"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aufgabenlisten_erledigt_von_profil_fkey"
+            columns: ["erledigt_von"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aufgabenlisten_erstellt_von_profil_fkey"
+            columns: ["erstellt_von"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aufgabenlisten_geaendert_von_profil_fkey"
+            columns: ["geaendert_von"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -258,6 +325,7 @@ export type Database = {
           erstellt_am: string
           gast_kontakt: string | null
           gast_name: string
+          geaendert_von: string | null
           geloescht_am: string | null
           gueltig_bis: string
           gueltig_von: string
@@ -277,6 +345,7 @@ export type Database = {
           erstellt_am?: string
           gast_kontakt?: string | null
           gast_name: string
+          geaendert_von?: string | null
           geloescht_am?: string | null
           gueltig_bis: string
           gueltig_von: string
@@ -296,6 +365,7 @@ export type Database = {
           erstellt_am?: string
           gast_kontakt?: string | null
           gast_name?: string
+          geaendert_von?: string | null
           geloescht_am?: string | null
           gueltig_bis?: string
           gueltig_von?: string
@@ -306,6 +376,20 @@ export type Database = {
           wildarten?: string[]
         }
         Relationships: [
+          {
+            foreignKeyName: "begehungsscheine_ausgestellt_von_profil_fkey"
+            columns: ["ausgestellt_von"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "begehungsscheine_geaendert_von_profil_fkey"
+            columns: ["geaendert_von"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "begehungsscheine_revier_id_fkey"
             columns: ["revier_id"]
@@ -323,6 +407,7 @@ export type Database = {
           bemerkung: string | null
           erfasst_von: string | null
           erstellt_am: string
+          geaendert_von: string | null
           geloescht_am: string | null
           geom: unknown
           geschlecht: Database["public"]["Enums"]["geschlecht"]
@@ -339,6 +424,7 @@ export type Database = {
           bemerkung?: string | null
           erfasst_von?: string | null
           erstellt_am?: string
+          geaendert_von?: string | null
           geloescht_am?: string | null
           geom?: unknown
           geschlecht?: Database["public"]["Enums"]["geschlecht"]
@@ -355,6 +441,7 @@ export type Database = {
           bemerkung?: string | null
           erfasst_von?: string | null
           erstellt_am?: string
+          geaendert_von?: string | null
           geloescht_am?: string | null
           geom?: unknown
           geschlecht?: Database["public"]["Enums"]["geschlecht"]
@@ -368,6 +455,13 @@ export type Database = {
           {
             foreignKeyName: "beobachtungen_erfasst_von_fkey"
             columns: ["erfasst_von"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "beobachtungen_geaendert_von_profil_fkey"
+            columns: ["geaendert_von"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -582,6 +676,8 @@ export type Database = {
       }
       bewegungsjagden: {
         Row: {
+          abgeschlossen_am: string | null
+          abgeschlossen_von: string | null
           abschlusskommentar: string | null
           aktualisiert_am: string
           art: string
@@ -589,6 +685,7 @@ export type Database = {
           einladungstext: string | null
           erstellt_am: string
           erstellt_von: string | null
+          geaendert_von: string | null
           geloescht_am: string | null
           hegebeitrag_aktiv: boolean
           hegebeitrag_betrag: number | null
@@ -606,6 +703,8 @@ export type Database = {
           uhrzeit: string | null
         }
         Insert: {
+          abgeschlossen_am?: string | null
+          abgeschlossen_von?: string | null
           abschlusskommentar?: string | null
           aktualisiert_am?: string
           art?: string
@@ -613,6 +712,7 @@ export type Database = {
           einladungstext?: string | null
           erstellt_am?: string
           erstellt_von?: string | null
+          geaendert_von?: string | null
           geloescht_am?: string | null
           hegebeitrag_aktiv?: boolean
           hegebeitrag_betrag?: number | null
@@ -630,6 +730,8 @@ export type Database = {
           uhrzeit?: string | null
         }
         Update: {
+          abgeschlossen_am?: string | null
+          abgeschlossen_von?: string | null
           abschlusskommentar?: string | null
           aktualisiert_am?: string
           art?: string
@@ -637,6 +739,7 @@ export type Database = {
           einladungstext?: string | null
           erstellt_am?: string
           erstellt_von?: string | null
+          geaendert_von?: string | null
           geloescht_am?: string | null
           hegebeitrag_aktiv?: boolean
           hegebeitrag_betrag?: number | null
@@ -654,6 +757,27 @@ export type Database = {
           uhrzeit?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "bewegungsjagden_abgeschlossen_von_profil_fkey"
+            columns: ["abgeschlossen_von"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bewegungsjagden_erstellt_von_profil_fkey"
+            columns: ["erstellt_von"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bewegungsjagden_geaendert_von_profil_fkey"
+            columns: ["geaendert_von"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "bewegungsjagden_revier_id_fkey"
             columns: ["revier_id"]
@@ -729,6 +853,8 @@ export type Database = {
           aktualisiert_am: string
           bemerkung: string | null
           erstellt_am: string
+          erstellt_von: string | null
+          geaendert_von: string | null
           geloescht_am: string | null
           geom: unknown
           id: string
@@ -741,6 +867,8 @@ export type Database = {
           aktualisiert_am?: string
           bemerkung?: string | null
           erstellt_am?: string
+          erstellt_von?: string | null
+          geaendert_von?: string | null
           geloescht_am?: string | null
           geom: unknown
           id?: string
@@ -753,6 +881,8 @@ export type Database = {
           aktualisiert_am?: string
           bemerkung?: string | null
           erstellt_am?: string
+          erstellt_von?: string | null
+          geaendert_von?: string | null
           geloescht_am?: string | null
           geom?: unknown
           id?: string
@@ -762,6 +892,20 @@ export type Database = {
           zustand?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "einrichtungen_erstellt_von_profil_fkey"
+            columns: ["erstellt_von"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "einrichtungen_geaendert_von_profil_fkey"
+            columns: ["geaendert_von"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "einrichtungen_revier_id_fkey"
             columns: ["revier_id"]
@@ -923,6 +1067,7 @@ export type Database = {
           erstellt_am: string
           erstellt_von: string | null
           farbe: string | null
+          geaendert_von: string | null
           geloescht_am: string | null
           geom: unknown
           id: string
@@ -939,6 +1084,7 @@ export type Database = {
           erstellt_am?: string
           erstellt_von?: string | null
           farbe?: string | null
+          geaendert_von?: string | null
           geloescht_am?: string | null
           geom: unknown
           id?: string
@@ -955,6 +1101,7 @@ export type Database = {
           erstellt_am?: string
           erstellt_von?: string | null
           farbe?: string | null
+          geaendert_von?: string | null
           geloescht_am?: string | null
           geom?: unknown
           id?: string
@@ -976,6 +1123,20 @@ export type Database = {
             columns: ["ebene_id"]
             isOneToOne: false
             referencedRelation: "routen_ebenen"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pirschwege_erstellt_von_profil_fkey"
+            columns: ["erstellt_von"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pirschwege_geaendert_von_profil_fkey"
+            columns: ["geaendert_von"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -1021,20 +1182,43 @@ export type Database = {
       revier_grenzen: {
         Row: {
           aktualisiert_am: string
+          erstellt_am: string
+          erstellt_von: string | null
+          geaendert_von: string | null
           geom: unknown
           revier_id: string
         }
         Insert: {
           aktualisiert_am?: string
+          erstellt_am?: string
+          erstellt_von?: string | null
+          geaendert_von?: string | null
           geom: unknown
           revier_id: string
         }
         Update: {
           aktualisiert_am?: string
+          erstellt_am?: string
+          erstellt_von?: string | null
+          geaendert_von?: string | null
           geom?: unknown
           revier_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "revier_grenzen_erstellt_von_profil_fkey"
+            columns: ["erstellt_von"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "revier_grenzen_geaendert_von_profil_fkey"
+            columns: ["geaendert_von"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "revier_grenzen_revier_id_fkey"
             columns: ["revier_id"]
@@ -1122,7 +1306,9 @@ export type Database = {
         Row: {
           aktualisiert_am: string
           erstellt_am: string
+          erstellt_von: string | null
           farbe: string | null
+          geaendert_von: string | null
           geloescht_am: string | null
           id: string
           name: string
@@ -1134,7 +1320,9 @@ export type Database = {
         Insert: {
           aktualisiert_am?: string
           erstellt_am?: string
+          erstellt_von?: string | null
           farbe?: string | null
+          geaendert_von?: string | null
           geloescht_am?: string | null
           id?: string
           name: string
@@ -1146,7 +1334,9 @@ export type Database = {
         Update: {
           aktualisiert_am?: string
           erstellt_am?: string
+          erstellt_von?: string | null
           farbe?: string | null
+          geaendert_von?: string | null
           geloescht_am?: string | null
           id?: string
           name?: string
@@ -1156,6 +1346,20 @@ export type Database = {
           wte_aktiv?: boolean
         }
         Relationships: [
+          {
+            foreignKeyName: "routen_ebenen_erstellt_von_profil_fkey"
+            columns: ["erstellt_von"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "routen_ebenen_geaendert_von_profil_fkey"
+            columns: ["geaendert_von"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "routen_ebenen_revier_id_fkey"
             columns: ["revier_id"]
@@ -1195,8 +1399,11 @@ export type Database = {
           angemeldet_am: string | null
           bemerkung: string | null
           erfasst_von: string | null
+          erledigt_am: string | null
+          erledigt_von: string | null
           erstellt_am: string
           flaeche_ha: number | null
+          geaendert_von: string | null
           geloescht_am: string | null
           geom: unknown
           geschaedigter: string | null
@@ -1216,8 +1423,11 @@ export type Database = {
           angemeldet_am?: string | null
           bemerkung?: string | null
           erfasst_von?: string | null
+          erledigt_am?: string | null
+          erledigt_von?: string | null
           erstellt_am?: string
           flaeche_ha?: number | null
+          geaendert_von?: string | null
           geloescht_am?: string | null
           geom?: unknown
           geschaedigter?: string | null
@@ -1237,8 +1447,11 @@ export type Database = {
           angemeldet_am?: string | null
           bemerkung?: string | null
           erfasst_von?: string | null
+          erledigt_am?: string | null
+          erledigt_von?: string | null
           erstellt_am?: string
           flaeche_ha?: number | null
+          geaendert_von?: string | null
           geloescht_am?: string | null
           geom?: unknown
           geschaedigter?: string | null
@@ -1254,6 +1467,27 @@ export type Database = {
           zone_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "wildschaeden_erfasst_von_profil_fkey"
+            columns: ["erfasst_von"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wildschaeden_erledigt_von_profil_fkey"
+            columns: ["erledigt_von"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wildschaeden_geaendert_von_profil_fkey"
+            columns: ["geaendert_von"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "wildschaeden_revier_id_fkey"
             columns: ["revier_id"]
@@ -1279,6 +1513,8 @@ export type Database = {
       }
       zaehlsitzungen: {
         Row: {
+          abgeschlossen_am: string | null
+          abgeschlossen_von: string | null
           aktualisiert_am: string
           beginn: string | null
           bemerkung: string | null
@@ -1289,6 +1525,7 @@ export type Database = {
           erstellt_von: string | null
           flaeche_ha: number | null
           flaechenmodus: string
+          geaendert_von: string | null
           geloescht_am: string | null
           id: string
           mondphase: string | null
@@ -1299,6 +1536,8 @@ export type Database = {
           wetter: Json | null
         }
         Insert: {
+          abgeschlossen_am?: string | null
+          abgeschlossen_von?: string | null
           aktualisiert_am?: string
           beginn?: string | null
           bemerkung?: string | null
@@ -1309,6 +1548,7 @@ export type Database = {
           erstellt_von?: string | null
           flaeche_ha?: number | null
           flaechenmodus?: string
+          geaendert_von?: string | null
           geloescht_am?: string | null
           id?: string
           mondphase?: string | null
@@ -1319,6 +1559,8 @@ export type Database = {
           wetter?: Json | null
         }
         Update: {
+          abgeschlossen_am?: string | null
+          abgeschlossen_von?: string | null
           aktualisiert_am?: string
           beginn?: string | null
           bemerkung?: string | null
@@ -1329,6 +1571,7 @@ export type Database = {
           erstellt_von?: string | null
           flaeche_ha?: number | null
           flaechenmodus?: string
+          geaendert_von?: string | null
           geloescht_am?: string | null
           id?: string
           mondphase?: string | null
@@ -1340,6 +1583,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "zaehlsitzungen_abgeschlossen_von_profil_fkey"
+            columns: ["abgeschlossen_von"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "zaehlsitzungen_ebene_id_fkey"
             columns: ["ebene_id"]
             isOneToOne: false
@@ -1349,6 +1599,13 @@ export type Database = {
           {
             foreignKeyName: "zaehlsitzungen_erstellt_von_fkey"
             columns: ["erstellt_von"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "zaehlsitzungen_geaendert_von_profil_fkey"
+            columns: ["geaendert_von"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -1451,7 +1708,9 @@ export type Database = {
           aktualisiert_am: string
           ebene_id: string | null
           erstellt_am: string
+          erstellt_von: string | null
           farbe: string | null
+          geaendert_von: string | null
           geloescht_am: string | null
           geom: unknown
           id: string
@@ -1463,7 +1722,9 @@ export type Database = {
           aktualisiert_am?: string
           ebene_id?: string | null
           erstellt_am?: string
+          erstellt_von?: string | null
           farbe?: string | null
+          geaendert_von?: string | null
           geloescht_am?: string | null
           geom?: unknown
           id?: string
@@ -1475,7 +1736,9 @@ export type Database = {
           aktualisiert_am?: string
           ebene_id?: string | null
           erstellt_am?: string
+          erstellt_von?: string | null
           farbe?: string | null
+          geaendert_von?: string | null
           geloescht_am?: string | null
           geom?: unknown
           id?: string
@@ -1492,6 +1755,20 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "zonen_erstellt_von_profil_fkey"
+            columns: ["erstellt_von"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "zonen_geaendert_von_profil_fkey"
+            columns: ["geaendert_von"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "zonen_revier_id_fkey"
             columns: ["revier_id"]
             isOneToOne: false
@@ -1504,7 +1781,9 @@ export type Database = {
         Row: {
           aktualisiert_am: string
           erstellt_am: string
+          erstellt_von: string | null
           farbe: string | null
+          geaendert_von: string | null
           id: string
           name: string
           revier_id: string
@@ -1514,7 +1793,9 @@ export type Database = {
         Insert: {
           aktualisiert_am?: string
           erstellt_am?: string
+          erstellt_von?: string | null
           farbe?: string | null
+          geaendert_von?: string | null
           id?: string
           name: string
           revier_id: string
@@ -1524,7 +1805,9 @@ export type Database = {
         Update: {
           aktualisiert_am?: string
           erstellt_am?: string
+          erstellt_von?: string | null
           farbe?: string | null
+          geaendert_von?: string | null
           id?: string
           name?: string
           revier_id?: string
@@ -1532,6 +1815,20 @@ export type Database = {
           wte_aktiv?: boolean
         }
         Relationships: [
+          {
+            foreignKeyName: "zonen_ebenen_erstellt_von_profil_fkey"
+            columns: ["erstellt_von"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "zonen_ebenen_geaendert_von_profil_fkey"
+            columns: ["geaendert_von"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "zonen_ebenen_revier_id_fkey"
             columns: ["revier_id"]

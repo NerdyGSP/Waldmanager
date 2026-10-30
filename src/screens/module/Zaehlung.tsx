@@ -1,3 +1,4 @@
+import { AuditZeile } from '../../components/AuditZeile';
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { supabase } from '../../lib/supabase';
 import { fehlertext } from '../../lib/fehler';
@@ -414,6 +415,7 @@ function SitzungAnsicht({ k, sitzungId }: { k: RevierKontext; sitzungId: string 
     return (
       <Seite titel={titel} untertitel={untertitel} zurueck={() => navigieren('/zaehlung')}>
         {fehler && <Hinweis art="fehler">{fehler}</Hinweis>}
+        <AuditZeile tabelle="zaehlsitzungen" id={sitzung.id} aktualisierung={sitzung.status} />
         <Gesamtuebersicht zeilen={zeilen} zonen={alleZonen} wildarten={wildarten} />
         <FlaechenGruppe sitzung={sitzung} onGeaendert={() => void laden()} onRouten={setRoutenAnzahl} />
         {sitzung.bemerkung && <Leer>Bemerkung: {sitzung.bemerkung}</Leer>}

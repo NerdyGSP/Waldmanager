@@ -1,3 +1,4 @@
+import { AuditZeile } from '../../components/AuditZeile';
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { supabase } from '../../lib/supabase';
 import { fehlertext } from '../../lib/fehler';
@@ -304,6 +305,7 @@ function AufgabeFormular({
 
   return (
     <Seite titel={vorlage ? 'Aufgabe bearbeiten' : 'Neue Aufgabe'} zurueck={() => void onFertig()}>
+      {vorlage && <AuditZeile tabelle="aufgaben" id={vorlage.id} />}
       <form onSubmit={speichern}>
         <Gruppe>
           <Feld label="Titel" required placeholder="z. B. Hochsitz Eichenkanzel reparieren" value={titel} onChange={(e) => setTitel(e.target.value)} />

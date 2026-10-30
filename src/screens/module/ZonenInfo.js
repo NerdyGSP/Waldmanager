@@ -1,4 +1,5 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+import { AuditZeile } from '../../components/AuditZeile';
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { fehlertext } from '../../lib/fehler';
@@ -78,7 +79,7 @@ export function ZonenInfo({ zone, onSchliessen, onBearbeiten }) {
     const verlaufsart = auswertung.arten.find((a) => a.id === verlaufArt);
     const mehrereJahre = new Set(auswertung.liste.map((s) => s.datum.slice(0, 4))).size > 1;
     const kurz = (d) => new Date(`${d}T12:00:00`).toLocaleDateString('de-DE', mehrereJahre ? { day: '2-digit', month: '2-digit', year: '2-digit' } : { day: '2-digit', month: '2-digit' });
-    return (_jsxs("section", { className: "zonen-info", role: "dialog", "aria-label": `Zone ${zone.name}`, children: [_jsxs("header", { className: "zonen-info-kopf", children: [_jsx("i", { className: "farbpunkt", style: { background: zone.farbe ?? 'var(--color-primary)' } }), _jsxs("div", { children: [_jsx("strong", { children: zone.name }), _jsxs("small", { children: [zone.flaecheHa ? `${zone.flaecheHa.toLocaleString('de-DE')} ha · ` : '', messungen === null && !fehler
+    return (_jsxs("section", { className: "zonen-info", role: "dialog", "aria-label": `Zone ${zone.name}`, children: [_jsxs("header", { className: "zonen-info-kopf", children: [_jsx("i", { className: "farbpunkt", style: { background: zone.farbe ?? 'var(--color-primary)' } }), _jsxs("div", { children: [_jsx("strong", { children: zone.name }), _jsx(AuditZeile, { tabelle: "zonen", id: zone.id }), _jsxs("small", { children: [zone.flaecheHa ? `${zone.flaecheHa.toLocaleString('de-DE')} ha · ` : '', messungen === null && !fehler
                                         ? 'Zählungen werden geladen …'
                                         : auswertung.liste.length
                                             ? `${auswertung.liste.length} ${auswertung.liste.length === 1 ? 'Zählung' : 'Zählungen'}, zuletzt am ${datumDE(auswertung.liste[0].datum)}`

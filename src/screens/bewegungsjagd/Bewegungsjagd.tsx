@@ -1,3 +1,4 @@
+import { AuditZeile } from '../../components/AuditZeile';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Geometry } from 'geojson';
 import { supabase } from '../../lib/supabase';
@@ -763,6 +764,7 @@ function Auswertung({ k, id }: { k: RevierKontext; id: string }) {
     <>
       <div>
         <h1 style={{ margin: 0, fontSize: '1.4rem' }}>{jagd.titel}</h1>
+        <AuditZeile tabelle="bewegungsjagden" id={jagd.id} aktualisierung={jagd.status} />
         <p style={{ margin: '4px 0 0', color: 'var(--color-text-muted)' }}>
           {jagd.art} · {datumDE(jagd.datum)}
           {jagd.uhrzeit ? `, ${jagd.uhrzeit.slice(0, 5)} Uhr` : ''} ·{' '}

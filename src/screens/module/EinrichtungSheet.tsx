@@ -1,3 +1,4 @@
+import { AuditZeile } from '../../components/AuditZeile';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { fehlertext } from '../../lib/fehler';
@@ -154,6 +155,7 @@ export function EinrichtungSheet({
         </button>
       </div>
       {einr.bemerkung && ansicht === 'start' && <p style={{ margin: '0 0 6px' }}>{einr.bemerkung}</p>}
+      {ansicht === 'start' && <AuditZeile tabelle="einrichtungen" id={einr.id} />}
       {fehler && <Hinweis art="fehler">{fehler}</Hinweis>}
 
       {ansicht === 'start' && (

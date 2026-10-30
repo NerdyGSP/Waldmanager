@@ -8,7 +8,7 @@ import type { Tables } from '../../lib/database.types';
 import { Auswahl, Feld, Gruppe, Hinweis, Knopf, Leer, Seite, Zeile } from '../../components/ui';
 import type { RevierKontext } from './kontext';
 
-type Schein = Omit<Tables<'begehungsscheine'>, 'revier_id' | 'geloescht_am' | 'erstellt_am' | 'aktualisiert_am' | 'ausgestellt_von'>;
+type Schein = Omit<Tables<'begehungsscheine'>, 'revier_id' | 'geloescht_am' | 'erstellt_am' | 'aktualisiert_am' | 'ausgestellt_von' | 'geaendert_von'>;
 
 const SPALTEN = 'id, gast_name, gast_kontakt, jagdschein_nr, art, entgelt_eur, gueltig_von, gueltig_bis, bereich, wildarten, bedingungen, widerrufen_am';
 

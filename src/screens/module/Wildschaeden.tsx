@@ -1,3 +1,4 @@
+import { AuditZeile } from '../../components/AuditZeile';
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { supabase } from '../../lib/supabase';
 import { fehlertext } from '../../lib/fehler';
@@ -284,6 +285,7 @@ function SchadenFormular({ k, vorlage, onFertig }: { k: RevierKontext; vorlage: 
 
   return (
     <Seite titel={vorlage ? 'Wildschaden bearbeiten' : 'Wildschaden erfassen'} zurueck={() => void onFertig()}>
+      {vorlage && <AuditZeile tabelle="wildschaeden" id={vorlage.id} />}
       <form onSubmit={speichern}>
         <div className={`hinweis ${['abgelaufen', 'spaet'].includes(frist.art) ? 'hinweis-fehler' : ['heute', 'bald'].includes(frist.art) ? 'frist' : ''}`} role="status">
           <strong>Anmeldefrist 1 Woche:</strong> {frist.text}
