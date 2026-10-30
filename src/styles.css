@@ -314,8 +314,14 @@ button.kachel:active { transform: scale(0.98); }
   font-size: 12px; font-weight: 600; color: #fff; background: rgb(0 0 0 / 0.45); padding: 2px 6px;
   border-radius: 6px; pointer-events: none; white-space: nowrap;
 }
+.karte-chips { position: absolute; top: 12px; left: 12px; right: 12px; z-index: 5; display: grid; gap: 8px; justify-items: start; pointer-events: none; }
+.karte-chips > * { pointer-events: auto; }
+.karte-chip-reihe { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; }
+.karte-chip { display: flex; align-items: center; gap: 6px; background: var(--flaeche); padding: 8px 12px; border-radius: var(--radius); border: 1px solid var(--color-border); font-size: 0.88rem; color: inherit; font-family: inherit; }
+.chip-knopf { cursor: pointer; }
+.chip-knopf.an { background: #1e5c3a; color: #fff; border-color: #1e5c3a; }
 .wind {
-  position: absolute; top: 12px; left: 12px; z-index: 2; display: flex; align-items: center; gap: 10px;
+  display: flex; align-items: center; gap: 10px;
   background: var(--flaeche); padding: 8px 12px; border-radius: var(--radius); border: 1px solid var(--color-border);
   font-size: 0.88rem;
 }
@@ -361,7 +367,6 @@ button.kachel:active { transform: scale(0.98); }
 .maplibregl-popup-content { border-radius: var(--radius-sm); padding: 12px 14px; }
 @media (max-width: 700px) {
   .karte-panel { top: auto; max-height: 55%; left: 8px; right: 8px; width: auto; bottom: 84px; }
-  .wind { top: auto; bottom: 36px; left: auto; right: 12px; }
 }
 @media (max-width: 600px) {
   .kacheln { grid-template-columns: repeat(2, 1fr); gap: 10px; }
@@ -459,7 +464,7 @@ button.kachel:active { transform: scale(0.98); }
   }
   .karte-panel .knopf { padding: 9px 12px; font-size: 0.88rem; }
   .karte-panel .ebene { font-size: 0.88rem; padding: 3px 0; }
-  .wind { top: 12px; left: 12px; right: auto; bottom: auto; padding: 6px 10px; font-size: 0.82rem; }
+  .karte-chip { padding: 6px 10px; font-size: 0.82rem; }
   .panel-schalter { bottom: 28px; padding: 9px 13px; font-size: 0.9rem; }
 }
 .farbwahl { width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%; overflow: hidden; background: none; cursor: pointer; flex: none; }
@@ -824,9 +829,7 @@ button.kachel:active { transform: none; }
 .ebenen-block { display: grid; gap: 6px; padding-bottom: 8px; border-bottom: 1px solid var(--color-border); }
 
 /* WTE-Modus */
-.wte-knopf { position: absolute; z-index: 5; top: 148px; right: 10px; width: 29px; min-height: 29px; padding: 0; border-radius: 4px; border: 0; background: #fff; color: #1e5c3a; font: 700 0.62rem/1 var(--font-sans, system-ui); box-shadow: 0 0 0 2px rgba(0,0,0,.1); cursor: pointer; }
-.wte-knopf.an { background: #1e5c3a; color: #fff; }
-.wte-menue { position: absolute; z-index: 6; top: 148px; right: 46px; display: grid; background: var(--color-bg); border: 1px solid var(--color-border-input); border-radius: var(--radius-lg, 12px); box-shadow: 0 8px 28px rgba(0,0,0,.25); padding: 6px; min-width: 240px; }
+.wte-menue { position: absolute; z-index: 6; top: 64px; left: 12px; display: grid; background: var(--color-bg); border: 1px solid var(--color-border-input); border-radius: var(--radius-lg, 12px); box-shadow: 0 8px 28px rgba(0,0,0,.25); padding: 6px; min-width: 240px; }
 .wte-menue button { background: none; border: 0; color: inherit; font: inherit; text-align: left; padding: 12px; border-radius: 8px; cursor: pointer; }
 .wte-menue button:hover { background: var(--linie); }
 .wte-leiste { position: absolute; z-index: 5; top: 10px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; align-items: center; max-width: calc(100% - 140px); background: #1e5c3a; color: #fff; padding: 8px 12px; border-radius: 999px; font-size: 0.85rem; box-shadow: 0 4px 14px rgba(0,0,0,.3); }
@@ -840,7 +843,7 @@ button.kachel:active { transform: none; }
 
 /* Wetter-Chip und Panel */
 .wind-haupt { display: flex; align-items: center; gap: 10px; background: none; border: 0; padding: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; }
-.wetter-panel { position: absolute; z-index: 9; top: 64px; left: 12px; width: min(380px, calc(100% - 24px)); max-height: calc(100% - 140px); overflow: auto; display: grid; gap: 10px; background: var(--color-bg); border: 1px solid var(--color-border-input); border-radius: var(--radius-lg, 12px); padding: 12px; box-shadow: 0 8px 28px rgba(0,0,0,.25); }
+.wetter-panel { width: min(380px, calc(100% - 24px)); max-height: calc(100% - 140px); overflow: auto; display: grid; gap: 10px; background: var(--color-bg); border: 1px solid var(--color-border-input); border-radius: var(--radius-lg, 12px); padding: 12px; box-shadow: 0 8px 28px rgba(0,0,0,.25); }
 .wetter-kopf { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .wetter-werte { display: grid; gap: 4px; margin: 0; }
 .wetter-werte > div { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--color-border); }
@@ -848,7 +851,6 @@ button.kachel:active { transform: none; }
 .wetter-stunden { display: grid; font-size: 0.85rem; }
 .wetter-stunden > div { display: grid; grid-template-columns: 1.4fr .6fr 1.2fr .7fr .8fr; gap: 6px; padding: 4px 0; border-bottom: 1px solid var(--color-border); }
 .wetter-stunden .kopf { color: var(--text-leise); font-weight: 600; }
-@media (max-width: 899px) { .wetter-panel { top: 56px; } }
 
 /* Druckansichten Bewegungsjagd */
 .bj-druck-ebene { position: fixed; inset: 0; z-index: 100; background: #e9ece6; overflow: auto; display: grid; justify-items: center; align-content: start; gap: 12px; padding: 12px; color: #111; }
@@ -872,3 +874,10 @@ button.kachel:active { transform: none; }
   body.bj-druckt .bj-druck-leiste { display: none !important; }
   body.bj-druckt .bj-druck-blatt { box-shadow: none; padding: 0; width: auto !important; min-height: 0 !important; overflow: visible; }
 }
+
+/* Windpfeile */
+.windpfeile { position: relative; width: 0; height: 0; pointer-events: none; }
+.windpfeile-punkt { position: absolute; left: -6px; top: -6px; width: 12px; height: 12px; border-radius: 50%; background: #1e5c3a; border: 2px solid #fff; box-shadow: 0 0 0 2px rgba(0,0,0,.25); }
+.windpfeil-n { position: absolute; left: -11px; top: -11px; width: 22px; height: 22px; fill: #1e5c3a; stroke: #fff; stroke-width: 1.5; opacity: 0; animation: windpfeil linear infinite; }
+@keyframes windpfeil { 0% { transform: translateY(-14px); opacity: 0; } 15% { opacity: .95; } 80% { opacity: .8; } 100% { transform: translateY(-110px); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .windpfeil-n { animation: none; opacity: .9; transform: translateY(-40px); } }

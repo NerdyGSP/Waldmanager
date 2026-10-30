@@ -96,10 +96,9 @@ export function WetterPanel({
           {!sm && <p className="leer">Bitte Revier-Grenze anlegen – Sonne und Mond werden für die Reviermitte berechnet.</p>}
           {sm && (
             <dl className="wetter-werte">
-              <div><dt>Bürgerl. Dämmerung (Morgen)</dt><dd>{zeitFmt(sm.daemmerungAnfang)}</dd></div>
               <div><dt>Sonnenaufgang</dt><dd>{zeitFmt(sm.aufgang)}</dd></div>
               <div><dt>Sonnenuntergang</dt><dd>{zeitFmt(sm.untergang)}</dd></div>
-              <div><dt>Bürgerl. Dämmerung (Abend)</dt><dd>{zeitFmt(sm.daemmerungEnde)}</dd></div>
+              <div><dt>Büchsenlicht</dt><dd>{zeitFmt(sm.buechsenlichtVon)} – {zeitFmt(sm.buechsenlichtBis)} <small>Richtwert: 30 min vor Aufgang bis 30 min nach Untergang</small></dd></div>
               <div><dt>Mondaufgang</dt><dd>{zeitFmt(sm.mondAufgang)}</dd></div>
               <div><dt>Monduntergang</dt><dd>{zeitFmt(sm.mondUntergang)}</dd></div>
               <div><dt>Mondphase</dt><dd>{sm.mondphase} <small>{sm.beleuchtung} % beleuchtet</small></dd></div>

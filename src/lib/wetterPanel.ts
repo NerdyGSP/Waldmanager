@@ -78,8 +78,8 @@ export async function wetterDetail(lat: number, lon: number, erzwingen = false):
 export type SonneMond = {
   aufgang: Date | null;
   untergang: Date | null;
-  daemmerungAnfang: Date | null; // bürgerliche Dämmerung (Sonne −6°)
-  daemmerungEnde: Date | null;
+  buechsenlichtVon: Date | null; // Richtwert: 30 min vor Sonnenaufgang
+  buechsenlichtBis: Date | null; // Richtwert: 30 min nach Sonnenuntergang
   mondAufgang: Date | null;
   mondUntergang: Date | null;
   mondphase: string;
@@ -97,8 +97,8 @@ export function sonneMond(lat: number, lon: number, tag: Date): SonneMond {
   return {
     aufgang: gueltig(s.sunrise),
     untergang: gueltig(s.sunset),
-    daemmerungAnfang: gueltig(s.dawn),
-    daemmerungEnde: gueltig(s.dusk),
+    buechsenlichtVon: gueltig(s.sunrise) && new Date(s.sunrise.getTime() - 30 * 60000),
+    buechsenlichtBis: gueltig(s.sunset) && new Date(s.sunset.getTime() + 30 * 60000),
     mondAufgang: gueltig(m.rise),
     mondUntergang: gueltig(m.set),
     mondphase: mp.name,

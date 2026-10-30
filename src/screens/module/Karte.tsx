@@ -174,6 +174,24 @@ export default function Karte({
   const [neueEinrichtung, setNeueEinrichtung] = useState<Position | null>(null);
   const [wind, setWind] = useState<Wetter | null>(null);
   const [wetterOffen, setWetterOffen] = useState(false);
+  // Animierte Windpfeile vom eigenen Standort (je Gerät gemerkt)
+  const [windpfeile, setWindpfeileState] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('hegewerk.karte.windpfeile') === '1';
+    } catch {
+      return false;
+    }
+  });
+  const setWindpfeile = (an: boolean) => {
+    setWindpfeileState(an);
+    try {
+      localStorage.setItem('hegewerk.karte.windpfeile', an ? '1' : '0');
+    } catch {
+      /* nur für diese Sitzung */
+    }
+  };
+  const [eigenePos, setEigenePos] = useState<[number, number] | null>(null);
+  const windMarker = useRef<Marker | null>(null);
   const [wetterOrt, setWetterOrt] = useState<[number, number]>([0, 0]);
   const [panelOffen, setPanelOffen] = useState(false);
   const [kartenFehler, setKartenFehler] = useState<string | null>(null);
@@ -655,6 +673,39 @@ export default function Karte({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bereit, modus, k.istInhaber, wildarten, wte]);
 
+  // Eigenen Standort verfolgen, solange die Windpfeile an sind
+  useEffect(() => {
+    if (!windpfeile || !navigator.geolocation) return;
+    const id = navigator.geolocation.watchPosition(
+      (p) => setEigenePos([p.coords.longitude, p.coords.latitude]),
+      () => setEigenePos(null),
+      { enableHighAccuracy: true, maximumAge: 15000, timeout: 20000 },
+    );
+    return () => navigator.geolocation.clearWatch(id);
+  }, [windpfeile]);
+
+  // Windpfeile: 1–4 animierte Pfeile ab dem eigenen Punkt in Windrichtung (wohin der Wind weht)
+  useEffect(() => {
+    const m = karte.current;
+    windMarker.current?.remove();
+    windMarker.current = null;
+    if (!m || !bereit || !windpfeile || !wind) return;
+    const punkt = eigenePos ?? (() => { const c = m.getCenter(); return [c.lng, c.lat] as [number, number]; })();
+    const anzahl = wind.windKmh < 6 ? 1 : wind.windKmh < 16 ? 2 : wind.windKmh < 30 ? 3 : 4;
+    const dauer = 2.4;
+    const el = document.createElement('div');
+    el.className = 'windpfeile';
+    el.setAttribute('aria-hidden', 'true');
+    el.innerHTML =
+      '<span class="windpfeile-punkt"></span>' +
+      Array.from({ length: anzahl }, (_, i) => `<svg class="windpfeil-n" style="animation-duration:${dauer}s;animation-delay:${((i * dauer) / anzahl).toFixed(2)}s" viewBox="0 0 24 24"><path d="M12 2 L21 20 L12 15 L3 20 Z" /></svg>`).join('');
+    windMarker.current = new Marker({ element: el, rotation: (wind.windRichtung + 180) % 360, rotationAlignment: 'map', pitchAlignment: 'map' }).setLngLat(punkt).addTo(m);
+    return () => {
+      windMarker.current?.remove();
+      windMarker.current = null;
+    };
+  }, [bereit, windpfeile, wind, eigenePos]);
+
   // Wind am Kartenmittelpunkt
   const windLaden = useCallback(async () => {
     const m = karte.current;
@@ -881,7 +932,7 @@ export default function Karte({
     <>
           {meldung && <div className={`hinweis hinweis-${meldung.art}`}>{meldung.text}</div>}
 
-          <Abschnitt titel="Heatmap & Abschüsse" offen>
+          <Abschnitt titel="Heatmap & Abschüsse">
             {(['heatmap', 'abschuesse'] as const).map((id) => (
               <div key={id} className="ebenen-block">
                 <EbenenSchalter label={ebenenInfo[id].label} an={ebenenInfo[id].an} onAendern={ebenenInfo[id].setAn} />
@@ -1084,23 +1135,42 @@ export default function Karte({
     <div className="karte-seite">
       <div ref={container} className="karte" />
 
-      {wind && (
-        <div className="wind" title="Wetter, Sonne und Mond">
-          <button type="button" className="wind-haupt" aria-expanded={wetterOffen} aria-haspopup="dialog" onClick={() => setWetterOffen((o) => !o)}>
-            <span className="wind-pfeil" style={{ transform: `rotate(${wind.windRichtung + 180}deg)` }} aria-hidden="true">
-              ↑
-            </span>
-            <span>
-              <strong>{Math.round(wind.windKmh)} km/h</strong> aus {himmelsrichtung(wind.windRichtung)}
-              <small>{Math.round(wind.temperatur)} °C · Wetter ▾</small>
-            </span>
-          </button>
-          <button className="link" onClick={windLaden} aria-label="Wind aktualisieren">
-            ↻
-          </button>
+      {!zeichnet && (
+        <div className="karte-chips">
+          <div className="karte-chip-reihe">
+            {wind && (
+              <div className="karte-chip wind" title="Wetter, Sonne, Mond und Büchsenlicht">
+                <button type="button" className="wind-haupt" aria-expanded={wetterOffen} aria-haspopup="dialog" onClick={() => setWetterOffen((o) => !o)}>
+                  <span className="wind-pfeil" style={{ transform: `rotate(${wind.windRichtung + 180}deg)` }} aria-hidden="true">
+                    ↑
+                  </span>
+                  <span>
+                    <strong>{Math.round(wind.windKmh)} km/h</strong> aus {himmelsrichtung(wind.windRichtung)}
+                    <small>{Math.round(wind.temperatur)} °C · Wetter ▾</small>
+                  </span>
+                </button>
+                <button className="link" onClick={windLaden} aria-label="Wind aktualisieren">
+                  ↻
+                </button>
+              </div>
+            )}
+            <button type="button" className={`karte-chip chip-knopf ${wte ? 'an' : ''}`} aria-pressed={wte} aria-haspopup="menu" aria-expanded={wteMenue} onClick={() => setWteMenue((o) => !o)}>
+              <span aria-hidden="true">👁</span> WTE
+            </button>
+            <button
+              type="button"
+              className={`karte-chip chip-knopf ${windpfeile ? 'an' : ''}`}
+              aria-pressed={windpfeile}
+              aria-label="Windpfeile auf der Karte ein- oder ausblenden"
+              title="Windpfeile von deinem Standort"
+              onClick={() => setWindpfeile(!windpfeile)}
+            >
+              <span aria-hidden="true">💨</span> Windpfeile
+            </button>
+          </div>
+          {wind && wetterOffen && <WetterPanel lat={wetterOrt[0]} lon={wetterOrt[1]} mitte={daten?.mitte ?? null} onSchliessen={() => setWetterOffen(false)} />}
         </div>
       )}
-      {wind && wetterOffen && <WetterPanel lat={wetterOrt[0]} lon={wetterOrt[1]} mitte={daten?.mitte ?? null} onSchliessen={() => setWetterOffen(false)} />}
 
       {zeichnet && (
         <div className="zeichen-leiste">
@@ -1136,11 +1206,6 @@ export default function Karte({
         />
       )}
 
-      {!zeichnet && (
-        <button type="button" className={`wte-knopf ${wte ? 'an' : ''}`} aria-pressed={wte} aria-haspopup="menu" aria-expanded={wteMenue} onClick={() => setWteMenue((o) => !o)}>
-          WTE
-        </button>
-      )}
       {wteMenue && (
         <div className="wte-menue" role="menu" aria-label="WTE">
           {k.istInhaber && (
