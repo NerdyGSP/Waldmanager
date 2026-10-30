@@ -921,3 +921,40 @@ button.kachel:active { transform: none; }
 /* WTE-Hinweis am unteren Bildschirmrand (Aussehen unverändert) */
 .wte-leiste { top: auto; bottom: calc(16px + env(safe-area-inset-bottom)); }
 .wte-toast { bottom: calc(72px + env(safe-area-inset-bottom)); }
+
+/* Standauswahl und Rettungspunkte */
+.bj-marker-frei { width: 22px; height: 22px; background: #2e8b57; }
+.bj-marker-belegt { width: 22px; height: 22px; background: #8a8f87; }
+.bj-marker-rettung { width: 24px; height: 24px; background: #c0392b; font-weight: 800; font-size: 20px; border-radius: 6px; }
+.bj-gruppe-kopf { display: flex; align-items: center; gap: 8px; padding: 8px var(--abstand, 16px); background: var(--color-neutral-soft, rgba(0,0,0,.05)); font-weight: 600; }
+.bj-gruppe-kopf button { background: none; border: 0; color: inherit; font: inherit; cursor: pointer; padding: 0; }
+.bj-zeile.im-gruppe { padding-left: calc(var(--abstand, 16px) + 18px); }
+.bj-haken { display: flex; gap: 12px; flex-wrap: wrap; font-size: .82rem; margin-top: 4px; }
+.bj-haken label { display: inline-flex; gap: 4px; align-items: center; }
+
+/* Statische Druckkarte */
+.bj-druck-dkarte { margin: 10px 0 0; max-width: 100%; break-inside: avoid; }
+.bj-druck-dkarte-rahmen { position: relative; width: 100%; border: 1px solid #666; background: #ddd; overflow: hidden; }
+.bj-druck-dkarte-rahmen img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; display: block; }
+.bj-druck-dkarte-rahmen svg { position: absolute; inset: 0; width: 100%; height: 100%; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.bj-druck-legende { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: center; margin-top: 4px; font-size: 9pt; }
+.bj-druck-legende span { display: inline-flex; align-items: center; gap: 4px; }
+.bj-druck-seite.quer { break-before: page; page-break-before: always; }
+.bj-druck-seite.quer:first-child { break-before: auto; page-break-before: auto; }
+.bj-druck-seite h2.klein { font-size: 1rem; margin: 6px 0 2px; }
+.bj-druck-kasten { border: 1px solid #888; padding: 6px 10px; margin: 8px 0; white-space: pre-wrap; }
+.bj-druck-haken { display: inline-block; width: 4mm; height: 4mm; border: 1px solid #000; vertical-align: middle; position: relative; }
+.bj-druck-haken.an::after { content: '✓'; position: absolute; inset: -2px 0 0 1px; font-size: 4mm; line-height: 1; }
+.bj-druck-liste .gruppe td { background: #e5e8e1; font-weight: 700; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.bj-druck-liste tr { break-inside: avoid; }
+
+/* Wildzählung-Zusammenfassung */
+.zr-kennzahlen { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.zr-karte { border: 2px solid #1e5c3a; border-radius: 6px; padding: 6px 12px; min-width: 120px; text-align: center; break-inside: avoid; background: #eef4ee; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.zr-karte h3 { margin: 0 0 2px; font-size: 1rem; }
+.zr-karte p { margin: 0; font-size: .8rem; color: #333; }
+.zr-karte .gross { font-size: 2rem; font-weight: 800; line-height: 1.1; color: #111; }
+.zr-karte .mittel { font-size: 1.3rem; font-weight: 700; margin-top: 4px; color: #111; }
+.zr-karte .klein { margin-top: 4px; font-size: .72rem; }
+.zr-tabelle .zahl { text-align: right; }
+.zr-tabelle tbody th { text-align: left; font-weight: 600; }

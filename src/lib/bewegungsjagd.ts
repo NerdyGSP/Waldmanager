@@ -68,7 +68,11 @@ export type BjLadeErgebnis = {
     mitfahrplaetze: number | null;
     schuesseltreiben_teilnahme: boolean | null;
     einrichtung_id: string | null;
+    ist_ansteller?: boolean;
   };
+  ansteller?: { name: string; telefon: string | null } | null;
+  jagdleitung?: Array<{ name: string; telefon: string | null; funktion: string | null }>;
+  rettungspunkte?: Array<{ id: string; name: string; bemerkung: string | null; lng: number; lat: number }>;
   boecke: Array<{ id: string; name: string | null; lng: number; lat: number }>;
   stand?: { id: string; name: string | null; typ: string; bemerkung: string | null; lng: number; lat: number } | null;
 };

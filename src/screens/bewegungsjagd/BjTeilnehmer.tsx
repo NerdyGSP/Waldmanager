@@ -63,6 +63,7 @@ export function BjTeilnehmer({ jagdId }: { jagdId: string }) {
       const eigener = b.id === daten.ich.einrichtung_id;
       m.push({ id: b.id, lng: b.lng, lat: b.lat, art: eigener ? 'eigener' : 'bock', label: eigener ? `Dein Stand${b.name ? `: ${b.name}` : ''}` : (b.name ?? 'Drückjagdbock') });
     }
+    for (const r of daten.rettungspunkte ?? []) m.push({ id: `r${r.id}`, lng: r.lng, lat: r.lat, art: 'rettung', label: r.name });
     return m;
   }, [daten]);
 
@@ -72,6 +73,7 @@ export function BjTeilnehmer({ jagdId }: { jagdId: string }) {
         <Hinweis art="erfolg">{fertig === 'zusage' ? 'Danke! Deine Zusage ist gespeichert. Du kannst sie über den Link in der E-Mail jederzeit ändern.' : 'Deine Absage ist eingegangen und deine Daten wurden gelöscht.'}</Hinweis>
         {fertig === 'zusage' && daten && (
           <>
+            <Anstellinfo daten={daten} />
             <Knopf variante="akzent" onClick={() => setDruck(true)}>Zusammenfassung drucken</Knopf>
             {druck && (
               <TeilnehmerSelbstDruck
@@ -92,6 +94,9 @@ export function BjTeilnehmer({ jagdId }: { jagdId: string }) {
                 tn={{ name, anschrift, telefon, hund, horn, auto, plaetze: Number(plaetze) || 0, schuessel }}
                 stand={daten.stand ?? undefined}
                 boecke={daten.boecke}
+                rettung={daten.rettungspunkte ?? []}
+                leitung={daten.jagdleitung ?? []}
+                ansteller={daten.ansteller ?? null}
                 onZu={() => setDruck(false)}
               />
             )}
@@ -169,6 +174,8 @@ export function BjTeilnehmer({ jagdId }: { jagdId: string }) {
         {daten.ich.einrichtung_id && <span style={{ color: '#f26a1b' }}>★ Dein Stand</span>}
       </div>
       {daten.ich.einrichtung_id ? <Hinweis art="info">Dein Stand ist auf der Karte mit ★ markiert.</Hinweis> : <Hinweis>Dir wurde noch kein Stand zugewiesen.</Hinweis>}
+
+      {daten.ich.status === 'zugesagt' && <Anstellinfo daten={daten} />}
 
       {geschlossen && <Hinweis art="fehler">Diese Jagd ist abgeschlossen. Antworten sind nicht mehr möglich.</Hinweis>}
       {fehler && <Hinweis art="fehler">{fehler}</Hinweis>}
@@ -248,5 +255,50 @@ export function BjTeilnehmer({ jagdId }: { jagdId: string }) {
         </>
       )}
     </main>
+  );
+}
+
+// Anstellinformation nach der Zusage: Ansteller, Jagdleitung, Treffpunkt/Zeit, Rettungspunkte
+function Anstellinfo({ daten }: { daten: BjLadeErgebnis }) {
+  const j = daten.jagd;
+  const leitung = daten.jagdleitung ?? [];
+  const rettung = daten.rettungspunkte ?? [];
+  const telLink = (t: string | null) => (t ? <> · <a href={`tel:${t.replace(/[^+\d]/g, '')}`}>{t}</a></> : null);
+  if (!daten.ansteller && leitung.length === 0 && rettung.length === 0) return null;
+  return (
+    <Gruppe titel="Deine Anstellinformation">
+      <div className="bj-text">
+        <span style={{ color: 'inherit' }}>
+          <strong>Treffpunkt und Zeit:</strong> {datumDE(j.datum)}
+          {j.uhrzeit ? `, ${j.uhrzeit.slice(0, 5)} Uhr` : ''}
+        </span>
+        {daten.ansteller && (
+          <span style={{ color: 'inherit' }}>
+            <strong>Dein Ansteller:</strong> {daten.ansteller.name}
+            {telLink(daten.ansteller.telefon)}
+          </span>
+        )}
+        {leitung.map((l, i) => (
+          <span key={i} style={{ color: 'inherit' }}>
+            <strong>{l.funktion || 'Jagdleitung'}:</strong> {l.name}
+            {telLink(l.telefon)}
+          </span>
+        ))}
+        {rettung.length > 0 && (
+          <span style={{ color: 'inherit' }}>
+            <strong>Rettungspunkte</strong> (auf der Karte mit + markiert):
+            <ul style={{ margin: '4px 0 0', paddingLeft: 20 }}>
+              {rettung.map((r) => (
+                <li key={r.id}>
+                  {r.name}
+                  {r.bemerkung ? ` – ${r.bemerkung}` : ''}{' '}
+                  <a href={navigationsLinks(r.lat, r.lng).google} target="_blank" rel="noreferrer">Navigation</a>
+                </li>
+              ))}
+            </ul>
+          </span>
+        )}
+      </div>
+    </Gruppe>
   );
 }

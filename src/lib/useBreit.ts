@@ -7,7 +7,11 @@ export function useBreit(): boolean {
   const [breit, setBreit] = useState(() => window.matchMedia(ABFRAGE).matches);
   useEffect(() => {
     const mq = window.matchMedia(ABFRAGE);
-    const aendern = () => setBreit(mq.matches);
+    // Beim Drucken schrumpft der Viewport auf Papierbreite – dann nicht umschalten, sonst wird die Ansicht samt Druckdialog neu aufgebaut
+    const aendern = () => {
+      if (window.matchMedia('print').matches) return;
+      setBreit(mq.matches);
+    };
     mq.addEventListener('change', aendern);
     return () => mq.removeEventListener('change', aendern);
   }, []);

@@ -14,7 +14,7 @@ const STIL: StyleSpecification = {
   layers: [{ id: 'osm', type: 'raster', source: 'osm' }],
 };
 
-export type BjMarker = { id: string; lng: number; lat: number; art: 'treffpunkt' | 'bock' | 'eigener'; label?: string };
+export type BjMarker = { id: string; lng: number; lat: number; art: 'treffpunkt' | 'bock' | 'eigener' | 'frei' | 'belegt' | 'rettung'; label?: string };
 
 // Kleine Karte für die Bewegungsjagd: Treffpunkt wählen oder Treffpunkt/Böcke/eigenen Stand anzeigen
 export default function BjKarte({
@@ -22,12 +22,14 @@ export default function BjKarte({
   grenze,
   waehlbar = false,
   onWaehlen,
+  onMarkerKlick,
   className = 'bj-karte',
 }: {
   marker: BjMarker[];
   grenze?: Geometry | null;
   waehlbar?: boolean;
   onWaehlen?: (lng: number, lat: number) => void;
+  onMarkerKlick?: (id: string) => void;
   className?: string;
 }) {
   const el = useRef<HTMLDivElement>(null);
@@ -36,6 +38,8 @@ export default function BjKarte({
   const gepasst = useRef(false);
   const waehlen = useRef(onWaehlen);
   waehlen.current = onWaehlen;
+  const markerKlick = useRef(onMarkerKlick);
+  markerKlick.current = onMarkerKlick;
   const wahl = useRef(waehlbar);
   wahl.current = waehlbar;
 
@@ -89,12 +93,18 @@ export default function BjKarte({
     aktive.current = marker.map((p) => {
       const d = document.createElement('div');
       d.className = `bj-marker bj-marker-${p.art}`;
-      d.textContent = p.art === 'treffpunkt' ? '⚑' : p.art === 'eigener' ? '★' : '';
+      d.textContent = p.art === 'treffpunkt' ? '⚑' : p.art === 'eigener' ? '★' : p.art === 'rettung' ? '+' : '';
+      d.addEventListener('click', (ev) => {
+        if (!markerKlick.current) return;
+        ev.stopPropagation();
+        markerKlick.current(p.id);
+      });
+      if (onMarkerKlick) d.style.cursor = 'pointer';
       if (p.label) {
         d.title = p.label;
         d.setAttribute('aria-label', p.label);
       }
-      if (p.label && p.art !== 'bock') {
+      if (p.label && p.art !== 'bock' && p.art !== 'frei') {
         const s = document.createElement('span');
         s.className = 'bj-marker-text';
         s.textContent = p.label;

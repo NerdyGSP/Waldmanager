@@ -1,4 +1,3 @@
-// Automatisch aus Supabase generiert (Projekt Hegewerk). Nicht von Hand ändern.
 export type Json =
   | string
   | number
@@ -17,17 +16,17 @@ export type Database = {
     Tables: {
       abschuesse: {
         Row: {
-          fang_ergebnis: string | null
-          fang_zustand: string | null
-          art: string
           aktualisiert_am: string
           altersklasse: string | null
+          art: string
           bemerkung: string | null
           einrichtung_id: string | null
           erfasst_von: string | null
           erleger_id: string | null
           erlegt_am: string
           erstellt_am: string
+          fang_ergebnis: string | null
+          fang_zustand: string | null
           geloescht_am: string | null
           geom: unknown
           geschlecht: Database["public"]["Enums"]["geschlecht"]
@@ -38,17 +37,17 @@ export type Database = {
           zone_id: string | null
         }
         Insert: {
-          fang_ergebnis?: string | null
-          fang_zustand?: string | null
-          art?: string
           aktualisiert_am?: string
           altersklasse?: string | null
+          art?: string
           bemerkung?: string | null
           einrichtung_id?: string | null
           erfasst_von?: string | null
           erleger_id?: string | null
           erlegt_am: string
           erstellt_am?: string
+          fang_ergebnis?: string | null
+          fang_zustand?: string | null
           geloescht_am?: string | null
           geom?: unknown
           geschlecht?: Database["public"]["Enums"]["geschlecht"]
@@ -59,17 +58,17 @@ export type Database = {
           zone_id?: string | null
         }
         Update: {
-          fang_ergebnis?: string | null
-          fang_zustand?: string | null
-          art?: string
           aktualisiert_am?: string
           altersklasse?: string | null
+          art?: string
           bemerkung?: string | null
           einrichtung_id?: string | null
           erfasst_von?: string | null
           erleger_id?: string | null
           erlegt_am?: string
           erstellt_am?: string
+          fang_ergebnis?: string | null
+          fang_zustand?: string | null
           geloescht_am?: string | null
           geom?: unknown
           geschlecht?: Database["public"]["Enums"]["geschlecht"]
@@ -120,6 +119,198 @@ export type Database = {
             columns: ["zone_id"]
             isOneToOne: false
             referencedRelation: "zonen"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      aufgaben: {
+        Row: {
+          aktualisiert_am: string
+          beschreibung: string | null
+          einrichtung_id: string | null
+          erledigt_am: string | null
+          erstellt_am: string
+          erstellt_von: string | null
+          faellig_am: string | null
+          geloescht_am: string | null
+          id: string
+          liste_id: string | null
+          revier_id: string
+          status: string
+          titel: string
+          zugewiesen_an: string | null
+        }
+        Insert: {
+          aktualisiert_am?: string
+          beschreibung?: string | null
+          einrichtung_id?: string | null
+          erledigt_am?: string | null
+          erstellt_am?: string
+          erstellt_von?: string | null
+          faellig_am?: string | null
+          geloescht_am?: string | null
+          id?: string
+          liste_id?: string | null
+          revier_id: string
+          status?: string
+          titel: string
+          zugewiesen_an?: string | null
+        }
+        Update: {
+          aktualisiert_am?: string
+          beschreibung?: string | null
+          einrichtung_id?: string | null
+          erledigt_am?: string | null
+          erstellt_am?: string
+          erstellt_von?: string | null
+          faellig_am?: string | null
+          geloescht_am?: string | null
+          id?: string
+          liste_id?: string | null
+          revier_id?: string
+          status?: string
+          titel?: string
+          zugewiesen_an?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "aufgaben_einrichtung_id_fkey"
+            columns: ["einrichtung_id"]
+            isOneToOne: false
+            referencedRelation: "einrichtungen"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aufgaben_liste_id_fkey"
+            columns: ["liste_id"]
+            isOneToOne: false
+            referencedRelation: "aufgabenlisten"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aufgaben_revier_id_fkey"
+            columns: ["revier_id"]
+            isOneToOne: false
+            referencedRelation: "reviere"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      aufgabenlisten: {
+        Row: {
+          aktualisiert_am: string
+          bewegungsjagd_id: string | null
+          erstellt_am: string
+          erstellt_von: string | null
+          geloescht_am: string | null
+          id: string
+          name: string
+          revier_id: string
+          status: string
+        }
+        Insert: {
+          aktualisiert_am?: string
+          bewegungsjagd_id?: string | null
+          erstellt_am?: string
+          erstellt_von?: string | null
+          geloescht_am?: string | null
+          id?: string
+          name: string
+          revier_id: string
+          status?: string
+        }
+        Update: {
+          aktualisiert_am?: string
+          bewegungsjagd_id?: string | null
+          erstellt_am?: string
+          erstellt_von?: string | null
+          geloescht_am?: string | null
+          id?: string
+          name?: string
+          revier_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "aufgabenlisten_bewegungsjagd_id_fkey"
+            columns: ["bewegungsjagd_id"]
+            isOneToOne: true
+            referencedRelation: "bewegungsjagden"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "aufgabenlisten_revier_id_fkey"
+            columns: ["revier_id"]
+            isOneToOne: false
+            referencedRelation: "reviere"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      begehungsscheine: {
+        Row: {
+          aktualisiert_am: string
+          art: string
+          ausgestellt_von: string | null
+          bedingungen: string | null
+          bereich: string | null
+          entgelt_eur: number | null
+          erstellt_am: string
+          gast_kontakt: string | null
+          gast_name: string
+          geloescht_am: string | null
+          gueltig_bis: string
+          gueltig_von: string
+          id: string
+          jagdschein_nr: string | null
+          revier_id: string
+          widerrufen_am: string | null
+          wildarten: string[]
+        }
+        Insert: {
+          aktualisiert_am?: string
+          art?: string
+          ausgestellt_von?: string | null
+          bedingungen?: string | null
+          bereich?: string | null
+          entgelt_eur?: number | null
+          erstellt_am?: string
+          gast_kontakt?: string | null
+          gast_name: string
+          geloescht_am?: string | null
+          gueltig_bis: string
+          gueltig_von: string
+          id?: string
+          jagdschein_nr?: string | null
+          revier_id: string
+          widerrufen_am?: string | null
+          wildarten?: string[]
+        }
+        Update: {
+          aktualisiert_am?: string
+          art?: string
+          ausgestellt_von?: string | null
+          bedingungen?: string | null
+          bereich?: string | null
+          entgelt_eur?: number | null
+          erstellt_am?: string
+          gast_kontakt?: string | null
+          gast_name?: string
+          geloescht_am?: string | null
+          gueltig_bis?: string
+          gueltig_von?: string
+          id?: string
+          jagdschein_nr?: string | null
+          revier_id?: string
+          widerrufen_am?: string | null
+          wildarten?: string[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "begehungsscheine_revier_id_fkey"
+            columns: ["revier_id"]
+            isOneToOne: false
+            referencedRelation: "reviere"
             referencedColumns: ["id"]
           },
         ]
@@ -200,6 +391,274 @@ export type Database = {
             columns: ["zone_id"]
             isOneToOne: false
             referencedRelation: "zonen"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bewegungsjagd_jagdleitung: {
+        Row: {
+          bewegungsjagd_id: string
+          erstellt_am: string
+          funktion: string | null
+          id: string
+          name: string
+          sortierung: number
+          telefon: string | null
+        }
+        Insert: {
+          bewegungsjagd_id: string
+          erstellt_am?: string
+          funktion?: string | null
+          id?: string
+          name: string
+          sortierung?: number
+          telefon?: string | null
+        }
+        Update: {
+          bewegungsjagd_id?: string
+          erstellt_am?: string
+          funktion?: string | null
+          id?: string
+          name?: string
+          sortierung?: number
+          telefon?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bewegungsjagd_jagdleitung_bewegungsjagd_id_fkey"
+            columns: ["bewegungsjagd_id"]
+            isOneToOne: false
+            referencedRelation: "bewegungsjagden"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bewegungsjagd_rettungspunkte: {
+        Row: {
+          bemerkung: string | null
+          bewegungsjagd_id: string
+          erstellt_am: string
+          id: string
+          lat: number
+          lng: number
+          name: string
+        }
+        Insert: {
+          bemerkung?: string | null
+          bewegungsjagd_id: string
+          erstellt_am?: string
+          id?: string
+          lat: number
+          lng: number
+          name: string
+        }
+        Update: {
+          bemerkung?: string | null
+          bewegungsjagd_id?: string
+          erstellt_am?: string
+          id?: string
+          lat?: number
+          lng?: number
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bewegungsjagd_rettungspunkte_bewegungsjagd_id_fkey"
+            columns: ["bewegungsjagd_id"]
+            isOneToOne: false
+            referencedRelation: "bewegungsjagden"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bewegungsjagd_teilnehmer: {
+        Row: {
+          aktiv: boolean
+          anschrift: string | null
+          ansteller_id: string | null
+          antwort_am: string | null
+          anwesend: boolean
+          auto_vorhanden: boolean | null
+          bewegungsjagd_id: string
+          einladungscode: string
+          email: string
+          erstellt_am: string
+          hat_hornblaeser: boolean | null
+          hat_hund: boolean | null
+          hegebeitrag_bezahlt: boolean
+          id: string
+          ist_ansteller: boolean
+          mail_fehler: string | null
+          mail_gesendet_am: string | null
+          mail_status: string | null
+          mitfahrplaetze: number | null
+          name: string
+          schuesseltreiben_teilgenommen: boolean
+          schuesseltreiben_teilnahme: boolean | null
+          status: string
+          telefon: string | null
+          user_id: string | null
+          zugeordnete_einrichtung_id: string | null
+        }
+        Insert: {
+          aktiv?: boolean
+          anschrift?: string | null
+          ansteller_id?: string | null
+          antwort_am?: string | null
+          anwesend?: boolean
+          auto_vorhanden?: boolean | null
+          bewegungsjagd_id: string
+          einladungscode?: string
+          email: string
+          erstellt_am?: string
+          hat_hornblaeser?: boolean | null
+          hat_hund?: boolean | null
+          hegebeitrag_bezahlt?: boolean
+          id?: string
+          ist_ansteller?: boolean
+          mail_fehler?: string | null
+          mail_gesendet_am?: string | null
+          mail_status?: string | null
+          mitfahrplaetze?: number | null
+          name: string
+          schuesseltreiben_teilgenommen?: boolean
+          schuesseltreiben_teilnahme?: boolean | null
+          status?: string
+          telefon?: string | null
+          user_id?: string | null
+          zugeordnete_einrichtung_id?: string | null
+        }
+        Update: {
+          aktiv?: boolean
+          anschrift?: string | null
+          ansteller_id?: string | null
+          antwort_am?: string | null
+          anwesend?: boolean
+          auto_vorhanden?: boolean | null
+          bewegungsjagd_id?: string
+          einladungscode?: string
+          email?: string
+          erstellt_am?: string
+          hat_hornblaeser?: boolean | null
+          hat_hund?: boolean | null
+          hegebeitrag_bezahlt?: boolean
+          id?: string
+          ist_ansteller?: boolean
+          mail_fehler?: string | null
+          mail_gesendet_am?: string | null
+          mail_status?: string | null
+          mitfahrplaetze?: number | null
+          name?: string
+          schuesseltreiben_teilgenommen?: boolean
+          schuesseltreiben_teilnahme?: boolean | null
+          status?: string
+          telefon?: string | null
+          user_id?: string | null
+          zugeordnete_einrichtung_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bewegungsjagd_teilnehmer_ansteller_id_fkey"
+            columns: ["ansteller_id"]
+            isOneToOne: false
+            referencedRelation: "bewegungsjagd_teilnehmer"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bewegungsjagd_teilnehmer_bewegungsjagd_id_fkey"
+            columns: ["bewegungsjagd_id"]
+            isOneToOne: false
+            referencedRelation: "bewegungsjagden"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bewegungsjagd_teilnehmer_zugeordnete_einrichtung_id_fkey"
+            columns: ["zugeordnete_einrichtung_id"]
+            isOneToOne: false
+            referencedRelation: "einrichtungen"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bewegungsjagden: {
+        Row: {
+          abschlusskommentar: string | null
+          aktualisiert_am: string
+          art: string
+          datum: string
+          einladungstext: string | null
+          erstellt_am: string
+          erstellt_von: string | null
+          geloescht_am: string | null
+          hegebeitrag_aktiv: boolean
+          hegebeitrag_betrag: number | null
+          id: string
+          info_jagdleitung: string | null
+          revier_id: string
+          schuesseltreiben: boolean
+          schuesseltreiben_adresse: string | null
+          schuesseltreiben_anmeldung_pflicht: boolean
+          status: string
+          titel: string
+          treffpunkt: unknown
+          treffpunkt_lat: number | null
+          treffpunkt_lng: number | null
+          uhrzeit: string | null
+        }
+        Insert: {
+          abschlusskommentar?: string | null
+          aktualisiert_am?: string
+          art?: string
+          datum: string
+          einladungstext?: string | null
+          erstellt_am?: string
+          erstellt_von?: string | null
+          geloescht_am?: string | null
+          hegebeitrag_aktiv?: boolean
+          hegebeitrag_betrag?: number | null
+          id?: string
+          info_jagdleitung?: string | null
+          revier_id: string
+          schuesseltreiben?: boolean
+          schuesseltreiben_adresse?: string | null
+          schuesseltreiben_anmeldung_pflicht?: boolean
+          status?: string
+          titel: string
+          treffpunkt?: unknown
+          treffpunkt_lat?: number | null
+          treffpunkt_lng?: number | null
+          uhrzeit?: string | null
+        }
+        Update: {
+          abschlusskommentar?: string | null
+          aktualisiert_am?: string
+          art?: string
+          datum?: string
+          einladungstext?: string | null
+          erstellt_am?: string
+          erstellt_von?: string | null
+          geloescht_am?: string | null
+          hegebeitrag_aktiv?: boolean
+          hegebeitrag_betrag?: number | null
+          id?: string
+          info_jagdleitung?: string | null
+          revier_id?: string
+          schuesseltreiben?: boolean
+          schuesseltreiben_adresse?: string | null
+          schuesseltreiben_anmeldung_pflicht?: boolean
+          status?: string
+          titel?: string
+          treffpunkt?: unknown
+          treffpunkt_lat?: number | null
+          treffpunkt_lng?: number | null
+          uhrzeit?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bewegungsjagden_revier_id_fkey"
+            columns: ["revier_id"]
+            isOneToOne: false
+            referencedRelation: "reviere"
             referencedColumns: ["id"]
           },
         ]
@@ -375,6 +834,62 @@ export type Database = {
           name?: string
         }
         Relationships: []
+      }
+      jagdzeiten: {
+        Row: {
+          bundesland: string
+          ganzjaehrig: boolean
+          gueltig_ab: string
+          id: string
+          jagdzeit_bis: string | null
+          jagdzeit_von: string | null
+          klasse: string | null
+          quelle: string
+          quelle_url: string | null
+          schonzeit_text: string | null
+          sonderregel: string | null
+          sortierung: number
+          wildart_id: string
+        }
+        Insert: {
+          bundesland: string
+          ganzjaehrig?: boolean
+          gueltig_ab: string
+          id?: string
+          jagdzeit_bis?: string | null
+          jagdzeit_von?: string | null
+          klasse?: string | null
+          quelle: string
+          quelle_url?: string | null
+          schonzeit_text?: string | null
+          sonderregel?: string | null
+          sortierung?: number
+          wildart_id: string
+        }
+        Update: {
+          bundesland?: string
+          ganzjaehrig?: boolean
+          gueltig_ab?: string
+          id?: string
+          jagdzeit_bis?: string | null
+          jagdzeit_von?: string | null
+          klasse?: string | null
+          quelle?: string
+          quelle_url?: string | null
+          schonzeit_text?: string | null
+          sonderregel?: string | null
+          sortierung?: number
+          wildart_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "jagdzeiten_wildart_id_fkey"
+            columns: ["wildart_id"]
+            isOneToOne: false
+            referencedRelation: "wildarten"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       masteradmins: {
         Row: {
@@ -564,26 +1079,6 @@ export type Database = {
           },
         ]
       }
-      jagdzeiten: {
-        Row: {
-          bundesland: string
-          ganzjaehrig: boolean
-          gueltig_ab: string
-          id: string
-          jagdzeit_bis: string | null
-          jagdzeit_von: string | null
-          klasse: string | null
-          quelle: string
-          quelle_url: string | null
-          schonzeit_text: string | null
-          sonderregel: string | null
-          sortierung: number
-          wildart_id: string
-        }
-        Insert: never
-        Update: never
-        Relationships: []
-      }
       wildarten: {
         Row: {
           altersklassen: string[]
@@ -608,13 +1103,101 @@ export type Database = {
         }
         Relationships: []
       }
+      wildschaeden: {
+        Row: {
+          aktualisiert_am: string
+          angemeldet_am: string | null
+          bemerkung: string | null
+          erfasst_von: string | null
+          erstellt_am: string
+          flaeche_ha: number | null
+          geloescht_am: string | null
+          geom: unknown
+          geschaedigter: string | null
+          id: string
+          kenntnis_am: string
+          kontakt: string | null
+          kultur: string
+          ort: string | null
+          revier_id: string
+          schaden_eur: number | null
+          status: string
+          wildart_id: string | null
+          zone_id: string | null
+        }
+        Insert: {
+          aktualisiert_am?: string
+          angemeldet_am?: string | null
+          bemerkung?: string | null
+          erfasst_von?: string | null
+          erstellt_am?: string
+          flaeche_ha?: number | null
+          geloescht_am?: string | null
+          geom?: unknown
+          geschaedigter?: string | null
+          id?: string
+          kenntnis_am?: string
+          kontakt?: string | null
+          kultur: string
+          ort?: string | null
+          revier_id: string
+          schaden_eur?: number | null
+          status?: string
+          wildart_id?: string | null
+          zone_id?: string | null
+        }
+        Update: {
+          aktualisiert_am?: string
+          angemeldet_am?: string | null
+          bemerkung?: string | null
+          erfasst_von?: string | null
+          erstellt_am?: string
+          flaeche_ha?: number | null
+          geloescht_am?: string | null
+          geom?: unknown
+          geschaedigter?: string | null
+          id?: string
+          kenntnis_am?: string
+          kontakt?: string | null
+          kultur?: string
+          ort?: string | null
+          revier_id?: string
+          schaden_eur?: number | null
+          status?: string
+          wildart_id?: string | null
+          zone_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wildschaeden_revier_id_fkey"
+            columns: ["revier_id"]
+            isOneToOne: false
+            referencedRelation: "reviere"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wildschaeden_wildart_id_fkey"
+            columns: ["wildart_id"]
+            isOneToOne: false
+            referencedRelation: "wildarten"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wildschaeden_zone_id_fkey"
+            columns: ["zone_id"]
+            isOneToOne: false
+            referencedRelation: "zonen"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       zaehlsitzungen: {
         Row: {
-          ebene_id: string | null
           aktualisiert_am: string
           beginn: string | null
           bemerkung: string | null
           datum: string
+          ebene_id: string | null
           ende: string | null
           erstellt_am: string
           erstellt_von: string | null
@@ -626,11 +1209,11 @@ export type Database = {
           wetter: Json | null
         }
         Insert: {
-          ebene_id?: string | null
           aktualisiert_am?: string
           beginn?: string | null
           bemerkung?: string | null
           datum: string
+          ebene_id?: string | null
           ende?: string | null
           erstellt_am?: string
           erstellt_von?: string | null
@@ -642,11 +1225,11 @@ export type Database = {
           wetter?: Json | null
         }
         Update: {
-          ebene_id?: string | null
           aktualisiert_am?: string
           beginn?: string | null
           bemerkung?: string | null
           datum?: string
+          ebene_id?: string | null
           ende?: string | null
           erstellt_am?: string
           erstellt_von?: string | null
@@ -658,6 +1241,13 @@ export type Database = {
           wetter?: Json | null
         }
         Relationships: [
+          {
+            foreignKeyName: "zaehlsitzungen_ebene_id_fkey"
+            columns: ["ebene_id"]
+            isOneToOne: false
+            referencedRelation: "zonen_ebenen"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "zaehlsitzungen_erstellt_von_fkey"
             columns: ["erstellt_von"]
@@ -760,8 +1350,8 @@ export type Database = {
       }
       zonen: {
         Row: {
-          ebene_id: string | null
           aktualisiert_am: string
+          ebene_id: string | null
           erstellt_am: string
           farbe: string | null
           geloescht_am: string | null
@@ -772,8 +1362,8 @@ export type Database = {
           sortierung: number
         }
         Insert: {
-          ebene_id?: string | null
           aktualisiert_am?: string
+          ebene_id?: string | null
           erstellt_am?: string
           farbe?: string | null
           geloescht_am?: string | null
@@ -784,8 +1374,8 @@ export type Database = {
           sortierung?: number
         }
         Update: {
-          ebene_id?: string | null
           aktualisiert_am?: string
+          ebene_id?: string | null
           erstellt_am?: string
           farbe?: string | null
           geloescht_am?: string | null
@@ -797,6 +1387,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "zonen_ebene_id_fkey"
+            columns: ["ebene_id"]
+            isOneToOne: false
+            referencedRelation: "zonen_ebenen"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "zonen_revier_id_fkey"
             columns: ["revier_id"]
             isOneToOne: false
@@ -807,7 +1404,6 @@ export type Database = {
       }
       zonen_ebenen: {
         Row: {
-          wte_aktiv: boolean
           aktualisiert_am: string
           erstellt_am: string
           farbe: string | null
@@ -815,9 +1411,9 @@ export type Database = {
           name: string
           revier_id: string
           sortierung: number
+          wte_aktiv: boolean
         }
         Insert: {
-          wte_aktiv?: boolean
           aktualisiert_am?: string
           erstellt_am?: string
           farbe?: string | null
@@ -825,9 +1421,9 @@ export type Database = {
           name: string
           revier_id: string
           sortierung?: number
+          wte_aktiv?: boolean
         }
         Update: {
-          wte_aktiv?: boolean
           aktualisiert_am?: string
           erstellt_am?: string
           farbe?: string | null
@@ -835,362 +1431,27 @@ export type Database = {
           name?: string
           revier_id?: string
           sortierung?: number
+          wte_aktiv?: boolean
         }
-        Relationships: []
-      }
-      aufgabenlisten: {
-        Row: {
-          aktualisiert_am: string
-          bewegungsjagd_id: string | null
-          erstellt_am: string
-          erstellt_von: string | null
-          geloescht_am: string | null
-          id: string
-          name: string
-          revier_id: string
-          status: string
-        }
-        Insert: {
-          aktualisiert_am?: string
-          bewegungsjagd_id?: string | null
-          erstellt_am?: string
-          erstellt_von?: string | null
-          geloescht_am?: string | null
-          id?: string
-          name: string
-          revier_id: string
-          status?: string
-        }
-        Update: {
-          aktualisiert_am?: string
-          bewegungsjagd_id?: string | null
-          erstellt_am?: string
-          erstellt_von?: string | null
-          geloescht_am?: string | null
-          id?: string
-          name?: string
-          revier_id?: string
-          status?: string
-        }
-        Relationships: []
-      }
-      aufgaben: {
-        Row: {
-          aktualisiert_am: string
-          beschreibung: string | null
-          einrichtung_id: string | null
-          erledigt_am: string | null
-          erstellt_am: string
-          erstellt_von: string | null
-          faellig_am: string | null
-          geloescht_am: string | null
-          id: string
-          liste_id: string | null
-          revier_id: string
-          status: string
-          titel: string
-          zugewiesen_an: string | null
-        }
-        Insert: {
-          aktualisiert_am?: string
-          beschreibung?: string | null
-          einrichtung_id?: string | null
-          erledigt_am?: string | null
-          erstellt_am?: string
-          erstellt_von?: string | null
-          faellig_am?: string | null
-          geloescht_am?: string | null
-          id?: string
-          liste_id?: string | null
-          revier_id: string
-          status?: string
-          titel: string
-          zugewiesen_an?: string | null
-        }
-        Update: {
-          aktualisiert_am?: string
-          beschreibung?: string | null
-          einrichtung_id?: string | null
-          erledigt_am?: string | null
-          erstellt_am?: string
-          erstellt_von?: string | null
-          faellig_am?: string | null
-          geloescht_am?: string | null
-          id?: string
-          liste_id?: string | null
-          revier_id?: string
-          status?: string
-          titel?: string
-          zugewiesen_an?: string | null
-        }
-        Relationships: []
-      }
-      bewegungsjagd_teilnehmer: {
-        Row: {
-          telefon: string | null
-          aktiv: boolean
-          anschrift: string | null
-          antwort_am: string | null
-          auto_vorhanden: boolean | null
-          bewegungsjagd_id: string
-          einladungscode: string
-          email: string
-          erstellt_am: string
-          hat_hornblaeser: boolean | null
-          hat_hund: boolean | null
-          id: string
-          mail_fehler: string | null
-          mail_gesendet_am: string | null
-          mail_status: string | null
-          mitfahrplaetze: number | null
-          name: string
-          schuesseltreiben_teilnahme: boolean | null
-          status: string
-          user_id: string | null
-          zugeordnete_einrichtung_id: string | null
-        }
-        Insert: {
-          telefon?: string | null
-          aktiv?: boolean
-          anschrift?: string | null
-          antwort_am?: string | null
-          auto_vorhanden?: boolean | null
-          bewegungsjagd_id: string
-          einladungscode?: string
-          email: string
-          erstellt_am?: string
-          hat_hornblaeser?: boolean | null
-          hat_hund?: boolean | null
-          id?: string
-          mail_fehler?: string | null
-          mail_gesendet_am?: string | null
-          mail_status?: string | null
-          mitfahrplaetze?: number | null
-          name: string
-          schuesseltreiben_teilnahme?: boolean | null
-          status?: string
-          user_id?: string | null
-          zugeordnete_einrichtung_id?: string | null
-        }
-        Update: {
-          telefon?: string | null
-          aktiv?: boolean
-          anschrift?: string | null
-          antwort_am?: string | null
-          auto_vorhanden?: boolean | null
-          bewegungsjagd_id?: string
-          einladungscode?: string
-          email?: string
-          erstellt_am?: string
-          hat_hornblaeser?: boolean | null
-          hat_hund?: boolean | null
-          id?: string
-          mail_fehler?: string | null
-          mail_gesendet_am?: string | null
-          mail_status?: string | null
-          mitfahrplaetze?: number | null
-          name?: string
-          schuesseltreiben_teilnahme?: boolean | null
-          status?: string
-          user_id?: string | null
-          zugeordnete_einrichtung_id?: string | null
-        }
-        Relationships: []
-      }
-      bewegungsjagden: {
-        Row: {
-          abschlusskommentar: string | null
-          aktualisiert_am: string
-          art: string
-          datum: string
-          einladungstext: string | null
-          erstellt_am: string
-          erstellt_von: string | null
-          geloescht_am: string | null
-          hegebeitrag_aktiv: boolean
-          hegebeitrag_betrag: number | null
-          id: string
-          revier_id: string
-          schuesseltreiben: boolean
-          schuesseltreiben_adresse: string | null
-          schuesseltreiben_anmeldung_pflicht: boolean
-          status: string
-          titel: string
-          treffpunkt: unknown
-          treffpunkt_lat: number | null
-          treffpunkt_lng: number | null
-          uhrzeit: string | null
-        }
-        Insert: {
-          abschlusskommentar?: string | null
-          art?: string
-          datum: string
-          einladungstext?: string | null
-          geloescht_am?: string | null
-          hegebeitrag_aktiv?: boolean
-          hegebeitrag_betrag?: number | null
-          id?: string
-          revier_id: string
-          schuesseltreiben?: boolean
-          schuesseltreiben_adresse?: string | null
-          schuesseltreiben_anmeldung_pflicht?: boolean
-          status?: string
-          titel: string
-          treffpunkt?: unknown
-          uhrzeit?: string | null
-        }
-        Update: {
-          abschlusskommentar?: string | null
-          art?: string
-          datum?: string
-          einladungstext?: string | null
-          geloescht_am?: string | null
-          hegebeitrag_aktiv?: boolean
-          hegebeitrag_betrag?: number | null
-          id?: string
-          revier_id?: string
-          schuesseltreiben?: boolean
-          schuesseltreiben_adresse?: string | null
-          schuesseltreiben_anmeldung_pflicht?: boolean
-          status?: string
-          titel?: string
-          treffpunkt?: unknown
-          uhrzeit?: string | null
-        }
-        Relationships: []
-      }
-      begehungsscheine: {
-        Row: {
-          aktualisiert_am: string
-          art: string
-          ausgestellt_von: string | null
-          bedingungen: string | null
-          bereich: string | null
-          entgelt_eur: number | null
-          erstellt_am: string
-          gast_kontakt: string | null
-          gast_name: string
-          geloescht_am: string | null
-          gueltig_bis: string
-          gueltig_von: string
-          id: string
-          jagdschein_nr: string | null
-          revier_id: string
-          widerrufen_am: string | null
-          wildarten: string[]
-        }
-        Insert: {
-          aktualisiert_am?: string
-          art?: string
-          ausgestellt_von?: string | null
-          bedingungen?: string | null
-          bereich?: string | null
-          entgelt_eur?: number | null
-          erstellt_am?: string
-          gast_kontakt?: string | null
-          gast_name: string
-          geloescht_am?: string | null
-          gueltig_bis: string
-          gueltig_von: string
-          id?: string
-          jagdschein_nr?: string | null
-          revier_id: string
-          widerrufen_am?: string | null
-          wildarten?: string[]
-        }
-        Update: {
-          aktualisiert_am?: string
-          art?: string
-          ausgestellt_von?: string | null
-          bedingungen?: string | null
-          bereich?: string | null
-          entgelt_eur?: number | null
-          erstellt_am?: string
-          gast_kontakt?: string | null
-          gast_name?: string
-          geloescht_am?: string | null
-          gueltig_bis?: string
-          gueltig_von?: string
-          id?: string
-          jagdschein_nr?: string | null
-          revier_id?: string
-          widerrufen_am?: string | null
-          wildarten?: string[]
-        }
-        Relationships: []
-      }
-      wildschaeden: {
-        Row: {
-          aktualisiert_am: string
-          angemeldet_am: string | null
-          bemerkung: string | null
-          erfasst_von: string | null
-          erstellt_am: string
-          flaeche_ha: number | null
-          geloescht_am: string | null
-          geom: unknown
-          geschaedigter: string | null
-          id: string
-          kenntnis_am: string
-          kontakt: string | null
-          kultur: string
-          ort: string | null
-          revier_id: string
-          schaden_eur: number | null
-          status: string
-          wildart_id: string | null
-          zone_id: string | null
-        }
-        Insert: {
-          aktualisiert_am?: string
-          angemeldet_am?: string | null
-          bemerkung?: string | null
-          erfasst_von?: string | null
-          erstellt_am?: string
-          flaeche_ha?: number | null
-          geloescht_am?: string | null
-          geom?: unknown
-          geschaedigter?: string | null
-          id?: string
-          kenntnis_am?: string
-          kontakt?: string | null
-          kultur: string
-          ort?: string | null
-          revier_id: string
-          schaden_eur?: number | null
-          status?: string
-          wildart_id?: string | null
-          zone_id?: string | null
-        }
-        Update: {
-          aktualisiert_am?: string
-          angemeldet_am?: string | null
-          bemerkung?: string | null
-          erfasst_von?: string | null
-          erstellt_am?: string
-          flaeche_ha?: number | null
-          geloescht_am?: string | null
-          geom?: unknown
-          geschaedigter?: string | null
-          id?: string
-          kenntnis_am?: string
-          kontakt?: string | null
-          kultur?: string
-          ort?: string | null
-          revier_id?: string
-          schaden_eur?: number | null
-          status?: string
-          wildart_id?: string | null
-          zone_id?: string | null
-        }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "zonen_ebenen_revier_id_fkey"
+            columns: ["revier_id"]
+            isOneToOne: false
+            referencedRelation: "reviere"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      bj_absagen_loeschen: { Args: { p_code: string; p_jagd: string }; Returns: boolean }
+      bj_absagen_loeschen: {
+        Args: { p_code: string; p_jagd: string }
+        Returns: boolean
+      }
       bj_antworten: {
         Args: {
           p_anschrift: string
@@ -1226,19 +1487,20 @@ export type Database = {
           rolle: string
         }[]
       }
-      grenze_setzen: { Args: { p_geojson: Json; p_revier_id: string }; Returns: number }
-      masteradmin_letzte_logins: {
-        Args: Record<PropertyKey, never>
-        Returns: { user_id: string; letzter_login: string | null }[]
-      }
-      karte_daten: { Args: { p_revier_id: string; p_tage?: number }; Returns: Json }
-      zone_an_position: {
-        Args: { p_lat: number; p_lon: number; p_revier_id: string }
-        Returns: string
-      }
-      zone_geometrie_setzen: {
-        Args: { p_geojson: Json; p_zone_id: string; p_zuschneiden?: boolean }
+      grenze_setzen: {
+        Args: { p_geojson: Json; p_revier_id: string }
         Returns: number
+      }
+      karte_daten: {
+        Args: { p_revier_id: string; p_tage?: number }
+        Returns: Json
+      }
+      masteradmin_letzte_logins: {
+        Args: never
+        Returns: {
+          letzter_login: string
+          user_id: string
+        }[]
       }
       quervergleich: {
         Args: { p_bis: string; p_revier_id: string; p_von: string }
@@ -1258,6 +1520,21 @@ export type Database = {
           wildart_id: string
           wildart_name: string
           zaehlsitzungen: number
+        }[]
+      }
+      zone_an_position: {
+        Args: { p_lat: number; p_lon: number; p_revier_id: string }
+        Returns: string
+      }
+      zone_geometrie_setzen: {
+        Args: { p_geojson: Json; p_zone_id: string; p_zuschneiden?: boolean }
+        Returns: number
+      }
+      zonen_flaechen: {
+        Args: { p_revier_id: string }
+        Returns: {
+          flaeche_ha: number
+          zone_id: string
         }[]
       }
     }
@@ -1285,9 +1562,143 @@ export type Database = {
   }
 }
 
-type PublicSchema = Database["public"]
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
 
-export type Tables<T extends keyof PublicSchema["Tables"]> = PublicSchema["Tables"][T]["Row"]
-export type TablesInsert<T extends keyof PublicSchema["Tables"]> = PublicSchema["Tables"][T]["Insert"]
-export type TablesUpdate<T extends keyof PublicSchema["Tables"]> = PublicSchema["Tables"][T]["Update"]
-export type Enums<T extends keyof PublicSchema["Enums"]> = PublicSchema["Enums"][T]
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never) = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
+
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never) = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never) = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never) = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never) = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  public: {
+    Enums: {
+      einrichtung_typ: [
+        "hochsitz",
+        "kanzel",
+        "ansitzleiter",
+        "bodensitz",
+        "kirrung",
+        "salzlecke",
+        "fuetterung",
+        "wildacker",
+        "wildkamera",
+        "falle",
+        "sonstiges",
+        "drueckjagdbock",
+      ],
+      geschlecht: ["maennlich", "weiblich", "unbekannt"],
+      revier_rolle: ["inhaber", "mitjaeger"],
+      sitzung_status: ["offen", "abgeschlossen"],
+    },
+  },
+} as const

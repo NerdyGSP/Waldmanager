@@ -305,6 +305,7 @@ function SitzungAnsicht({ k, sitzungId }: { k: RevierKontext; sitzungId: string 
         )}
         {report && (
           <ZaehlReport
+            revierId={k.revierId}
             revierName={k.revierName}
             sitzung={sitzung}
             ebeneName={ebenen.find((x) => x.id === sitzung.ebene_id)?.name ?? null}

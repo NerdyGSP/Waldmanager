@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { DruckPortal } from '../../components/DruckPortal';
 import { datumDE } from '../../lib/zeit';
 import type { Tables } from '../../lib/database.types';
@@ -6,9 +6,13 @@ import { Knopf } from '../../components/ui';
 import { QrCode } from '../../components/QrCode';
 import { navigationsLinks } from '../../lib/bewegungsjagd';
 import { EINRICHTUNGSTYPEN } from '../../lib/stammdaten';
+import { nachAnstellern } from '../../lib/bjGruppen';
+import { DruckKarte, teilePunkte, type KartenPunkt } from './DruckKarte';
 
 type Jagd = Tables<'bewegungsjagden'>;
 type Teilnehmer = Tables<'bewegungsjagd_teilnehmer'>;
+type Jagdleiter = Pick<Tables<'bewegungsjagd_jagdleitung'>, 'name' | 'telefon' | 'funktion'>;
+type Rettung = Pick<Tables<'bewegungsjagd_rettungspunkte'>, 'id' | 'name' | 'bemerkung' | 'lng' | 'lat'>;
 type Bock = { id: string; lng: number; lat: number; name: string | null };
 export type Stand = { id: string; lng: number; lat: number; name: string | null; typ: string; bemerkung?: string | null };
 
@@ -41,11 +45,7 @@ export function Druckrahmen({ querformat, onZu, leiste, children }: { querformat
   );
 }
 
-// ---------- Teilnehmerinfo (A4 hoch) ----------
-
-const R = 6378137;
-const mx = (lng: number) => (lng * Math.PI * R) / 180;
-const my = (lat: number) => R * Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI) / 360));
+// ---------- Teilnehmerinfo / Anstellinformation (A4 hoch) ----------
 
 const STANDARD_HINWEIS =
   'Bitte pünktlich am Treffpunkt sein. Jagdschein, Waffenbesitzkarte und Schießnachweis (Gültigkeit im Bundesland prüfen) sind mitzuführen. Signalkleidung ist Pflicht. Den Anweisungen der Jagdleitung ist uneingeschränkt Folge zu leisten.';
@@ -66,6 +66,7 @@ export type JagdInfo = {
   einladungstext: string | null;
 };
 export type TnInfo = { name: string; anschrift?: string | null; telefon?: string | null; hund: boolean; horn: boolean; auto: boolean; plaetze: number; schuessel: boolean };
+export type AnstellerInfo = { name: string; telefon: string | null } | null;
 
 const jagdInfo = (j: Jagd): JagdInfo => ({
   titel: j.titel,
@@ -92,7 +93,10 @@ const tnInfo = (t: Teilnehmer): TnInfo => ({
   schuessel: !!t.schuesseltreiben_teilnahme,
 });
 
-const standLabel = (e: Stand) => e.name || (EINRICHTUNGSTYPEN.find((t) => t.wert === e.typ)?.label ?? e.typ);
+const typLabel = (typ: string) => EINRICHTUNGSTYPEN.find((t) => t.wert === typ)?.label ?? typ;
+const standLabel = (e: { name: string | null; typ: string }) => e.name || typLabel(e.typ);
+const zeitText = (j: { datum: string; uhrzeit: string | null }) =>
+  `${new Date(`${j.datum}T12:00:00`).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}${j.uhrzeit ? `, ${j.uhrzeit.slice(0, 5)} Uhr` : ''}`;
 
 // Adresse des Treffpunkts (OpenStreetMap Nominatim), nur ein einzelner Abruf
 function useAdresse(lat: number | null, lng: number | null) {
@@ -107,26 +111,21 @@ function useAdresse(lat: number | null, lng: number | null) {
   return adresse;
 }
 
-// Eine Seite der Teilnehmerinfo (A4 hoch): Eckdaten, QR-Codes, Hinweise, Luftbild
-function InfoSeite({ jagd, tn, stand, boecke, hinweise, adresse, folge }: { jagd: JagdInfo; tn: TnInfo | null; stand: Stand | undefined; boecke: Bock[]; hinweise: string; adresse: string | null; folge: boolean }) {
+const tel = (t: string | null | undefined) => (t ? ` · Tel. ${t}` : '');
+
+// Eine Seite der Anstellinformation (A4 hoch)
+function InfoSeite({ jagd, tn, stand, boecke, rettung, leitung, ansteller, hinweise, adresse, folge }: { jagd: JagdInfo; tn: TnInfo | null; stand: Stand | undefined; boecke: Bock[]; rettung: Rettung[]; leitung: Jagdleiter[]; ansteller: AnstellerInfo; hinweise: string; adresse: string | null; folge: boolean }) {
   const hatTreffpunkt = jagd.lng != null && jagd.lat != null;
-  const luftbild = useMemo(() => {
-    if (!hatTreffpunkt) return null;
-    const cx = mx(jagd.lng!);
-    const cy = my(jagd.lat!);
-    const halbX = 700;
-    const halbY = 500; // Seitenverhältnis 7:5
-    const bbox = [cx - halbX, cy - halbY, cx + halbX, cy + halbY];
-    const url =
-      'https://opendata.lgln.niedersachsen.de/doorman/noauth/dop_wms?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&FORMAT=image/jpeg&LAYERS=ni_dop20&STYLES=&CRS=EPSG:3857' +
-      `&WIDTH=1400&HEIGHT=1000&BBOX=${bbox.join(',')}`;
-    const pos = (lng: number, lat: number) => ({ x: ((mx(lng) - bbox[0]!) / (bbox[2]! - bbox[0]!)) * 100, y: (1 - (my(lat) - bbox[1]!) / (bbox[3]! - bbox[1]!)) * 100 });
-    const innen = (p: { x: number; y: number }) => p.x >= 0 && p.x <= 100 && p.y >= 0 && p.y <= 100;
-    return { url, pos, innen, tp: pos(jagd.lng!, jagd.lat!), boecke: boecke.map((b) => ({ ...b, ...pos(b.lng, b.lat) })).filter(innen) };
-  }, [hatTreffpunkt, jagd.lng, jagd.lat, boecke]);
-  const standPos = stand && luftbild ? luftbild.pos(stand.lng, stand.lat) : null;
-  const datumLang = new Date(`${jagd.datum}T12:00:00`).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
   const ja = (b: boolean) => (b ? 'ja' : 'nein');
+  const punkte = useMemo<KartenPunkt[]>(() => {
+    const l: KartenPunkt[] = [];
+    if (hatTreffpunkt) l.push({ id: 'tp', lng: jagd.lng!, lat: jagd.lat!, art: 'treffpunkt', label: 'Treffpunkt' });
+    for (const r of rettung) l.push({ id: `r${r.id}`, lng: r.lng, lat: r.lat, art: 'rettung', label: r.name });
+    // Nur der eigene Stand wird benannt; die übrigen Stände erscheinen ohne Namen
+    for (const b of boecke) if (!stand || b.id !== stand.id) l.push({ id: `b${b.id}`, lng: b.lng, lat: b.lat, art: 'frei' });
+    if (stand) l.push({ id: 'eigener', lng: stand.lng, lat: stand.lat, art: 'eigener', label: 'Dein Stand' });
+    return l;
+  }, [hatTreffpunkt, jagd.lng, jagd.lat, rettung, boecke, stand]);
 
   return (
     <section className={folge ? 'bj-druck-seite folge' : 'bj-druck-seite'}>
@@ -134,7 +133,7 @@ function InfoSeite({ jagd, tn, stand, boecke, hinweise, adresse, folge }: { jagd
       <p className="art">{jagd.art}{tn ? ` · Teilnehmer: ${tn.name}` : ''}</p>
       <table className="bj-druck-tabelle">
         <tbody>
-          <tr><th>Datum</th><td>{datumLang}</td></tr>
+          <tr><th>Datum</th><td>{new Date(`${jagd.datum}T12:00:00`).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}</td></tr>
           {jagd.uhrzeit && <tr><th>Uhrzeit</th><td>{jagd.uhrzeit.slice(0, 5)} Uhr</td></tr>}
           {hatTreffpunkt && (
             <tr>
@@ -151,13 +150,32 @@ function InfoSeite({ jagd, tn, stand, boecke, hinweise, adresse, folge }: { jagd
               <td>
                 {stand ? (
                   <>
-                    <strong>{standLabel(stand)}</strong> ({EINRICHTUNGSTYPEN.find((x) => x.wert === stand.typ)?.label ?? stand.typ})<br />
+                    <strong>{standLabel(stand)}</strong> ({typLabel(stand.typ)})<br />
                     <small>{stand.lat.toFixed(5)}, {stand.lng.toFixed(5)}</small>
                     {stand.bemerkung && <><br /><small>{stand.bemerkung}</small></>}
                   </>
                 ) : (
                   'Noch kein Stand zugewiesen – Zuweisung vor Ort durch die Jagdleitung.'
                 )}
+              </td>
+            </tr>
+          )}
+          {tn && ansteller && (
+            <tr>
+              <th>Dein Ansteller</th>
+              <td><strong>{ansteller.name}</strong>{tel(ansteller.telefon)}</td>
+            </tr>
+          )}
+          {leitung.length > 0 && (
+            <tr>
+              <th>Jagdleitung</th>
+              <td>
+                {leitung.map((l, i) => (
+                  <span key={i}>
+                    {i > 0 && <br />}
+                    <strong>{l.name}</strong>{l.funktion ? ` (${l.funktion})` : ''}{tel(l.telefon)}
+                  </span>
+                ))}
               </td>
             </tr>
           )}
@@ -208,25 +226,23 @@ function InfoSeite({ jagd, tn, stand, boecke, hinweise, adresse, folge }: { jagd
           <p className="text">{hinweise}</p>
         </>
       )}
-      {luftbild && (
-        <div className="bj-druck-karte">
-          <img src={luftbild.url} alt="Luftbild um den Treffpunkt" />
-          {luftbild.boecke.map((b) => (
-            <span key={b.id} className="bj-druck-bock" style={{ left: `${b.x}%`, top: `${b.y}%` }} title={b.name ?? 'Drückjagdbock'} />
-          ))}
-          {stand && standPos && luftbild.innen(standPos) && (
-            <span className="bj-druck-eigener" style={{ left: `${standPos.x}%`, top: `${standPos.y}%` }}>Dein Stand</span>
-          )}
-          <span className="bj-druck-tp" style={{ left: `${luftbild.tp.x}%`, top: `${luftbild.tp.y}%` }}>⚑ Treffpunkt</span>
-          <small className="bj-druck-quelle">© LGLN · ● Drückjagdbock · Maßstab ca. 1 : 6.000 (Ausschnitt 1,4 km × 1,0 km)</small>
-        </div>
+      {rettung.length > 0 && (
+        <>
+          <h2>Rettungspunkte</h2>
+          <ul style={{ margin: '4px 0', paddingLeft: 20 }}>
+            {rettung.map((r) => (
+              <li key={r.id}><strong>{r.name}</strong>{r.bemerkung ? ` – ${r.bemerkung}` : ''} <small>({r.lat.toFixed(5)}, {r.lng.toFixed(5)})</small></li>
+            ))}
+          </ul>
+        </>
       )}
+      {punkte.length > 0 && <DruckKarte punkte={punkte} breiteMm={186} hoeheMm={82} mindestBreiteM={700} pflichtLabels alt="Luftbild mit Treffpunkt, Ständen und Rettungspunkten" />}
     </section>
   );
 }
 
 // Organisator: allgemein, je Teilnehmer oder alle Zusagen
-export function TeilnehmerInfoDruck({ jagd, boecke, staende, tn, onZu }: { jagd: Jagd; boecke: Bock[]; staende: Stand[]; tn: Teilnehmer[]; onZu: () => void }) {
+export function TeilnehmerInfoDruck({ jagd, leitung, rettung, boecke, staende, tn, onZu }: { jagd: Jagd; leitung: Jagdleiter[]; rettung: Rettung[]; boecke: Bock[]; staende: Stand[]; tn: Teilnehmer[]; onZu: () => void }) {
   const [hinweise, setHinweise] = useState(STANDARD_HINWEIS);
   const [fuer, setFuer] = useState<string>(''); // '' = allgemein, 'alle' = je Zusage eine Seite, sonst Teilnehmer-ID
   const adresse = useAdresse(jagd.treffpunkt_lat, jagd.treffpunkt_lng);
@@ -259,28 +275,34 @@ export function TeilnehmerInfoDruck({ jagd, boecke, staende, tn, onZu }: { jagd:
         </>
       }
     >
-      {seiten.map((t, i) => (
-        <InfoSeite
-          key={t?.id ?? 'allgemein'}
-          jagd={info}
-          tn={t ? tnInfo(t) : null}
-          stand={t?.zugeordnete_einrichtung_id ? staende.find((e) => e.id === t.zugeordnete_einrichtung_id) : undefined}
-          boecke={boecke}
-          hinweise={hinweise}
-          adresse={adresse}
-          folge={i > 0}
-        />
-      ))}
+      {seiten.map((t, i) => {
+        const a = t?.ansteller_id ? tn.find((x) => x.id === t.ansteller_id) : undefined;
+        return (
+          <InfoSeite
+            key={t?.id ?? 'allgemein'}
+            jagd={info}
+            tn={t ? tnInfo(t) : null}
+            stand={t?.zugeordnete_einrichtung_id ? staende.find((e) => e.id === t.zugeordnete_einrichtung_id) : undefined}
+            boecke={boecke}
+            rettung={rettung}
+            leitung={leitung}
+            ansteller={a ? { name: a.name, telefon: a.telefon } : null}
+            hinweise={hinweise}
+            adresse={adresse}
+            folge={i > 0}
+          />
+        );
+      })}
     </Druckrahmen>
   );
 }
 
-// Teilnehmer (ohne Konto): dieselbe Zusammenfassung für die eigene Zusage
-export function TeilnehmerSelbstDruck({ jagd, tn, stand, boecke, onZu }: { jagd: JagdInfo; tn: TnInfo; stand: Stand | undefined; boecke: Bock[]; onZu: () => void }) {
+// Teilnehmer (ohne Konto): dieselbe Anstellinformation für die eigene Zusage
+export function TeilnehmerSelbstDruck({ jagd, tn, stand, boecke, rettung, leitung, ansteller, onZu }: { jagd: JagdInfo; tn: TnInfo; stand: Stand | undefined; boecke: Bock[]; rettung: Rettung[]; leitung: Jagdleiter[]; ansteller: AnstellerInfo; onZu: () => void }) {
   const adresse = useAdresse(jagd.lat, jagd.lng);
   return (
     <Druckrahmen querformat={false} onZu={onZu}>
-      <InfoSeite jagd={jagd} tn={tn} stand={stand} boecke={boecke} hinweise={STANDARD_HINWEIS} adresse={adresse} folge={false} />
+      <InfoSeite jagd={jagd} tn={tn} stand={stand} boecke={boecke} rettung={rettung} leitung={leitung} ansteller={ansteller} hinweise={STANDARD_HINWEIS} adresse={adresse} folge={false} />
     </Druckrahmen>
   );
 }
@@ -304,6 +326,24 @@ export function TeilnehmerListeDruck({ jagd, tn, standName, onZu }: { jagd: Jagd
     plaetze: zu.reduce((s, t) => s + (t.auto_vorhanden ? t.mitfahrplaetze ?? 0 : 0), 0),
     hege: jagd.hegebeitrag_aktiv ? zu.length * Number(jagd.hegebeitrag_betrag ?? 0) : 0,
   };
+  const gruppiert = tn.some((t) => t.ist_ansteller);
+  const spalten = 10 + (jagd.schuesseltreiben ? 1 : 0) + (jagd.hegebeitrag_aktiv ? 1 : 0);
+  const zeile = (t: Teilnehmer) => (
+    <tr key={t.id}>
+              <td>{t.name}</td>
+              <td>{t.anschrift ?? ''}</td>
+              <td>{t.email}</td>
+              <td>{t.telefon ?? ''}</td>
+              <td>{STATUSTEXT[t.status] ?? t.status}</td>
+              <td>{standName(t.zugeordnete_einrichtung_id)}</td>
+              <td>{ja(t.hat_hund)}</td>
+              <td>{ja(t.hat_hornblaeser)}</td>
+              <td>{ja(t.auto_vorhanden)}</td>
+              <td>{t.auto_vorhanden ? t.mitfahrplaetze ?? 0 : ''}</td>
+              {jagd.schuesseltreiben && <td>{ja(t.schuesseltreiben_teilnahme)}</td>}
+              {jagd.hegebeitrag_aktiv && <td>{t.status === 'zugesagt' ? Number(jagd.hegebeitrag_betrag ?? 0).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' }) : ''}</td>}
+            </tr>
+  );
   const ja = (b: boolean | null) => (b ? 'ja' : '–');
   const stand = new Date().toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' });
 
@@ -343,22 +383,17 @@ export function TeilnehmerListeDruck({ jagd, tn, standName, onZu }: { jagd: Jagd
           </tr>
         </thead>
         <tbody>
-          {liste.map((t) => (
-            <tr key={t.id}>
-              <td>{t.name}</td>
-              <td>{t.anschrift ?? ''}</td>
-              <td>{t.email}</td>
-              <td>{t.telefon ?? ''}</td>
-              <td>{STATUSTEXT[t.status] ?? t.status}</td>
-              <td>{standName(t.zugeordnete_einrichtung_id)}</td>
-              <td>{ja(t.hat_hund)}</td>
-              <td>{ja(t.hat_hornblaeser)}</td>
-              <td>{ja(t.auto_vorhanden)}</td>
-              <td>{t.auto_vorhanden ? t.mitfahrplaetze ?? 0 : ''}</td>
-              {jagd.schuesseltreiben && <td>{ja(t.schuesseltreiben_teilnahme)}</td>}
-              {jagd.hegebeitrag_aktiv && <td>{t.status === 'zugesagt' ? Number(jagd.hegebeitrag_betrag ?? 0).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' }) : ''}</td>}
-            </tr>
-          ))}
+          {!gruppiert && liste.map((t) => zeile(t))}
+          {gruppiert &&
+            nachAnstellern(liste).map((g) => (
+              <Fragment key={g.ansteller?.id ?? 'ohne'}>
+                <tr className="gruppe">
+                  <td colSpan={spalten}>{g.ansteller ? `Gruppe ${g.ansteller.name}${g.ansteller.telefon ? ` · Tel. ${g.ansteller.telefon}` : ''}` : 'Ohne Gruppe'}</td>
+                </tr>
+                {g.ansteller && zeile(g.ansteller)}
+                {g.mitglieder.map((t) => zeile(t))}
+              </Fragment>
+            ))}
         </tbody>
         <tfoot>
           <tr>
@@ -374,6 +409,172 @@ export function TeilnehmerListeDruck({ jagd, tn, standName, onZu }: { jagd: Jagd
         </tfoot>
       </table>
       <small className="art">Einladungscodes sind bewusst nicht aufgeführt.</small>
+    </Druckrahmen>
+  );
+}
+
+// ---------- Jagdtag-Mappe (A4 quer) ----------
+
+const Haken = ({ an }: { an: boolean }) => <span className={`bj-druck-haken ${an ? 'an' : ''}`} aria-label={an ? 'ja' : 'offen'} />;
+
+export function JagdtagMappeDruck({ jagd, tn, leitung, rettung, staende, standName, onZu }: { jagd: Jagd; tn: Teilnehmer[]; leitung: Jagdleiter[]; rettung: Rettung[]; staende: Stand[]; standName: (id: string | null) => string; onZu: () => void }) {
+  const [detail, setDetail] = useState(true);
+  const [anhang, setAnhang] = useState(true);
+  const adresse = useAdresse(jagd.treffpunkt_lat, jagd.treffpunkt_lng);
+  const zu = useMemo(() => tn.filter((t) => t.status === 'zugesagt' && t.aktiv), [tn]);
+  const gruppiert = zu.some((t) => t.ist_ansteller);
+  const boecke = useMemo(() => staende.filter((e) => e.typ === 'drueckjagdbock'), [staende]);
+  const inhaber = (eid: string) => zu.find((t) => t.zugeordnete_einrichtung_id === eid);
+  const hatTp = jagd.treffpunkt_lng != null && jagd.treffpunkt_lat != null;
+  const sonst = useMemo<KartenPunkt[]>(
+    () => [
+      ...(hatTp ? [{ id: 'tp', lng: jagd.treffpunkt_lng!, lat: jagd.treffpunkt_lat!, art: 'treffpunkt' as const, label: 'Treffpunkt' }] : []),
+      ...rettung.map((r) => ({ id: `r${r.id}`, lng: r.lng, lat: r.lat, art: 'rettung' as const, label: r.name })),
+    ],
+    [hatTp, jagd.treffpunkt_lng, jagd.treffpunkt_lat, rettung],
+  );
+  const standPunkt = (e: Stand, mitName: boolean): KartenPunkt => {
+    const t = inhaber(e.id);
+    return { id: `b${e.id}`, lng: e.lng, lat: e.lat, art: t ? 'belegt' : 'frei', label: standLabel(e), label2: mitName && t ? t.name : undefined };
+  };
+  const uebersicht = useMemo(() => [...sonst, ...boecke.map((e) => standPunkt(e, false))], [sonst, boecke, zu]); // eslint-disable-line react-hooks/exhaustive-deps
+  const blaetter = useMemo(() => {
+    return teilePunkte(boecke, 8).map((gruppe) => {
+      const xs = gruppe.map((e) => e.lng);
+      const ys = gruppe.map((e) => e.lat);
+      const rand = 0.0015;
+      const nah = sonst.filter((p) => p.lng >= Math.min(...xs) - rand && p.lng <= Math.max(...xs) + rand && p.lat >= Math.min(...ys) - rand && p.lat <= Math.max(...ys) + rand);
+      return [...nah, ...gruppe.map((e) => standPunkt(e, true))];
+    });
+  }, [boecke, sonst, zu]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const gruppenFuerListe = gruppiert ? nachAnstellern(zu) : [{ ansteller: null as Teilnehmer | null, mitglieder: [...zu].sort((a, b) => a.name.localeCompare(b.name, 'de')) }];
+  const ja = (b: boolean | null) => (b ? 'ja' : '–');
+  const zeile = (t: Teilnehmer) => (
+    <tr key={t.id}>
+      <td>{t.name}{t.ist_ansteller ? ' (Ansteller)' : ''}</td>
+      <td>{t.anschrift ?? ''}</td>
+      <td>{t.telefon ?? ''}</td>
+      <td>{t.email}</td>
+      <td>{standName(t.zugeordnete_einrichtung_id)}</td>
+      <td>{ja(t.hat_hund)}</td>
+      <td>{ja(t.hat_hornblaeser)}</td>
+      <td>{t.auto_vorhanden ? `ja, ${t.mitfahrplaetze ?? 0} Pl.` : '–'}</td>
+      {jagd.schuesseltreiben && <td>{ja(t.schuesseltreiben_teilnahme)}</td>}
+      {jagd.hegebeitrag_aktiv && <td style={{ textAlign: 'center' }}><Haken an={t.hegebeitrag_bezahlt} /></td>}
+      {jagd.schuesseltreiben && <td style={{ textAlign: 'center' }}><Haken an={t.schuesseltreiben_teilgenommen} /></td>}
+      <td style={{ textAlign: 'center' }}><Haken an={t.anwesend} /></td>
+    </tr>
+  );
+  const spalten = 9 + (jagd.hegebeitrag_aktiv ? 1 : 0) + (jagd.schuesseltreiben ? 2 : 0);
+  const gesamtZaehler = { zu: zu.length, hunde: zu.filter((t) => t.hat_hund).length, horn: zu.filter((t) => t.hat_hornblaeser).length };
+  const ansteller = zu.filter((t) => t.ist_ansteller);
+
+  return (
+    <Druckrahmen
+      querformat
+      onZu={onZu}
+      leiste={
+        <>
+          <label><input type="checkbox" checked={detail} onChange={(e) => setDetail(e.target.checked)} /> Detailkarten</label>
+          <label><input type="checkbox" checked={anhang} onChange={(e) => setAnhang(e.target.checked)} /> Anstellerlisten als Anhang</label>
+        </>
+      }
+    >
+      <section className="bj-druck-seite quer">
+        <h1>Jagdtag-Mappe · {jagd.titel}</h1>
+        <p className="art">{jagd.art} · {zeitText(jagd)}</p>
+        <table className="bj-druck-tabelle">
+          <tbody>
+            {hatTp && <tr><th>Treffpunkt</th><td>{adresse ? `${adresse} · ` : ''}<small>{jagd.treffpunkt_lat!.toFixed(5)}, {jagd.treffpunkt_lng!.toFixed(5)}</small></td></tr>}
+            <tr>
+              <th>Jagdleitung</th>
+              <td>
+                {leitung.length === 0 ? '–' : leitung.map((l, i) => (
+                  <span key={i}>{i > 0 && <br />}<strong>{l.name}</strong>{l.funktion ? ` (${l.funktion})` : ''}{tel(l.telefon)}</span>
+                ))}
+              </td>
+            </tr>
+            <tr><th>Teilnehmer</th><td>{gesamtZaehler.zu} Zusagen · {gesamtZaehler.hunde} Hunde · {gesamtZaehler.horn} Hornbläser</td></tr>
+          </tbody>
+        </table>
+        {jagd.info_jagdleitung && (
+          <>
+            <h2 className="klein">Infos für die Jagdleitung</h2>
+            <div className="bj-druck-kasten">{jagd.info_jagdleitung}</div>
+          </>
+        )}
+        <h2 className="klein">Teilnehmer{gruppiert ? ' nach Anstellergruppen' : ''}</h2>
+        <table className="bj-druck-liste">
+          <thead>
+            <tr>
+              <th>Name</th><th>Anschrift</th><th>Telefon</th><th>E-Mail</th><th>Stand</th><th>Hund</th><th>Horn</th><th>Auto</th>
+              {jagd.schuesseltreiben && <th>Schüsseltr.</th>}
+              {jagd.hegebeitrag_aktiv && <th>Hege bezahlt</th>}
+              {jagd.schuesseltreiben && <th>Schüsseltr. teilgen.</th>}
+              <th>bei Ansprache da</th>
+            </tr>
+          </thead>
+          <tbody>
+            {gruppenFuerListe.map((g) => (
+              <Fragment key={g.ansteller?.id ?? 'ohne'}>
+                {gruppiert && (
+                  <tr className="gruppe">
+                    <td colSpan={spalten + 1}>{g.ansteller ? `Gruppe ${g.ansteller.name}${g.ansteller.telefon ? ` · Tel. ${g.ansteller.telefon}` : ''}` : 'Ohne Gruppe'}</td>
+                  </tr>
+                )}
+                {g.ansteller && zeile(g.ansteller)}
+                {g.mitglieder.map((t) => zeile(t))}
+              </Fragment>
+            ))}
+          </tbody>
+        </table>
+        <small className="art">Leere Kästchen zum Abhaken vor Ort; gespeicherte Angaben erscheinen angehakt.</small>
+      </section>
+
+      {(uebersicht.length > 0) && (
+        <section className="bj-druck-seite quer">
+          <h1 style={{ fontSize: '1.2rem' }}>Übersichtskarte · {jagd.titel}</h1>
+          <DruckKarte punkte={uebersicht} breiteMm={273} hoeheMm={158} mindestBreiteM={800} pflichtLabels={false} alt="Übersichtskarte aller Stände" />
+        </section>
+      )}
+
+      {detail &&
+        blaetter.map((punkte, i) => (
+          <section className="bj-druck-seite quer" key={i}>
+            <h1 style={{ fontSize: '1.2rem' }}>Detailkarte {i + 1} von {blaetter.length} · {jagd.titel}</h1>
+            <DruckKarte punkte={punkte} breiteMm={273} hoeheMm={158} mindestBreiteM={450} pflichtLabels alt={`Detailkarte ${i + 1}`} />
+          </section>
+        ))}
+
+      {anhang &&
+        ansteller.map((a) => {
+          const gruppe = zu.filter((t) => t.ansteller_id === a.id).sort((x, y) => x.name.localeCompare(y.name, 'de'));
+          const uebrige = zu.filter((t) => t.id !== a.id && t.ansteller_id !== a.id).sort((x, y) => x.name.localeCompare(y.name, 'de'));
+          const kurz = (t: Teilnehmer) => (
+            <tr key={t.id}>
+              <td>{t.name}</td>
+              <td>{standName(t.zugeordnete_einrichtung_id)}</td>
+              <td>{t.telefon ?? ''}</td>
+            </tr>
+          );
+          return (
+            <section className="bj-druck-seite quer" key={a.id}>
+              <h1 style={{ fontSize: '1.3rem' }}>Anstellerliste · {a.name}</h1>
+              <p className="art">{jagd.titel} · {zeitText(jagd)}{a.telefon ? ` · Tel. ${a.telefon}` : ''}</p>
+              <table className="bj-druck-liste">
+                <thead><tr><th>Name</th><th>Stand</th><th>Telefon</th></tr></thead>
+                <tbody>
+                  <tr className="gruppe"><td colSpan={3}>Deine Gruppe</td></tr>
+                  {kurz(a)}
+                  {gruppe.map(kurz)}
+                  {uebrige.length > 0 && <tr className="gruppe"><td colSpan={3}>Übrige Teilnehmer</td></tr>}
+                  {uebrige.map(kurz)}
+                </tbody>
+              </table>
+            </section>
+          );
+        })}
     </Druckrahmen>
   );
 }
