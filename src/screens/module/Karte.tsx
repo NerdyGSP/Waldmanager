@@ -1442,6 +1442,7 @@ export default function Karte({
       {gpsImport && (
         <GpsImport
           k={k}
+          standardSitzungId={wteSitzung?.id ?? null}
           onZu={() => setGpsImport(false)}
           onFertig={(text) => {
             setGpsImport(false);
@@ -1453,6 +1454,7 @@ export default function Karte({
       {sheetArt && (
         <ZeichnenSheet
           art={sheetArt}
+          standardSitzungId={wteSitzung?.id ?? null}
           revierId={k.revierId}
           zonen={zonen}
           ebenen={kartenEbenen}

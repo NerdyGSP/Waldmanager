@@ -10,6 +10,7 @@ import type { Enums, Json } from '../../lib/database.types';
 import { Auswahl, Feld, Gruppe, Hinweis, Knopf, Leer, Seite, Zaehler, Zeile, useRadHorizontal, WildartOptionen } from '../../components/ui';
 import type { RevierKontext } from './kontext';
 import { ZaehlReport } from './ZaehlReport';
+import { FlaechenmodusWahl, modusText, STANDARD_BREITE_M, type Flaechenmodus } from './FlaechenmodusWahl';
 import { SitzungsdatenFormular } from './SitzungsdatenFormular';
 import { alsSitzungsZeile, vonSitzungsZeile } from '../../lib/sitzungsdaten';
 
@@ -24,6 +25,10 @@ type Sitzung = {
   bemerkung: string | null;
   erstellt_von: string | null;
   ebene_id: string | null;
+  flaechenmodus: string;
+  streifenbreite_m: number;
+  strecke_km: number | null;
+  flaeche_ha: number | null;
 };
 
 type Zaehlzeile = {
@@ -48,7 +53,7 @@ function SitzungsListe({ k }: { k: RevierKontext }) {
   useEffect(() => {
     void supabase
       .from('zaehlsitzungen')
-      .select('id, datum, beginn, ende, status, wetter, mondphase, bemerkung, erstellt_von, ebene_id, zaehlungen(anzahl, geloescht_am)')
+      .select('id, datum, beginn, ende, status, wetter, mondphase, bemerkung, erstellt_von, ebene_id, flaechenmodus, streifenbreite_m, strecke_km, flaeche_ha, zaehlungen(anzahl, geloescht_am)')
       .eq('revier_id', k.revierId)
       .is('geloescht_am', null)
       .order('datum', { ascending: false })
@@ -98,6 +103,7 @@ function SitzungsZeile({ s }: { s: Sitzung & { summe: number } }) {
         <small>
           {s.summe} Stück gezählt
           {s.mondphase ? ` · ${s.mondphase}` : ''}
+          {s.flaeche_ha !== null ? ` · ${s.flaeche_ha.toLocaleString('de-DE')} ha (${modusText(s.flaechenmodus === 'strecke' ? 'strecke' : 'zonen', s.streifenbreite_m)})` : ''}
           {s.bemerkung ? ` · ${s.bemerkung}` : ''}
         </small>
       </span>
@@ -113,6 +119,8 @@ function NeueSitzung({ k, onAbbrechen }: { k: RevierKontext; onAbbrechen: () => 
   const [ebeneId, setEbeneId] = useState('');
   const [datum, setDatum] = useState(heuteISO());
   const [bemerkung, setBemerkung] = useState('');
+  const [modus, setModus] = useState<Flaechenmodus>('zonen');
+  const [breite, setBreite] = useState(STANDARD_BREITE_M);
   const [wetter, setWetter] = useState<Wetter | null>(null);
   const [wetterStatus, setWetterStatus] = useState('Wetter wird abgerufen …');
   const [fehler, setFehler] = useState<string | null>(null);
@@ -144,6 +152,8 @@ function NeueSitzung({ k, onAbbrechen }: { k: RevierKontext; onAbbrechen: () => 
         wetter: wetter ? (wetter as unknown as Json) : null,
         bemerkung: bemerkung.trim() || null,
         ebene_id: ebeneId || null,
+        flaechenmodus: modus,
+        streifenbreite_m: breite || STANDARD_BREITE_M,
       })
       .select('id')
       .single();
@@ -169,6 +179,7 @@ function NeueSitzung({ k, onAbbrechen }: { k: RevierKontext; onAbbrechen: () => 
               ))}
             </Auswahl>
           )}
+          <FlaechenmodusWahl modus={modus} breite={breite} onModus={setModus} onBreite={setBreite} />
           <Zeile label="Wetter" wert={wetterStatus} />
           <Zeile label="Mond" wert={`${mond.name}, ${mond.beleuchtung} % beleuchtet`} />
           <Feld label="Bemerkung" placeholder="z. B. Scheinwerferzählung" value={bemerkung} onChange={(e) => setBemerkung(e.target.value)} />
@@ -219,6 +230,71 @@ function SitzungBearbeiten({ k, sitzung, onFertig }: { k: RevierKontext; sitzung
   );
 }
 
+// Gezählte Fläche der Zählung: Modus, Strecke und Fläche – änderbar, auch nach dem Abschluss
+function FlaechenGruppe({ sitzung, onGeaendert, onRouten }: { sitzung: Sitzung; onGeaendert: () => void; onRouten?: (n: number) => void }) {
+  const [modus, setModus] = useState<Flaechenmodus>(sitzung.flaechenmodus === 'strecke' ? 'strecke' : 'zonen');
+  const [breite, setBreite] = useState(sitzung.streifenbreite_m);
+  const [vorschau, setVorschau] = useState<{ strecke_km: number | null; flaeche_ha: number | null; routen: number } | null>(null);
+  const [fehler, setFehler] = useState<string | null>(null);
+  const [laeuft, setLaeuft] = useState(false);
+  const geaendert = modus !== sitzung.flaechenmodus || breite !== sitzung.streifenbreite_m;
+  const abgeschlossen = sitzung.status === 'abgeschlossen';
+
+  useEffect(() => {
+    let aktiv = true;
+    void supabase.rpc('sitzung_flaeche_berechnen', { p_sitzung_id: sitzung.id, p_modus: modus, p_breite_m: breite || STANDARD_BREITE_M }).then(({ data, error }) => {
+      if (!aktiv) return;
+      const z = data?.[0];
+      if (error || !z) return;
+      setVorschau({ strecke_km: z.strecke_km === null ? null : Number(z.strecke_km), flaeche_ha: z.flaeche_ha === null ? null : Number(z.flaeche_ha), routen: z.routen });
+    });
+    return () => {
+      aktiv = false;
+    };
+  }, [sitzung.id, modus, breite, sitzung.status]);
+
+  useEffect(() => {
+    if (vorschau && modus === 'strecke') onRouten?.(vorschau.routen);
+  }, [vorschau, modus, onRouten]);
+
+  async function speichern() {
+    setLaeuft(true);
+    setFehler(null);
+    const { error } = await supabase.from('zaehlsitzungen').update({ flaechenmodus: modus, streifenbreite_m: breite || STANDARD_BREITE_M }).eq('id', sitzung.id);
+    setLaeuft(false);
+    if (error) setFehler(fehlertext(error));
+    else onGeaendert();
+  }
+
+  const fehltRoute = modus === 'strecke' && vorschau !== null && vorschau.routen === 0;
+  const zahlDE = (n: number | null, nk = 1) => (n === null ? '–' : n.toLocaleString('de-DE', { minimumFractionDigits: nk, maximumFractionDigits: nk }));
+  const gespeichert = abgeschlossen && !geaendert && sitzung.flaeche_ha !== null;
+
+  return (
+    <Gruppe titel="Gezählte Fläche" fuss={abgeschlossen ? 'Die Fläche wird beim Abschluss festgeschrieben. Ändern von Modus oder Breite berechnet sie neu.' : 'Wird beim Abschluss der Zählung festgeschrieben.'}>
+      <FlaechenmodusWahl modus={modus} breite={breite} onModus={setModus} onBreite={setBreite} />
+      {fehltRoute && (
+        <Hinweis art="warnung">Dieser Zählung ist noch keine WTE-Route zugeordnet. Im Modus „Strecke × Breite“ lässt sie sich so nicht abschließen. Zeichne, zeichne per GPS auf oder importiere eine WTE-Route über das Menü „+ NEU“ auf der Karte.</Hinweis>
+      )}
+      <Zeile
+        label="Fläche"
+        wert={
+          (gespeichert ? sitzung.flaeche_ha : vorschau?.flaeche_ha ?? null) === null
+            ? '–'
+            : `${zahlDE(gespeichert ? sitzung.flaeche_ha : vorschau?.flaeche_ha ?? null)} ha${modus === 'strecke' ? ` (${zahlDE(gespeichert ? sitzung.strecke_km : vorschau?.strecke_km ?? null, 2)} km × ${breite} m)` : ''}`
+        }
+      />
+      {!gespeichert && vorschau && <p className="gruppe-fuss" style={{ margin: 0 }}>Vorschau – {modusText(modus, breite)}.</p>}
+      {fehler && <Hinweis art="fehler">{fehler}</Hinweis>}
+      {geaendert && (
+        <Knopf variante="sekundaer" disabled={laeuft || fehltRoute} onClick={() => void speichern()}>
+          {laeuft ? 'Speichern …' : 'Flächenmodus speichern'}
+        </Knopf>
+      )}
+    </Gruppe>
+  );
+}
+
 function SitzungAnsicht({ k, sitzungId }: { k: RevierKontext; sitzungId: string }) {
   const wildarten = useWildarten();
   const tabsRef = useRadHorizontal<HTMLDivElement>();
@@ -226,6 +302,7 @@ function SitzungAnsicht({ k, sitzungId }: { k: RevierKontext; sitzungId: string 
   const { ebenen } = useZonenEbenen(k.revierId);
   const [report, setReport] = useState(false);
   const [bearbeiten, setBearbeiten] = useState(false);
+  const [routenAnzahl, setRoutenAnzahl] = useState(1);
   const [sitzung, setSitzung] = useState<Sitzung | null>(null);
   // Ist die Zählung auf eine Zonenebene beschränkt, nur deren Zonen anbieten
   const zonen = useMemo(
@@ -242,7 +319,7 @@ function SitzungAnsicht({ k, sitzungId }: { k: RevierKontext; sitzungId: string 
     const [s, z] = await Promise.all([
       supabase
         .from('zaehlsitzungen')
-        .select('id, datum, beginn, ende, status, wetter, mondphase, bemerkung, erstellt_von, ebene_id')
+        .select('id, datum, beginn, ende, status, wetter, mondphase, bemerkung, erstellt_von, ebene_id, flaechenmodus, streifenbreite_m, strecke_km, flaeche_ha')
         .eq('id', sitzungId)
         .maybeSingle(),
       supabase.from('zaehlungen').select('id, zone_id, wildart_id, geschlecht, anzahl').eq('sitzung_id', sitzungId).is('geloescht_am', null),
@@ -338,10 +415,13 @@ function SitzungAnsicht({ k, sitzungId }: { k: RevierKontext; sitzungId: string 
       <Seite titel={titel} untertitel={untertitel} zurueck={() => navigieren('/zaehlung')}>
         {fehler && <Hinweis art="fehler">{fehler}</Hinweis>}
         <Gesamtuebersicht zeilen={zeilen} zonen={alleZonen} wildarten={wildarten} />
+        <FlaechenGruppe sitzung={sitzung} onGeaendert={() => void laden()} onRouten={setRoutenAnzahl} />
         {sitzung.bemerkung && <Leer>Bemerkung: {sitzung.bemerkung}</Leer>}
         {sitzung.status === 'offen' ? (
           <>
-            <Knopf onClick={abschliessen}>Zählung abschließen</Knopf>
+            <Knopf onClick={abschliessen} disabled={sitzung.flaechenmodus === 'strecke' && routenAnzahl === 0}>
+              Zählung abschließen
+            </Knopf>
             <Knopf variante="sekundaer" onClick={() => setUebersicht(false)}>
               Weiter zählen
             </Knopf>

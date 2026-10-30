@@ -38,6 +38,7 @@ export function ZeichnenSheet({
   fehler,
   onSpeichern,
   onAbbrechen,
+  standardSitzungId,
 }: {
   art: SheetArt;
   revierId: string;
@@ -49,6 +50,7 @@ export function ZeichnenSheet({
   fehler: string | null;
   onSpeichern: (w: SheetWerte) => void;
   onAbbrechen: () => void;
+  standardSitzungId?: string | null; // laufende WTE: WTE-Routen werden ihr automatisch zugeordnet
 }) {
   const [name, setName] = useState(art === 'zone' ? `Zone ${zonen.length + 1}` : art === 'grenze' ? '' : STANDARDNAME[art]);
   const [bemerkung, setBemerkung] = useState('');
@@ -57,7 +59,7 @@ export function ZeichnenSheet({
   const [farbe, setFarbe] = useState(ZONENFARBEN[zonen.length % ZONENFARBEN.length]!);
   const [wteAktiv, setWteAktiv] = useState(false);
   const [bewegungsjagdId, setBewegungsjagdId] = useState('');
-  const [sitzungId, setSitzungId] = useState('');
+  const [sitzungId, setSitzungId] = useState(standardSitzungId ?? '');
   const [bestaetigt, setBestaetigt] = useState(false);
   const [jagden, setJagden] = useState<Array<{ id: string; titel: string; datum: string }>>([]);
   const [sitzungen, setSitzungen] = useState<Array<{ id: string; datum: string; status: string }>>([]);
@@ -67,7 +69,12 @@ export function ZeichnenSheet({
       void supabase.from('bewegungsjagden').select('id, titel, datum').eq('revier_id', revierId).is('geloescht_am', null).order('datum', { ascending: false }).limit(30).then(({ data }) => setJagden(data ?? []));
     }
     if (art === 'wte_route') {
-      void supabase.from('zaehlsitzungen').select('id, datum, status').eq('revier_id', revierId).is('geloescht_am', null).order('datum', { ascending: false }).limit(20).then(({ data }) => setSitzungen(data ?? []));
+      void supabase.from('zaehlsitzungen').select('id, datum, status').eq('revier_id', revierId).is('geloescht_am', null).order('datum', { ascending: false }).limit(20).then(({ data }) => {
+        setSitzungen(data ?? []);
+        // Läuft gerade eine Zählung, wird die WTE-Route ihr automatisch zugeordnet
+        const offen = (data ?? []).find((s) => s.status === 'offen');
+        if (offen) setSitzungId((alt) => alt || offen.id);
+      });
     }
   }, [art, revierId]);
 

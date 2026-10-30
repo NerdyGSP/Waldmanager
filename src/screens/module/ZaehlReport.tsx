@@ -7,7 +7,7 @@ import { datumDE } from '../../lib/zeit';
 import type { Enums, Json } from '../../lib/database.types';
 
 type Zeile = { zone_id: string | null; wildart_id: string; geschlecht: Enums<'geschlecht'>; anzahl: number };
-type Sitz = { datum: string; beginn: string | null; ende: string | null; wetter: Json | null; mondphase: string | null; bemerkung: string | null; ebene_id: string | null };
+type Sitz = { datum: string; beginn: string | null; ende: string | null; wetter: Json | null; mondphase: string | null; bemerkung: string | null; ebene_id: string | null; flaechenmodus?: string; streifenbreite_m?: number; strecke_km?: number | null; flaeche_ha?: number | null };
 
 const uhr = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : null);
 const zahl = (n: number, stellen = 1) => n.toLocaleString('de-DE', { maximumFractionDigits: stellen, minimumFractionDigits: 0 });
@@ -41,6 +41,13 @@ export function ZaehlReport({ revierId, revierName, sitzung, ebeneName, zeilen, 
     return { arten, zeilenZonen, wert, flaeche };
   }, [zeilen, zonen, wildarten, ha, sitzung.ebene_id]);
 
+  // Gezählte Fläche: beim Abschluss festgeschrieben (Strecke × Breite oder Zonenfläche), sonst Summe der erfassten Zonen
+  const streckeModus = sitzung.flaechenmodus === 'strecke';
+  const bezug = sitzung.flaeche_ha != null ? Number(sitzung.flaeche_ha) : streckeModus ? 0 : d.flaeche;
+  const modusZeile = streckeModus
+    ? `Strecke × ${sitzung.streifenbreite_m ?? 400} m${sitzung.strecke_km != null && bezug > 0 ? `: ${zahl(Number(sitzung.strecke_km), 1)} km × ${sitzung.streifenbreite_m ?? 400} m = ${zahl(bezug)} ha` : ''}`
+    : 'Zonenfläche';
+
   const zeit = [uhr(sitzung.beginn), uhr(sitzung.ende)].filter(Boolean).join(' – ');
   const wetter = sitzung.wetter ? wetterText(sitzung.wetter as unknown as Wetter) : null;
 
@@ -70,9 +77,10 @@ export function ZaehlReport({ revierId, revierName, sitzung, ebeneName, zeilen, 
                     <h3>{wildartName(wildarten, a)}</h3>
                     <p className="gross">{summe}</p>
                     <p>gezählt gesamt</p>
-                    <p className="mittel">{d.flaeche > 0 ? zahl((summe / d.flaeche) * 100, 2) : '–'}</p>
+                    <p className="mittel">{bezug > 0 ? zahl((summe / bezug) * 100, 2) : '–'}</p>
                     <p>je 100 ha</p>
-                    <p className="klein">Gezählte Fläche: {d.flaeche > 0 ? `${zahl(d.flaeche)} ha` : '–'}</p>
+                    <p className="klein">Gezählte Fläche: {bezug > 0 ? `${zahl(bezug)} ha` : '–'}</p>
+                    <p className="klein">{modusZeile}</p>
                   </div>
                 );
               })}
@@ -92,7 +100,7 @@ export function ZaehlReport({ revierId, revierName, sitzung, ebeneName, zeilen, 
                 {d.zeilenZonen.map((z) => (
                   <tr key={z.id ?? 'ohne'}>
                     <th scope="row">{z.name}</th>
-                    <td className="zahl">{z.ha != null ? zahl(z.ha) : '–'}</td>
+                    <td className="zahl">{!streckeModus && z.ha != null ? zahl(z.ha) : '–'}</td>
                     {d.arten.map((a) => <td key={a} className="zahl">{d.wert(a, z.id) || '–'}</td>)}
                     <td className="zahl"><strong>{d.wert(null, z.id)}</strong></td>
                   </tr>
@@ -101,14 +109,14 @@ export function ZaehlReport({ revierId, revierName, sitzung, ebeneName, zeilen, 
               <tfoot>
                 <tr>
                   <td><strong>Summe</strong></td>
-                  <td className="zahl"><strong>{d.flaeche > 0 ? zahl(d.flaeche) : '–'}</strong></td>
+                  <td className="zahl"><strong>{bezug > 0 ? zahl(bezug) : '–'}</strong></td>
                   {d.arten.map((a) => <td key={a} className="zahl"><strong>{d.wert(a, undefined)}</strong></td>)}
                   <td className="zahl"><strong>{d.wert(null, undefined)}</strong></td>
                 </tr>
               </tfoot>
             </table>
             <p className="art" style={{ marginTop: 8, fontSize: '.8rem' }}>
-              Bezugsfläche „je 100 ha“ = Summe der erfassten Zonen. Erstellt am {new Date().toLocaleDateString('de-DE')} mit Hegewerk.
+              {streckeModus ? `Bezugsfläche „je 100 ha“ = gezählte Fläche (${modusZeile}); die Zonenzeilen zeigen Zählwerte.` : 'Bezugsfläche „je 100 ha“ = Summe der erfassten Zonen.'} Erstellt am {new Date().toLocaleDateString('de-DE')} mit Hegewerk.
             </p>
           </>
         )}

@@ -1227,11 +1227,15 @@ export type Database = {
           ende: string | null
           erstellt_am: string
           erstellt_von: string | null
+          flaeche_ha: number | null
+          flaechenmodus: string
           geloescht_am: string | null
           id: string
           mondphase: string | null
           revier_id: string
           status: Database["public"]["Enums"]["sitzung_status"]
+          strecke_km: number | null
+          streifenbreite_m: number
           wetter: Json | null
         }
         Insert: {
@@ -1243,11 +1247,15 @@ export type Database = {
           ende?: string | null
           erstellt_am?: string
           erstellt_von?: string | null
+          flaeche_ha?: number | null
+          flaechenmodus?: string
           geloescht_am?: string | null
           id?: string
           mondphase?: string | null
           revier_id: string
           status?: Database["public"]["Enums"]["sitzung_status"]
+          strecke_km?: number | null
+          streifenbreite_m?: number
           wetter?: Json | null
         }
         Update: {
@@ -1259,11 +1267,15 @@ export type Database = {
           ende?: string | null
           erstellt_am?: string
           erstellt_von?: string | null
+          flaeche_ha?: number | null
+          flaechenmodus?: string
           geloescht_am?: string | null
           id?: string
           mondphase?: string | null
           revier_id?: string
           status?: Database["public"]["Enums"]["sitzung_status"]
+          strecke_km?: number | null
+          streifenbreite_m?: number
           wetter?: Json | null
         }
         Relationships: [
@@ -1555,6 +1567,20 @@ export type Database = {
       revier_aufteilen_vorschau: {
         Args: { p_anzahl: number; p_revier_id: string }
         Returns: Json
+      }
+      sitzung_flaeche_berechnen: {
+        Args: { p_breite_m?: number; p_modus?: string; p_sitzung_id: string }
+        Returns: {
+          breite_m: number
+          flaeche_ha: number
+          modus: string
+          routen: number
+          strecke_km: number
+        }[]
+      }
+      zaehlsitzung_flaeche_setzen: {
+        Args: { p_sitzung_id: string }
+        Returns: number
       }
       zone_an_position: {
         Args: { p_lat: number; p_lon: number; p_revier_id: string }

@@ -320,6 +320,10 @@ export function Datenimport({ k }: { k: RevierKontext }) {
             if (e2) throw e2;
           }
           anzahlZaehlungen += zeilen.length;
+          // Gezählte Fläche (Zonenfläche) festschreiben, damit Monitoring und Auswertung je 100 ha rechnen können
+          for (const gruppe of stuecke(sitzungen ?? [], 10)) {
+            await Promise.all(gruppe.map((x) => supabase.rpc('zaehlsitzung_flaeche_setzen', { p_sitzung_id: x.id })));
+          }
         }
         setMeldung(
           `${neueTage.length} Zählungen mit ${anzahlZaehlungen.toLocaleString('de-DE')} Einträgen importiert` +

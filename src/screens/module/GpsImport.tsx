@@ -31,7 +31,7 @@ const zahl = (n: number) => n.toLocaleString('de-DE');
 type Auswahlzeile = { an: boolean; name: string; ziel: GpsZiel; bemerkung: string; mitDatum: boolean };
 
 // GPS-Datei einer Smartwatch (GPX, KML, KMZ, FIT) übernehmen: 1. Datei und Ziel, 2. Prüfbericht und Punktreduktion, 3. Benennung
-export function GpsImport({ k, onZu, onFertig }: { k: RevierKontext; onZu: () => void; onFertig: (text: string) => void }) {
+export function GpsImport({ k, onZu, onFertig, standardSitzungId }: { k: RevierKontext; onZu: () => void; onFertig: (text: string) => void; standardSitzungId?: string | null }) {
   const [schritt, setSchritt] = useState<1 | 2 | 3>(1);
   const [ziel, setZiel] = useState<GpsZiel>('pirschweg');
   const [laedt, setLaedt] = useState(false);
@@ -48,7 +48,7 @@ export function GpsImport({ k, onZu, onFertig }: { k: RevierKontext; onZu: () =>
   const [jagden, setJagden] = useState<Array<{ id: string; titel: string; datum: string | null }>>([]);
   const [sitzungen, setSitzungen] = useState<Array<{ id: string; datum: string }>>([]);
   const [jagdId, setJagdId] = useState('');
-  const [sitzungId, setSitzungId] = useState('');
+  const [sitzungId, setSitzungId] = useState(standardSitzungId ?? '');
   const [speichert, setSpeichert] = useState(false);
 
   useEffect(() => {
@@ -57,7 +57,11 @@ export function GpsImport({ k, onZu, onFertig }: { k: RevierKontext; onZu: () =>
     });
     void supabase.from('pirschwege').select('name').eq('revier_id', k.revierId).is('geloescht_am', null).then(({ data }) => setVorhandeneNamen((data ?? []).map((x) => x.name)));
     void supabase.from('bewegungsjagden').select('id, titel, datum').eq('revier_id', k.revierId).is('geloescht_am', null).order('datum', { ascending: false }).limit(30).then(({ data }) => setJagden(data ?? []));
-    void supabase.from('zaehlsitzungen').select('id, datum').eq('revier_id', k.revierId).is('geloescht_am', null).order('datum', { ascending: false }).limit(20).then(({ data }) => setSitzungen(data ?? []));
+    void supabase.from('zaehlsitzungen').select('id, datum, status').eq('revier_id', k.revierId).is('geloescht_am', null).order('datum', { ascending: false }).limit(20).then(({ data }) => {
+      setSitzungen(data ?? []);
+      const offen = (data ?? []).find((s) => s.status === 'offen');
+      if (offen) setSitzungId((alt) => alt || offen.id); // laufende Zählung: WTE-Route automatisch zuordnen
+    });
   }, [k.revierId]);
 
   async function dateiLesen(datei: File) {

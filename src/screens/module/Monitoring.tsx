@@ -11,7 +11,7 @@ import { Symbol } from '../../components/symbole';
 import type { RevierKontext } from './kontext';
 
 type Vergleich = Database['public']['Functions']['quervergleich']['Returns'][number];
-type Sitzungssumme = { id: string; datum: string; arten: Record<string, number> };
+type Sitzungssumme = { id: string; datum: string; arten: Record<string, number>; modus: string; breite: number; strecke: number | null; flaeche: number | null };
 
 export function Monitoring({ k, breit = false, abgedockt = false }: { k: RevierKontext; breit?: boolean; abgedockt?: boolean }) {
   const voll = window.location.pathname.startsWith('/monitoring/voll');
@@ -32,7 +32,7 @@ export function Monitoring({ k, breit = false, abgedockt = false }: { k: RevierK
       const [s, a, b, v, f] = await Promise.all([
         supabase
           .from('zaehlsitzungen')
-          .select('id, datum, zaehlungen(wildart_id, anzahl, geloescht_am)')
+          .select('id, datum, flaechenmodus, streifenbreite_m, strecke_km, flaeche_ha, zaehlungen(wildart_id, anzahl, geloescht_am)')
           .eq('revier_id', k.revierId)
           .eq('status', 'abgeschlossen')
           .is('geloescht_am', null)
@@ -64,7 +64,7 @@ export function Monitoring({ k, breit = false, abgedockt = false }: { k: RevierK
         (s.data ?? []).map((x) => {
           const arten: Record<string, number> = {};
           for (const z of x.zaehlungen) if (!z.geloescht_am) arten[z.wildart_id] = (arten[z.wildart_id] ?? 0) + z.anzahl;
-          return { id: x.id, datum: x.datum, arten };
+          return { id: x.id, datum: x.datum, arten, modus: x.flaechenmodus, breite: x.streifenbreite_m, strecke: x.strecke_km === null ? null : Number(x.strecke_km), flaeche: x.flaeche_ha === null ? null : Number(x.flaeche_ha) };
         }),
       );
       const st: Record<string, number> = {};
@@ -90,6 +90,18 @@ export function Monitoring({ k, breit = false, abgedockt = false }: { k: RevierK
     for (const s of sitzungen) for (const [art, n] of Object.entries(s.arten)) m[art] = Math.max(m[art] ?? 0, n);
     return m;
   }, [sitzungen]);
+
+  // Höchstwerte je 100 ha: Bezug ist die gezählte Fläche der jeweiligen Zählung (Revierfläche nur als Ersatz, wenn keine festgeschrieben ist)
+  const maxJe100 = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const s of sitzungen) {
+      const fl = s.flaeche ?? k.flaecheHa;
+      if (!fl) continue;
+      for (const [art, n] of Object.entries(s.arten)) m[art] = Math.max(m[art] ?? 0, (n / fl) * 100);
+    }
+    return m;
+  }, [sitzungen, k.flaecheHa]);
+  const gemischt = new Set(sitzungen.map((x) => x.modus)).size > 1;
 
   const streckeSumme = Object.values(strecke).reduce((a, n) => a + n, 0);
 
@@ -134,7 +146,7 @@ export function Monitoring({ k, breit = false, abgedockt = false }: { k: RevierK
             <Kennzahl wert={gezaehlteArten.length} label="Gezählte Wildarten" />
             <Kennzahl wert={Object.values(maxJeArt).reduce((a, n) => a + n, 0)} label="Summe der Höchstwerte" />
             <Kennzahl
-              wert={k.flaecheHa ? (Object.values(maxJeArt).reduce((a, n) => a + n, 0) / k.flaecheHa) * 100 : null}
+              wert={Object.keys(maxJe100).length ? Object.values(maxJe100).reduce((a, n) => a + n, 0) : null}
               nachkomma={1}
               label="Höchstwerte je 100 ha"
             />
@@ -144,6 +156,35 @@ export function Monitoring({ k, breit = false, abgedockt = false }: { k: RevierK
             <div className="breit">
               <Jahresvergleich k={k} wildarten={wildarten} />
             </div>
+          )}
+
+          {sitzungen.length > 0 && (
+            <Gruppe titel="Gezählte Fläche je Zählung" fuss={gemischt ? 'Achtung: Zählungen mit Strecke × Breite und mit Zonenfläche sind nicht streng vergleichbar.' : undefined}>
+              <div className="tabelle-rahmen" style={{ border: 0 }}>
+                <table className="tabelle">
+                  <thead>
+                    <tr>
+                      <th scope="col">Datum</th>
+                      <th scope="col">Modus</th>
+                      <th scope="col" className="zahl">Strecke</th>
+                      <th scope="col" className="zahl">Fläche</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sitzungen.map((x) => (
+                      <tr key={x.id}>
+                        <th scope="row">{datumDE(x.datum)}</th>
+                        <td>
+                          <span className={`badge ${x.modus === 'strecke' ? 'badge-orange' : 'badge-gruen'}`}>{x.modus === 'strecke' ? `Strecke × ${x.breite} m` : 'Zonenfläche'}</span>
+                        </td>
+                        <td className="zahl">{x.strecke !== null ? `${x.strecke.toLocaleString('de-DE', { maximumFractionDigits: 1 })} km` : '–'}</td>
+                        <td className="zahl">{x.flaeche !== null ? `${x.flaeche.toLocaleString('de-DE')} ha` : '–'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Gruppe>
           )}
 
           <Gruppe titel="Zählverlauf">
@@ -170,13 +211,13 @@ export function Monitoring({ k, breit = false, abgedockt = false }: { k: RevierK
           </Gruppe>
 
           {gezaehlteArten.length > 0 && (
-            <Gruppe titel="Höchster Zählwert je Wildart" fuss={k.flaecheHa ? `Bezogen auf ${k.flaecheHa.toLocaleString('de-DE')} ha Revierfläche` : undefined}>
+            <Gruppe titel="Höchster Zählwert je Wildart" fuss="Je 100 ha bezogen auf die gezählte Fläche der jeweiligen Zählung.">
               <div className="diagramm-block">
                 <Balken
                   zeilen={gezaehlteArten.map((w) => ({
                     label: w.name,
                     wert: maxJeArt[w.id] ?? 0,
-                    zusatz: k.flaecheHa ? ` · ${(((maxJeArt[w.id] ?? 0) / k.flaecheHa) * 100).toLocaleString('de-DE', { maximumFractionDigits: 1 })} / 100 ha` : undefined,
+                    zusatz: maxJe100[w.id] !== undefined ? ` · ${maxJe100[w.id]!.toLocaleString('de-DE', { maximumFractionDigits: 1 })} / 100 ha` : undefined,
                   }))}
                 />
               </div>
@@ -228,7 +269,7 @@ function Anordnung({ voll }: { voll: boolean }) {
   );
 }
 
-type Sitzung = { id: string; datum: string; arten: Record<string, number> };
+type Sitzung = { id: string; datum: string; arten: Record<string, number>; modus: string; flaeche: number | null };
 
 function tagImJagdjahr(datum: string, start: number): number {
   const t = (d: string) => Date.UTC(Number(d.slice(0, 4)), Number(d.slice(5, 7)) - 1, Number(d.slice(8, 10)));
@@ -255,7 +296,7 @@ function Jahresvergleich({ k, wildarten }: { k: RevierKontext; wildarten: Return
       const [s, a] = await Promise.all([
         supabase
           .from('zaehlsitzungen')
-          .select('id, datum, zaehlungen(wildart_id, anzahl, geloescht_am)')
+          .select('id, datum, flaechenmodus, streifenbreite_m, strecke_km, flaeche_ha, zaehlungen(wildart_id, anzahl, geloescht_am)')
           .eq('revier_id', k.revierId)
           .eq('status', 'abgeschlossen')
           .is('geloescht_am', null)
@@ -278,7 +319,7 @@ function Jahresvergleich({ k, wildarten }: { k: RevierKontext; wildarten: Return
         (s.data ?? []).map((x) => {
           const arten: Record<string, number> = {};
           for (const z of x.zaehlungen) if (!z.geloescht_am) arten[z.wildart_id] = (arten[z.wildart_id] ?? 0) + z.anzahl;
-          return { id: x.id, datum: x.datum, arten };
+          return { id: x.id, datum: x.datum, arten, modus: x.flaechenmodus, flaeche: x.flaeche_ha === null ? null : Number(x.flaeche_ha) };
         }),
       );
       setAbschuesse((a.data ?? []).filter((x): x is { wildart_id: string; erlegt_am: string } => !!x.wildart_id));
@@ -298,6 +339,11 @@ function Jahresvergleich({ k, wildarten }: { k: RevierKontext; wildarten: Return
     if (verfuegbar.length && !verfuegbar.some((w) => w.id === art)) setArt(verfuegbar.find((w) => w.id === 'rehwild')?.id ?? verfuegbar[0]!.id);
   }, [verfuegbar, art]);
 
+  // Je 100 ha: Bezug ist die gezählte Fläche der Zählung (Ersatz: Revierfläche)
+  const faktorFuer = (s: Sitzung) => {
+    const fl = s.flaeche ?? k.flaecheHa;
+    return bezug === 'je100' && fl ? 100 / fl : 1;
+  };
   const faktor = bezug === 'je100' && k.flaecheHa ? 100 / k.flaecheHa : 1;
   const imJahr = (datum: string, start: number) => datum >= `${start}-04-01` && datum <= `${start + 1}-03-31`;
 
@@ -310,7 +356,7 @@ function Jahresvergleich({ k, wildarten }: { k: RevierKontext; wildarten: Return
         label: `Jagdjahr ${j.label}`,
         punkte: sitzungen
           .filter((s) => imJahr(s.datum, j.start) && s.arten[art] !== undefined)
-          .map((s) => ({ x: tagImJagdjahr(s.datum, j.start), wert: (s.arten[art] ?? 0) * faktor, titel: datumDE(s.datum) })),
+          .map((s) => ({ x: tagImJagdjahr(s.datum, j.start), wert: (s.arten[art] ?? 0) * faktorFuer(s), titel: datumDE(s.datum) })),
       };
     }
     let summe = 0;
@@ -327,7 +373,7 @@ function Jahresvergleich({ k, wildarten }: { k: RevierKontext; wildarten: Return
   // Kennzahlen je Jagdjahr
   const tabelle = gewaehlteJahre.map((j) => {
     const s = sitzungen.filter((x) => imJahr(x.datum, j.start));
-    const werte = s.map((x) => x.arten[art]).filter((n): n is number => n !== undefined);
+    const werte = s.filter((x) => x.arten[art] !== undefined).map((x) => (x.arten[art] as number) * faktorFuer(x));
     const strecke = abschuesse.filter((x) => imJahr(x.erlegt_am.slice(0, 10), j.start));
     return {
       jahr: j,
@@ -340,7 +386,8 @@ function Jahresvergleich({ k, wildarten }: { k: RevierKontext; wildarten: Return
   });
 
   const einheit = bezug === 'je100' ? ' je 100 ha' : ' Stück';
-  const zahl = (n: number | null, nk = 1) => (n === null ? '–' : (n * (bezug === 'je100' && k.flaecheHa ? 100 / k.flaecheHa : 1)).toLocaleString('de-DE', { maximumFractionDigits: nk }));
+  const zahl = (n: number | null, nk = 1) => (n === null ? '–' : n.toLocaleString('de-DE', { maximumFractionDigits: nk }));
+  const gemischtJahre = new Set(sitzungen.filter((x) => gewaehlteJahre.some((j) => imJahr(x.datum, j.start))).map((x) => x.modus)).size > 1;
 
   return (
     <Gruppe titel="Jahresvergleich" fuss="Zählungen: Summe aller Zonen je abgeschlossener Zählung. Strecke: Abschüsse der Wildart, kumuliert ab 1. April.">
@@ -391,6 +438,9 @@ function Jahresvergleich({ k, wildarten }: { k: RevierKontext; wildarten: Return
             </label>
           ))}
         </fieldset>
+        {bezug === 'je100' && gemischtJahre && (
+          <Hinweis art="warnung">Die gewählten Jagdjahre enthalten Zählungen mit Strecke × Breite und mit Zonenfläche. Die Werte je 100 ha sind nicht streng vergleichbar.</Hinweis>
+        )}
         {laedt ? (
           <Leer>Daten werden geladen …</Leer>
         ) : serien.every((s) => s.punkte.length <= 1) ? (
