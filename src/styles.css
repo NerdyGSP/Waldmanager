@@ -905,3 +905,11 @@ button.kachel:active { transform: none; }
 .bj-zeile-aussen { border-top: 1px solid var(--color-border); padding-right: var(--abstand); }
 .bj-zeile-aussen:first-child { border-top: 0; }
 .bj-zeile-aussen .bj-zeile { border-top: 0; }
+
+.bj-druck-qrreihe { display: flex; gap: 24px; margin: 12px 0; }
+.bj-druck-qrreihe figure { margin: 0; display: flex; align-items: center; gap: 10px; font-size: .85rem; }
+.bj-druck-qrreihe figcaption { max-width: 170px; }
+.bj-druck-eigener { position: absolute; transform: translate(-50%, -130%); background: #1f6fb2; color: #fff; padding: 2px 7px; border-radius: 4px; font-weight: 700; font-size: .8rem; white-space: nowrap; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.bj-druck-eigener::after { content: ''; position: absolute; left: 50%; top: 100%; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: #1f6fb2; border: 2px solid #fff; box-shadow: 0 0 0 1px #000; }
+.bj-druck-seite.folge { margin-top: 24px; padding-top: 24px; border-top: 2px dashed #bbb; }
+@media print { .bj-druck-seite.folge { break-before: page; page-break-before: always; margin-top: 0; padding-top: 0; border-top: 0; } }

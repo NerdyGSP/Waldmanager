@@ -15,6 +15,7 @@
     "but-unzip": "^0.1.10",
     "maplibre-gl": "^6.16.0",
     "proj4": "^2.22.0",
+    "qrcode-generator": "^1.4.4",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "shpjs": "^6.2.0",

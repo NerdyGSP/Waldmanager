@@ -3,10 +3,14 @@ import { createPortal } from 'react-dom';
 import { datumDE } from '../../lib/zeit';
 import type { Tables } from '../../lib/database.types';
 import { Knopf } from '../../components/ui';
+import { QrCode } from '../../components/QrCode';
+import { navigationsLinks } from '../../lib/bewegungsjagd';
+import { EINRICHTUNGSTYPEN } from '../../lib/stammdaten';
 
 type Jagd = Tables<'bewegungsjagden'>;
 type Teilnehmer = Tables<'bewegungsjagd_teilnehmer'>;
 type Bock = { id: string; lng: number; lat: number; name: string | null };
+export type Stand = { id: string; lng: number; lat: number; name: string | null; typ: string; bemerkung?: string | null };
 
 // Gemeinsamer Rahmen: Vollbild-Ebene mit Werkzeugleiste, beim Drucken nur das Blatt
 function Druckrahmen({ querformat, onZu, leiste, children }: { querformat: boolean; onZu: () => void; leiste?: React.ReactNode; children: React.ReactNode }) {
@@ -20,11 +24,16 @@ function Druckrahmen({ querformat, onZu, leiste, children }: { querformat: boole
       stil.remove();
     };
   }, [querformat]);
+  useEffect(() => {
+    const esc = (e: KeyboardEvent) => e.key === 'Escape' && onZu();
+    window.addEventListener('keydown', esc);
+    return () => window.removeEventListener('keydown', esc);
+  }, [onZu]);
   return createPortal(
     <div className="bj-druck-ebene" role="dialog" aria-modal="true">
       <div className="bj-druck-leiste">
+        <Knopf variante="ghost" onClick={onZu}>‹ Zurück</Knopf>
         <Knopf variante="akzent" onClick={() => window.print()}>Drucken / als PDF</Knopf>
-        <Knopf variante="ghost" onClick={onZu}>Schließen</Knopf>
         {leiste}
       </div>
       <div className={`bj-druck-blatt ${querformat ? 'quer' : 'hoch'}`}>{children}</div>
@@ -39,10 +48,15 @@ const R = 6378137;
 const mx = (lng: number) => (lng * Math.PI * R) / 180;
 const my = (lat: number) => R * Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI) / 360));
 
-export function TeilnehmerInfoDruck({ jagd, boecke, onZu }: { jagd: Jagd; boecke: Bock[]; onZu: () => void }) {
-  const [hinweise, setHinweise] = useState('Bitte pünktlich am Treffpunkt sein. Jagdschein, Waffenbesitzkarte und Versicherungsnachweis sind mitzuführen. Signalkleidung ist Pflicht. Den Anweisungen der Jagdleitung ist Folge zu leisten.');
+const STANDARD_HINWEIS =
+  'Bitte pünktlich am Treffpunkt sein. Jagdschein, Waffenbesitzkarte und Schießnachweis (Gültigkeit im Bundesland prüfen) sind mitzuführen. Signalkleidung ist Pflicht. Den Anweisungen der Jagdleitung ist uneingeschränkt Folge zu leisten.';
+
+export function TeilnehmerInfoDruck({ jagd, boecke, staende, tn, onZu }: { jagd: Jagd; boecke: Bock[]; staende: Stand[]; tn: Teilnehmer[]; onZu: () => void }) {
+  const [hinweise, setHinweise] = useState(STANDARD_HINWEIS);
   const [adresse, setAdresse] = useState<string | null>(null);
+  const [fuer, setFuer] = useState<string>(''); // '' = allgemein, 'alle' = je Zusage eine Seite, sonst Teilnehmer-ID
   const hatTreffpunkt = jagd.treffpunkt_lng != null && jagd.treffpunkt_lat != null;
+  const zusagen = useMemo(() => tn.filter((t) => t.status === 'zugesagt' && t.aktiv).sort((a, b) => a.name.localeCompare(b.name, 'de')), [tn]);
 
   // Adresse des Treffpunkts (OpenStreetMap Nominatim), nur ein einzelner Abruf
   useEffect(() => {
@@ -53,7 +67,7 @@ export function TeilnehmerInfoDruck({ jagd, boecke, onZu }: { jagd: Jagd; boecke
       .catch(() => setAdresse(null));
   }, [hatTreffpunkt, jagd.treffpunkt_lat, jagd.treffpunkt_lng]);
 
-  const karte = useMemo(() => {
+  const luftbild = useMemo(() => {
     if (!hatTreffpunkt) return null;
     const cx = mx(jagd.treffpunkt_lng!);
     const cy = my(jagd.treffpunkt_lat!);
@@ -64,67 +78,130 @@ export function TeilnehmerInfoDruck({ jagd, boecke, onZu }: { jagd: Jagd; boecke
       'https://opendata.lgln.niedersachsen.de/doorman/noauth/dop_wms?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&FORMAT=image/jpeg&LAYERS=ni_dop20&STYLES=&CRS=EPSG:3857' +
       `&WIDTH=1400&HEIGHT=1000&BBOX=${bbox.join(',')}`;
     const pos = (lng: number, lat: number) => ({ x: ((mx(lng) - bbox[0]!) / (bbox[2]! - bbox[0]!)) * 100, y: (1 - (my(lat) - bbox[1]!) / (bbox[3]! - bbox[1]!)) * 100 });
+    const innen = (p: { x: number; y: number }) => p.x >= 0 && p.x <= 100 && p.y >= 0 && p.y <= 100;
     return {
       url,
+      pos,
+      innen,
       tp: pos(jagd.treffpunkt_lng!, jagd.treffpunkt_lat!),
-      boecke: boecke.map((b) => ({ ...b, ...pos(b.lng, b.lat) })).filter((b) => b.x >= 0 && b.x <= 100 && b.y >= 0 && b.y <= 100),
+      boecke: boecke.map((b) => ({ ...b, ...pos(b.lng, b.lat) })).filter(innen),
     };
   }, [hatTreffpunkt, jagd.treffpunkt_lng, jagd.treffpunkt_lat, boecke]);
 
   const datumLang = new Date(`${jagd.datum}T12:00:00`).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+  const standLabel = (e: Stand) => e.name || (EINRICHTUNGSTYPEN.find((t) => t.wert === e.typ)?.label ?? e.typ);
+
+  const seiten: Array<Teilnehmer | null> = fuer === 'alle' ? zusagen : fuer ? [tn.find((t) => t.id === fuer) ?? null] : [null];
 
   return (
     <Druckrahmen
       querformat={false}
       onZu={onZu}
       leiste={
-        <label className="bj-druck-hinweise">
-          Hinweise (anpassbar)
-          <textarea value={hinweise} onChange={(e) => setHinweise(e.target.value)} rows={3} />
-        </label>
+        <>
+          <label className="bj-druck-hinweise" style={{ flex: '0 1 260px' }}>
+            Ausgabe für
+            <select value={fuer} onChange={(e) => setFuer(e.target.value)}>
+              <option value="">Allgemein (ohne Stand)</option>
+              {zusagen.length > 0 && <option value="alle">Alle Zusagen – eine Seite je Teilnehmer</option>}
+              {zusagen.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="bj-druck-hinweise">
+            Hinweise (anpassbar)
+            <textarea value={hinweise} onChange={(e) => setHinweise(e.target.value)} rows={4} />
+          </label>
+        </>
       }
     >
-      <h1>{jagd.titel}</h1>
-      <p className="art">{jagd.art}</p>
-      <table className="bj-druck-tabelle">
-        <tbody>
-          <tr><th>Datum</th><td>{datumLang}</td></tr>
-          {jagd.uhrzeit && <tr><th>Uhrzeit</th><td>{jagd.uhrzeit.slice(0, 5)} Uhr</td></tr>}
-          {hatTreffpunkt && (
-            <tr>
-              <th>Treffpunkt</th>
-              <td>
-                {adresse && <>{adresse}<br /></>}
-                <small>{jagd.treffpunkt_lat!.toFixed(5)}, {jagd.treffpunkt_lng!.toFixed(5)}</small>
-              </td>
-            </tr>
-          )}
-          {jagd.schuesseltreiben && (
-            <tr>
-              <th>Schüsseltreiben</th>
-              <td>{jagd.schuesseltreiben_adresse || 'ja'}{jagd.schuesseltreiben_anmeldung_pflicht ? ' · Anmeldung erforderlich' : ''}</td>
-            </tr>
-          )}
-          {jagd.hegebeitrag_aktiv && <tr><th>Hegebeitrag</th><td>{Number(jagd.hegebeitrag_betrag ?? 0).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</td></tr>}
-        </tbody>
-      </table>
-      {jagd.einladungstext && <p className="text">{jagd.einladungstext}</p>}
-      {hinweise.trim() && (
-        <>
-          <h2>Hinweise</h2>
-          <p className="text">{hinweise}</p>
-        </>
-      )}
-      {karte && (
-        <div className="bj-druck-karte">
-          <img src={karte.url} alt="Luftbild um den Treffpunkt" />
-          {karte.boecke.map((b) => (
-            <span key={b.id} className="bj-druck-bock" style={{ left: `${b.x}%`, top: `${b.y}%` }} title={b.name ?? 'Drückjagdbock'} />
-          ))}
-          <span className="bj-druck-tp" style={{ left: `${karte.tp.x}%`, top: `${karte.tp.y}%` }}>⚑ Treffpunkt</span>
-          <small className="bj-druck-quelle">© LGLN · ● Drückjagdbock · Maßstab ca. 1 : 6.000 (Ausschnitt 1,4 km × 1,0 km)</small>
-        </div>
-      )}
+      {seiten.map((t, i) => {
+        const stand = t?.zugeordnete_einrichtung_id ? staende.find((e) => e.id === t.zugeordnete_einrichtung_id) : undefined;
+        const standPos = stand && luftbild ? luftbild.pos(stand.lng, stand.lat) : null;
+        return (
+          <section key={t?.id ?? 'allgemein'} className={i > 0 ? 'bj-druck-seite folge' : 'bj-druck-seite'}>
+            <h1>{jagd.titel}</h1>
+            <p className="art">{jagd.art}{t ? ` · Teilnehmer: ${t.name}` : ''}</p>
+            <table className="bj-druck-tabelle">
+              <tbody>
+                <tr><th>Datum</th><td>{datumLang}</td></tr>
+                {jagd.uhrzeit && <tr><th>Uhrzeit</th><td>{jagd.uhrzeit.slice(0, 5)} Uhr</td></tr>}
+                {hatTreffpunkt && (
+                  <tr>
+                    <th>Treffpunkt</th>
+                    <td>
+                      {adresse && <>{adresse}<br /></>}
+                      <small>{jagd.treffpunkt_lat!.toFixed(5)}, {jagd.treffpunkt_lng!.toFixed(5)}</small>
+                    </td>
+                  </tr>
+                )}
+                {t && (
+                  <tr>
+                    <th>Dein Stand</th>
+                    <td>
+                      {stand ? (
+                        <>
+                          <strong>{standLabel(stand)}</strong> ({EINRICHTUNGSTYPEN.find((x) => x.wert === stand.typ)?.label ?? stand.typ})<br />
+                          <small>{stand.lat.toFixed(5)}, {stand.lng.toFixed(5)}</small>
+                          {stand.bemerkung && <><br /><small>{stand.bemerkung}</small></>}
+                        </>
+                      ) : (
+                        'Noch kein Stand zugewiesen – Zuweisung vor Ort durch die Jagdleitung.'
+                      )}
+                    </td>
+                  </tr>
+                )}
+                {jagd.schuesseltreiben && (
+                  <tr>
+                    <th>Schüsseltreiben</th>
+                    <td>{jagd.schuesseltreiben_adresse || 'ja'}{jagd.schuesseltreiben_anmeldung_pflicht ? ' · Anmeldung erforderlich' : ''}</td>
+                  </tr>
+                )}
+                {jagd.hegebeitrag_aktiv && <tr><th>Hegebeitrag</th><td>{Number(jagd.hegebeitrag_betrag ?? 0).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</td></tr>}
+              </tbody>
+            </table>
+            {(hatTreffpunkt || stand) && (
+              <div className="bj-druck-qrreihe">
+                {hatTreffpunkt && (
+                  <figure>
+                    <QrCode text={navigationsLinks(jagd.treffpunkt_lat!, jagd.treffpunkt_lng!).google} groesse={110} titel="Navigation zum Treffpunkt" />
+                    <figcaption>Navigation zum <strong>Treffpunkt</strong><br />QR-Code mit dem Handy scannen</figcaption>
+                  </figure>
+                )}
+                {stand && (
+                  <figure>
+                    <QrCode text={navigationsLinks(stand.lat, stand.lng).google} groesse={110} titel="Navigation zum Stand" />
+                    <figcaption>Navigation zu <strong>deinem Stand</strong><br />QR-Code mit dem Handy scannen</figcaption>
+                  </figure>
+                )}
+              </div>
+            )}
+            {jagd.einladungstext && <p className="text">{jagd.einladungstext}</p>}
+            {hinweise.trim() && (
+              <>
+                <h2>Hinweise</h2>
+                <p className="text">{hinweise}</p>
+              </>
+            )}
+            {luftbild && (
+              <div className="bj-druck-karte">
+                <img src={luftbild.url} alt="Luftbild um den Treffpunkt" />
+                {luftbild.boecke.map((b) => (
+                  <span key={b.id} className="bj-druck-bock" style={{ left: `${b.x}%`, top: `${b.y}%` }} title={b.name ?? 'Drückjagdbock'} />
+                ))}
+                {stand && standPos && luftbild.innen(standPos) && (
+                  <span className="bj-druck-eigener" style={{ left: `${standPos.x}%`, top: `${standPos.y}%` }}>Dein Stand</span>
+                )}
+                <span className="bj-druck-tp" style={{ left: `${luftbild.tp.x}%`, top: `${luftbild.tp.y}%` }}>⚑ Treffpunkt</span>
+                <small className="bj-druck-quelle">© LGLN · ● Drückjagdbock · Maßstab ca. 1 : 6.000 (Ausschnitt 1,4 km × 1,0 km)</small>
+              </div>
+            )}
+          </section>
+        );
+      })}
     </Druckrahmen>
   );
 }

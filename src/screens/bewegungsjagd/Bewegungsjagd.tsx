@@ -20,7 +20,7 @@ const kartenLaden = <div className="laden">Karte wird geladen …</div>;
 
 type Jagd = Tables<'bewegungsjagden'>;
 type Teilnehmer = Tables<'bewegungsjagd_teilnehmer'>;
-type Einrichtung = { id: string; name: string | null; typ: string; lng: number; lat: number };
+type Einrichtung = { id: string; name: string | null; typ: string; lng: number; lat: number; bemerkung?: string | null };
 
 type KartenAuszug = { grenze: Geometry | null; einrichtungen: Einrichtung[] };
 
@@ -31,7 +31,7 @@ function useRevierKarte(revierId: string): KartenAuszug {
     void supabase.rpc('karte_daten', { p_revier_id: revierId, p_tage: 1 }).then(({ data }) => {
       const x = data as unknown as {
         grenze?: Geometry | null;
-        einrichtungen?: Array<{ id?: string; geometry?: { coordinates?: number[] }; properties?: { id?: string; typ?: string; name?: string | null } }>;
+        einrichtungen?: Array<{ id?: string; geometry?: { coordinates?: number[] }; properties?: { id?: string; typ?: string; name?: string | null; bemerkung?: string | null } }>;
       } | null;
       setD({
         grenze: x?.grenze ?? null,
@@ -39,6 +39,7 @@ function useRevierKarte(revierId: string): KartenAuszug {
           id: e.id ?? e.properties?.id ?? '',
           name: e.properties?.name ?? null,
           typ: e.properties?.typ ?? 'sonstiges',
+          bemerkung: e.properties?.bemerkung ?? null,
           lng: e.geometry?.coordinates?.[0] ?? 0,
           lat: e.geometry?.coordinates?.[1] ?? 0,
         })),
@@ -895,7 +896,7 @@ function Auswertung({ k, id }: { k: RevierKontext; id: string }) {
         </div>
       )}
 
-      {druck === 'info' && <TeilnehmerInfoDruck jagd={jagd} boecke={einrichtungen.filter((e) => e.typ === 'drueckjagdbock').map((e) => ({ id: e.id, lng: e.lng, lat: e.lat, name: e.name }))} onZu={() => setDruck(null)} />}
+      {druck === 'info' && <TeilnehmerInfoDruck jagd={jagd} staende={einrichtungen} tn={tn} boecke={einrichtungen.filter((e) => e.typ === 'drueckjagdbock').map((e) => ({ id: e.id, lng: e.lng, lat: e.lat, name: e.name }))} onZu={() => setDruck(null)} />}
       {druck === 'liste' && <TeilnehmerListeDruck jagd={jagd} tn={tn} standName={(eid) => (stand(eid) ? einrLabel(stand(eid)!) : '')} onZu={() => setDruck(null)} />}
 
       {abschluss && (
