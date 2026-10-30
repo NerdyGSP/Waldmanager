@@ -918,39 +918,65 @@ export type Database = {
         Row: {
           aktualisiert_am: string
           bemerkung: string | null
+          bewegungsjagd_id: string | null
           erstellt_am: string
+          erstellt_von: string | null
           geloescht_am: string | null
           geom: unknown
           id: string
           name: string
           revier_id: string
+          typ: string
+          zaehlsitzung_id: string | null
         }
         Insert: {
           aktualisiert_am?: string
           bemerkung?: string | null
+          bewegungsjagd_id?: string | null
           erstellt_am?: string
+          erstellt_von?: string | null
           geloescht_am?: string | null
           geom: unknown
           id?: string
           name: string
           revier_id: string
+          typ?: string
+          zaehlsitzung_id?: string | null
         }
         Update: {
           aktualisiert_am?: string
           bemerkung?: string | null
+          bewegungsjagd_id?: string | null
           erstellt_am?: string
+          erstellt_von?: string | null
           geloescht_am?: string | null
           geom?: unknown
           id?: string
           name?: string
           revier_id?: string
+          typ?: string
+          zaehlsitzung_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "pirschwege_bewegungsjagd_id_fkey"
+            columns: ["bewegungsjagd_id"]
+            isOneToOne: false
+            referencedRelation: "bewegungsjagden"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "pirschwege_revier_id_fkey"
             columns: ["revier_id"]
             isOneToOne: false
             referencedRelation: "reviere"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pirschwege_zaehlsitzung_id_fkey"
+            columns: ["zaehlsitzung_id"]
+            isOneToOne: false
+            referencedRelation: "zaehlsitzungen"
             referencedColumns: ["id"]
           },
         ]

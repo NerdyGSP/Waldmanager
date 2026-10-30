@@ -958,3 +958,6 @@ button.kachel:active { transform: none; }
 .zr-karte .klein { margin-top: 4px; font-size: .72rem; }
 .zr-tabelle .zahl { text-align: right; }
 .zr-tabelle tbody th { text-align: left; font-weight: 600; }
+.wte-menue .menue-gruppe { margin: 6px 12px 2px; font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-leise, #667); }
+.wte-menue button:disabled { opacity: .45; cursor: default; }
+.wte-menue { max-height: calc(100% - 90px); overflow-y: auto; }

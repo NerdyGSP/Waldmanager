@@ -30,6 +30,7 @@ import { EinrichtungsIcon, einrichtungsBild } from '../../lib/einrichtungsIcons'
 import type { Enums, Json } from '../../lib/database.types';
 import type { RevierKontext } from './kontext';
 import { Symbol } from '../../components/symbole';
+import { ZeichnenSheet, type SheetArt, type SheetWerte } from './ZeichnenSheet';
 
 // ---------- Kartengrundlagen ----------
 
@@ -58,22 +59,26 @@ const STANDARD_ZENTRUM: [number, number] = [9.47, 52.2]; // Raum Bad Münder
 
 
 // Logische Kartenebenen: jede besteht aus einer oder mehreren MapLibre-Schichten
-type EbenenId = 'einrichtungen' | 'abschuesse' | 'pirschwege' | 'heatmap' | 'grenze' | 'zonen' | 'luftbild';
+type EbenenId = 'einrichtungen' | 'abschuesse' | 'pirschwege' | 'treiberrouten' | 'wteRouten' | 'heatmap' | 'grenze' | 'zonen' | 'luftbild';
 const EBENEN_SCHICHTEN: Record<EbenenId, string[]> = {
   luftbild: ['luftbild'],
   zonen: ['zonen-flaeche', 'zonen-linie', 'zonen-auswahl'],
   grenze: ['grenze-linie'],
   heatmap: ['heatmap'],
   pirschwege: ['pirschwege-linie'],
+  treiberrouten: ['treiberrouten-linie', 'treiberrouten-pfeile'],
+  wteRouten: ['wte-routen-linie', 'wte-routen-pfeile'],
   abschuesse: ['abschuesse-punkt'],
   einrichtungen: ['einrichtungen-punkt'],
 };
 // oben → unten
-const STANDARD_REIHENFOLGE: EbenenId[] = ['einrichtungen', 'abschuesse', 'pirschwege', 'heatmap', 'grenze', 'zonen', 'luftbild'];
+const STANDARD_REIHENFOLGE: EbenenId[] = ['einrichtungen', 'abschuesse', 'pirschwege', 'treiberrouten', 'wteRouten', 'heatmap', 'grenze', 'zonen', 'luftbild'];
 const STANDARD_DECKKRAFT: Record<EbenenId, number> = {
   einrichtungen: 1,
   abschuesse: 1,
   pirschwege: 1,
+  treiberrouten: 1,
+  wteRouten: 1,
   heatmap: 0.75,
   grenze: 1,
   zonen: 0.55,
@@ -95,6 +100,25 @@ function ebenenEinstellungenLesen(): { reihenfolge: EbenenId[]; deckkraft: Recor
   } catch {
     return { reihenfolge: STANDARD_REIHENFOLGE, deckkraft: { ...STANDARD_DECKKRAFT } };
   }
+}
+
+// Richtungspfeil (zeigt nach rechts = Linienrichtung) für Treiber- und WTE-Routen
+function pfeilBild(): ImageData {
+  const c = document.createElement('canvas');
+  c.width = c.height = 24;
+  const g = c.getContext('2d')!;
+  g.fillStyle = '#fff';
+  g.strokeStyle = '#111';
+  g.lineWidth = 2;
+  g.beginPath();
+  g.moveTo(4, 5);
+  g.lineTo(20, 12);
+  g.lineTo(4, 19);
+  g.lineTo(8, 12);
+  g.closePath();
+  g.fill();
+  g.stroke();
+  return g.getImageData(0, 0, 24, 24);
 }
 
 // Handys laden das Luftbild nur für den Revierbereich, Tablets/PCs für den ganzen Kartenausschnitt
@@ -126,15 +150,20 @@ type Ebenen = {
   zonen: boolean;
   einrichtungen: boolean;
   pirschwege: boolean;
+  treiberrouten: boolean;
+  wteRouten: boolean;
   heatmap: boolean;
   abschuesse: boolean;
 };
 
+type RouteTyp = 'pirschweg' | 'treiberroute' | 'wte_route';
+const ROUTENNAME: Record<RouteTyp, string> = { pirschweg: 'Pirschweg', treiberroute: 'Treiberroute', wte_route: 'WTE-Route' };
+
 type Modus =
   | { art: 'grenze' }
   | { art: 'zone'; zoneId: string | null; name: string; bearbeiten?: boolean }
-  | { art: 'pirschweg' }
-  | { art: 'aufzeichnung' }
+  | { art: 'route'; typ: RouteTyp }
+  | { art: 'aufzeichnung'; typ: RouteTyp }
   | { art: 'einrichtung' }
   | null;
 
@@ -167,10 +196,15 @@ export default function Karte({
     zonen: true,
     einrichtungen: true,
     pirschwege: true,
+    treiberrouten: true,
+    wteRouten: true,
     heatmap: false,
     abschuesse: false,
   });
   const [modus, setModusState] = useState<Modus>(null);
+  const [sheetArt, setSheetArt] = useState<SheetArt | null>(null);
+  const [sheetFehler, setSheetFehler] = useState<string | null>(null);
+  const [sheetSpeichert, setSheetSpeichert] = useState(false);
   const modusRef = useRef<Modus>(null);
   const [punkte, setPunkte] = useState<Position[]>([]);
   const punkteRef = useRef<Position[]>([]);
@@ -205,7 +239,6 @@ export default function Karte({
   const [meldung, setMeldung] = useState<{ art: 'fehler' | 'erfolg' | 'info'; text: string } | null>(null);
   const aufzeichnung = useRef<number | null>(null);
   const [ausgeblendet, setAusgeblendet] = useState<Set<string>>(new Set());
-  const [zielEbene, setZielEbene] = useState('');
   const grenzeRef = useRef<MultiPolygon | null>(null);
   const luftbildSchluessel = useRef('');
   const [einst, setEinst] = useState(ebenenEinstellungenLesen);
@@ -385,8 +418,28 @@ export default function Karte({
         type: 'line',
         source: 'pirschwege',
         layout: { 'line-cap': 'round', 'line-join': 'round' },
+        filter: ['==', ['get', 'typ'], 'pirschweg'],
         paint: { 'line-color': '#7b4a12', 'line-width': 3, 'line-dasharray': [2, 1.5] },
       });
+      // Treiberrouten und WTE-Routen: eigene Farben, Richtungspfeile entlang der Linie
+      m.addImage('route-pfeil', pfeilBild(), { pixelRatio: 2 });
+      for (const [id, typ, farbe] of [['treiberrouten', 'treiberroute', '#c2185b'], ['wte-routen', 'wte_route', '#00796b']] as const) {
+        m.addLayer({
+          id: `${id}-linie`,
+          type: 'line',
+          source: 'pirschwege',
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          filter: ['==', ['get', 'typ'], typ],
+          paint: { 'line-color': farbe, 'line-width': 3.5 },
+        });
+        m.addLayer({
+          id: `${id}-pfeile`,
+          type: 'symbol',
+          source: 'pirschwege',
+          filter: ['==', ['get', 'typ'], typ],
+          layout: { 'symbol-placement': 'line', 'symbol-spacing': 70, 'icon-image': 'route-pfeil', 'icon-size': 0.8, 'icon-allow-overlap': true, 'icon-ignore-placement': true, 'icon-rotation-alignment': 'map' },
+        });
+      }
       m.addLayer({
         id: 'abschuesse-punkt',
         type: 'circle',
@@ -428,7 +481,7 @@ export default function Karte({
         paint: { 'circle-radius': ['case', ['==', ['get', 'sel'], 1], 9, 6], 'circle-color': ['case', ['==', ['get', 'sel'], 1], '#1f6fb2', '#fff'], 'circle-stroke-color': '#1f6fb2', 'circle-stroke-width': 2 },
       });
 
-      for (const ebene of ['einrichtungen-punkt', 'pirschwege-linie', 'zonen-flaeche']) {
+      for (const ebene of ['einrichtungen-punkt', 'pirschwege-linie', 'treiberrouten-linie', 'wte-routen-linie', 'zonen-flaeche']) {
         m.on('mouseenter', ebene, () => {
           if (!modusRef.current) m.getCanvas().style.cursor = 'pointer';
         });
@@ -556,6 +609,11 @@ export default function Karte({
     sichtbar('zonen-linie', wte ? true : ebenen.zonen);
     sichtbar('einrichtungen-punkt', !wte && ebenen.einrichtungen);
     sichtbar('pirschwege-linie', !wte && ebenen.pirschwege);
+    sichtbar('treiberrouten-linie', !wte && ebenen.treiberrouten);
+    sichtbar('treiberrouten-pfeile', !wte && ebenen.treiberrouten);
+    // WTE-Routen sind im WTE-Modus immer sichtbar
+    sichtbar('wte-routen-linie', wte || ebenen.wteRouten);
+    sichtbar('wte-routen-pfeile', wte || ebenen.wteRouten);
     sichtbar('heatmap', !wte && ebenen.heatmap);
     sichtbar('abschuesse-punkt', !wte && ebenen.abschuesse);
     // Einzelne Zonenebenen ein-/ausblenden
@@ -582,6 +640,10 @@ export default function Karte({
     setze('grenze-linie', 'line-opacity', d.grenze);
     setze('heatmap', 'heatmap-opacity', d.heatmap);
     setze('pirschwege-linie', 'line-opacity', d.pirschwege);
+    setze('treiberrouten-linie', 'line-opacity', d.treiberrouten);
+    setze('treiberrouten-pfeile', 'icon-opacity', d.treiberrouten);
+    setze('wte-routen-linie', 'line-opacity', d.wteRouten);
+    setze('wte-routen-pfeile', 'icon-opacity', d.wteRouten);
     setze('abschuesse-punkt', 'circle-opacity', d.abschuesse);
     setze('abschuesse-punkt', 'circle-stroke-opacity', d.abschuesse);
     setze('einrichtungen-punkt', 'icon-opacity', d.einrichtungen);
@@ -640,7 +702,7 @@ export default function Karte({
         return;
       }
       if (aktiv?.art === 'zone' && aktiv.bearbeiten) return; // eigener Handler (Punkte ziehen/einfügen)
-      if (aktiv && aktiv.art !== 'aufzeichnung') {
+      if (aktiv && aktiv.art !== 'aufzeichnung' && !sheetArt) {
         const grenze = grenzeRef.current;
         if (aktiv.art === 'zone' && grenze && !punktInFlaeche(pos, grenze)) {
           // Zonen dürfen nicht über die Reviergrenze hinausgehen
@@ -652,7 +714,7 @@ export default function Karte({
         return;
       }
       if (aktiv) return;
-      const treffer = m.queryRenderedFeatures(e.point, { layers: ['einrichtungen-punkt', 'abschuesse-punkt', 'pirschwege-linie', 'zonen-flaeche'] });
+      const treffer = m.queryRenderedFeatures(e.point, { layers: ['einrichtungen-punkt', 'abschuesse-punkt', 'pirschwege-linie', 'treiberrouten-linie', 'wte-routen-linie', 'zonen-flaeche'] });
       const f = treffer[0];
       if (!f) {
         setGewaehlteZone(null);
@@ -680,7 +742,7 @@ export default function Karte({
       m.off('click', klick);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bereit, modus, k.istInhaber, wildarten, wte]);
+  }, [bereit, modus, k.istInhaber, wildarten, wte, sheetArt]);
 
   // Zone bearbeiten: Eckpunkte ziehen, Linie antippen = Punkt einfügen, Punkt antippen = markieren
   const bearbeitet = modus?.art === 'zone' && !!modus.bearbeiten;
@@ -878,8 +940,8 @@ export default function Karte({
       titel.textContent = `Abschuss: ${wildartName(wildarten, String(p.wildart_id ?? ''))}`;
       const g = GESCHLECHTER.find((x) => x.wert === p.geschlecht)?.label ?? 'unbekannt';
       text.textContent = `${datumZeitDE(String(p.erlegt_am ?? p.zeitpunkt ?? ''))} · ${g}`;
-    } else if (ebene === 'pirschwege-linie') {
-      titel.textContent = `Pirschweg: ${String(p.name ?? '')}`;
+    } else if (ebene === 'pirschwege-linie' || ebene === 'treiberrouten-linie' || ebene === 'wte-routen-linie') {
+      titel.textContent = `${ebene === 'treiberrouten-linie' ? 'Treiberroute' : ebene === 'wte-routen-linie' ? 'WTE-Route' : 'Pirschweg'}: ${String(p.name ?? '')}`;
       text.textContent = `${Number(p.laenge_m ?? 0).toLocaleString('de-DE')} m${p.bemerkung ? ` · ${String(p.bemerkung)}` : ''}`;
       loeschen = async () => {
         await supabase.from('pirschwege').update({ geloescht_am: new Date().toISOString() }).eq('id', String(p.id));
@@ -905,12 +967,37 @@ export default function Karte({
     return el;
   }
 
-  async function zeichnungSpeichern() {
-    if (!modus) return;
+  // „Speichern“ in der Zeichenleiste: prüfen und – außer bei einer bestehenden Zone – Details im Bottom-Sheet abfragen
+  function zeichnungAbschliessen() {
+    if (!modus || modus.art === 'einrichtung') return;
     setMeldung(null);
+    if (modus.art === 'grenze' || modus.art === 'zone') {
+      if (punkte.length < 3) {
+        setMeldung({ art: 'fehler', text: 'Bitte mindestens drei Punkte setzen.' });
+        return;
+      }
+      if (modus.art === 'zone' && modus.zoneId) {
+        void zeichnungSpeichern();
+        return;
+      }
+      setSheetFehler(null);
+      setSheetArt(modus.art);
+    } else {
+      if (punkte.length < 2) {
+        setMeldung({ art: 'fehler', text: `Eine ${ROUTENNAME[modus.typ]} braucht mindestens zwei Punkte.` });
+        return;
+      }
+      setSheetFehler(null);
+      setSheetArt(modus.typ);
+    }
+  }
+
+  async function zeichnungSpeichern(w?: SheetWerte) {
+    if (!modus || modus.art === 'einrichtung') return;
+    setMeldung(null);
+    setSheetSpeichert(true);
     try {
       if (modus.art === 'grenze' || modus.art === 'zone') {
-        if (punkte.length < 3) throw new Error('Bitte mindestens drei Punkte setzen.');
         const aussen = [...punkte, punkte[0]!];
         const geojson = (
           modus.art === 'zone' && modus.bearbeiten
@@ -925,66 +1012,67 @@ export default function Karte({
           setMeldung({ art: 'erfolg', text: `Reviergrenze gespeichert · ${Number(data).toLocaleString('de-DE')} ha` });
           await k.neuLaden();
         } else {
-          let zoneId = modus.zoneId;
+          let zoneId = modus.zoneId ?? w?.zoneId ?? null;
           let name = modus.name;
+          const neu = !zoneId;
           if (!zoneId) {
-            // Neue Zone: erst benennen und anlegen, dann Fläche speichern
-            let vorschlag = `Zone ${zonen.length + 1}`;
-            let eingabe: string | undefined;
-            for (;;) {
-              eingabe = window.prompt('Name der neuen Zone:', vorschlag)?.trim();
-              if (!eingabe) return;
-              if (!nameVergeben(zonen.map((z) => z.name), eingabe)) break;
-              window.alert(`Eine Zone „${eingabe}“ gibt es in diesem Revier bereits. Bitte einen anderen Namen wählen.`);
-              vorschlag = eingabe;
-            }
-            name = eingabe;
-            const ziel = daten?.ebenen.find((e) => e.id === zielEbene);
-            const { data: neu, error: anlegeFehler } = await supabase
+            if (!w) return;
+            name = w.name;
+            const ziel = daten?.ebenen.find((e) => e.id === w.ebeneId);
+            const { data: angelegt, error: anlegeFehler } = await supabase
               .from('zonen')
               .insert({
                 revier_id: k.revierId,
                 name,
                 ebene_id: ziel?.id ?? null,
                 sortierung: zonen.length,
-                farbe: ziel?.farbe ?? ZONENFARBEN[zonen.length % ZONENFARBEN.length],
+                farbe: w.farbe || ziel?.farbe || ZONENFARBEN[zonen.length % ZONENFARBEN.length],
               })
               .select('id')
               .single();
             if (anlegeFehler) throw anlegeFehler;
-            zoneId = neu.id;
+            zoneId = angelegt.id;
+            if (ziel && w.wteAktiv !== !!ziel.wte_aktiv) await supabase.from('zonen_ebenen').update({ wte_aktiv: w.wteAktiv }).eq('id', ziel.id);
+          } else if (w?.zoneId) {
+            name = zonen.find((z) => z.id === w.zoneId)?.name ?? name;
           }
           const { data: ha, error } = await supabase.rpc('zone_geometrie_setzen', { p_zone_id: zoneId, p_geojson: geojson });
           if (error) {
             // Neu angelegte Zone ohne gültige Fläche wieder entfernen
-            if (!modus.zoneId) await supabase.from('zonen').delete().eq('id', zoneId);
+            if (neu) await supabase.from('zonen').delete().eq('id', zoneId);
             throw error;
           }
           setMeldung({ art: 'erfolg', text: `Zone „${name}“ gespeichert · ${Number(ha).toLocaleString('de-DE')} ha (auf Reviergrenze zugeschnitten)` });
           await zonenLaden();
         }
-      } else if (modus.art === 'pirschweg' || modus.art === 'aufzeichnung') {
-        if (punkte.length < 2) throw new Error('Ein Pirschweg braucht mindestens zwei Punkte.');
-        const name = window.prompt('Name des Pirschwegs:', 'Pirschweg')?.trim();
-        if (!name) return;
+      } else {
+        if (!w) return;
         const { error } = await supabase.from('pirschwege').insert({
           revier_id: k.revierId,
-          name,
+          name: w.name,
+          bemerkung: w.bemerkung || null,
+          typ: modus.typ,
+          bewegungsjagd_id: modus.typ === 'treiberroute' ? w.bewegungsjagdId || null : null,
+          zaehlsitzung_id: modus.typ === 'wte_route' ? w.sitzungId || null : null,
           geom: linieEWKT(punkte as Array<[number, number]>),
         });
         if (error) throw error;
-        setMeldung({ art: 'erfolg', text: `Pirschweg „${name}“ gespeichert` });
+        setMeldung({ art: 'erfolg', text: `${ROUTENNAME[modus.typ]} „${w.name}“ gespeichert` });
       }
       aufzeichnungStoppen();
+      setSheetArt(null);
       setModus(null);
       await laden();
     } catch (err) {
-      setMeldung({ art: 'fehler', text: fehlertext(err) });
+      if (sheetArt) setSheetFehler(fehlertext(err));
+      else setMeldung({ art: 'fehler', text: fehlertext(err) });
+    } finally {
+      setSheetSpeichert(false);
     }
   }
 
-  function aufzeichnungStarten() {
-    setModus({ art: 'aufzeichnung' });
+  function aufzeichnungStarten(typ: RouteTyp) {
+    setModus({ art: 'aufzeichnung', typ });
     setMeldung({ art: 'info', text: 'Aufzeichnung läuft – Bildschirm eingeschaltet lassen.' });
     aufzeichnung.current = navigator.geolocation.watchPosition(
       (p) => {
@@ -1058,6 +1146,8 @@ export default function Karte({
     grenze: { name: 'Reviergrenze', label: 'Reviergrenze', an: ebenen.grenze, setAn: (an) => setEbenen({ ...ebenen, grenze: an }) },
     heatmap: { name: 'Heatmap', label: `Heatmap ${HEATNAMEN[heatQuelle]} (${gefiltert[heatQuelle].length})`, an: ebenen.heatmap, setAn: (an) => setEbenen({ ...ebenen, heatmap: an }) },
     pirschwege: { name: 'Pirschwege', label: 'Pirschwege', an: ebenen.pirschwege, setAn: (an) => setEbenen({ ...ebenen, pirschwege: an }) },
+    treiberrouten: { name: 'Treiberrouten', label: 'Treiberrouten', an: ebenen.treiberrouten, setAn: (an) => setEbenen({ ...ebenen, treiberrouten: an }) },
+    wteRouten: { name: 'WTE-Routen', label: 'WTE-Routen', an: ebenen.wteRouten, setAn: (an) => setEbenen({ ...ebenen, wteRouten: an }) },
     abschuesse: {
       name: 'Abschüsse',
       label: `Abschüsse (${gefiltert.abschuesse.length})`,
@@ -1194,73 +1284,14 @@ export default function Karte({
 
           </Abschnitt>
 
-          {k.istInhaber ? (
-            <>
-              <Abschnitt titel="Zeichnen" offen={!eingebettet ? false : true}>
-              <button className="knopf knopf-sekundaer" onClick={() => setModus({ art: 'grenze' })} disabled={!!modus}>
-                {daten?.grenze ? 'Reviergrenze neu zeichnen' : 'Reviergrenze zeichnen'}
-              </button>
-              {kartenEbenen.length > 0 && (
-                <label className="ebene">
-                  Neue Zonen in Ebene
-                  <select value={zielEbene} onChange={(e) => setZielEbene(e.target.value)}>
-                    <option value="">Ohne Ebene</option>
-                    {kartenEbenen.map((e) => (
-                      <option key={e.id} value={e.id}>
-                        {e.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
-              <button className="knopf knopf-sekundaer" onClick={() => setModus({ art: 'zone', zoneId: null, name: '' })} disabled={!!modus}>
-                Neue Zone zeichnen
-              </button>
-              {zonen.length > 0 && (
-                <select
-                  className="karte-auswahl"
-                  value=""
-                  disabled={!!modus}
-                  aria-label="Fläche einer bestehenden Zone zeichnen"
-                  onChange={(e) => {
-                    const z = zonen.find((x) => x.id === e.target.value);
-                    if (z) setModus({ art: 'zone', zoneId: z.id, name: z.name });
-                  }}
-                >
-                  <option value="">Fläche für bestehende Zone …</option>
-                  {zonen.map((z) => (
-                    <option key={z.id} value={z.id}>
-                      {z.name}
-                      {z.hatGeometrie ? ' (neu zeichnen)' : ' (noch ohne Fläche)'}
-                    </option>
-                  ))}
-                </select>
-              )}
-              <button className="knopf knopf-sekundaer" onClick={() => setModus({ art: 'einrichtung' })} disabled={!!modus}>
-                Einrichtung setzen
-              </button>
-              {modus?.art === 'einrichtung' && (
-                <button className="knopf knopf-gefahr" onClick={() => setModus(null)}>
-                  Einrichtungen setzen beenden
-                </button>
-              )}
-              <button className="knopf knopf-sekundaer" onClick={() => setModus({ art: 'pirschweg' })} disabled={!!modus}>
-                Pirschweg zeichnen
-              </button>
-              <button className="knopf knopf-sekundaer" onClick={aufzeichnungStarten} disabled={!!modus}>
-                Pirschweg per GPS aufzeichnen
-              </button>
-
-              </Abschnitt>
-              <Abschnitt titel="Import">
+          {k.istInhaber && (
+            <Abschnitt titel="Import">
               <button className="knopf knopf-sekundaer" onClick={() => navigieren('/import')}>
                 Geodaten importieren (SHP, GeoPackage)
               </button>
-              </Abschnitt>
-            </>
-          ) : (
-            <p className="leer">Zeichnen und Importieren kann nur der Revierinhaber.</p>
+            </Abschnitt>
           )}
+          <p className="leer">Zeichnen, Aufzeichnen und GPS-Import findest du im Menü „+ NEU“ auf der Karte.</p>
           <p className="leer">Heatmap und Abschüsse zeigen nur Erfassungen mit Position (Zählungen: Zone). Wind: Open-Meteo.</p>
           {wildarten.length > 0 && anzahlBeob > 0 && (
             <p className="leer">
@@ -1317,8 +1348,8 @@ export default function Karte({
             {modus.art === 'grenze' && 'Reviergrenze: Eckpunkte antippen'}
             {modus.art === 'zone' && modus.bearbeiten && `Zone „${modus.name}“ bearbeiten: Punkte ziehen, Linie antippen = Punkt einfügen`}
             {modus.art === 'zone' && !modus.bearbeiten && (modus.zoneId ? `Zone „${modus.name}“: Eckpunkte antippen` : 'Neue Zone: Eckpunkte antippen')}
-            {modus.art === 'pirschweg' && 'Pirschweg: Wegpunkte antippen'}
-            {modus.art === 'aufzeichnung' && `GPS-Aufzeichnung: ${punkte.length} Punkte`}
+            {modus.art === 'route' && `${ROUTENNAME[modus.typ]}: Wegpunkte antippen`}
+            {modus.art === 'aufzeichnung' && `${ROUTENNAME[modus.typ]} per GPS: ${punkte.length} Punkte`}
           </span>
           {modus.art === 'zone' && modus.bearbeiten ? (
             <button
@@ -1336,13 +1367,14 @@ export default function Karte({
               ↶ Zurück
             </button>
           )}
-          <button className="knopf knopf-primaer klein" onClick={zeichnungSpeichern}>
-            Speichern
+          <button className="knopf knopf-primaer klein" onClick={zeichnungAbschliessen}>
+            Fertig
           </button>
           <button
             className="knopf knopf-gefahr klein"
             onClick={() => {
               aufzeichnungStoppen();
+              setSheetArt(null);
               setModus(null);
             }}
           >
@@ -1360,31 +1392,70 @@ export default function Karte({
       )}
 
       {wteMenue && (
-        <div className="wte-menue" role="menu" aria-label="WTE">
-          {k.istInhaber && (
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                setWte(false);
-                setModus({ art: 'einrichtung' });
-              }}
-            >
-              Einrichtung anlegen
-            </button>
-          )}
-          <button type="button" role="menuitem" onClick={() => navigieren('/abschuesse/fang')}>
-            Fang melden
+        <div className="wte-menue" role="menu" aria-label="Neu">
+          {(() => {
+            const frei = !modus && !sheetArt;
+            const los = (f: () => void) => () => {
+              setWteMenue(false);
+              f();
+            };
+            const eintrag = (text: string, f: () => void, an = true) =>
+              an && (
+                <button type="button" role="menuitem" disabled={!frei && !text.includes('beenden')} onClick={los(f)}>
+                  {text}
+                </button>
+              );
+            const route = (typ: RouteTyp) => () => {
+              setWte(false);
+              setPunkte([]);
+              setModus({ art: 'route', typ });
+            };
+            return (
+              <>
+                <p className="menue-gruppe">Erfassen</p>
+                {wte
+                  ? eintrag('Wildtiererfassung beenden', () => setWte(false))
+                  : eintrag('Wildtiererfassung starten', () => setWte(true))}
+                {eintrag('Fang melden', () => navigieren('/abschuesse/fang'))}
+                {eintrag('Einrichtung anlegen', () => {
+                  setWte(false);
+                  setModus({ art: 'einrichtung' });
+                }, k.istInhaber)}
+                <p className="menue-gruppe">Zeichnen</p>
+                {eintrag(daten?.grenze ? 'Reviergrenze neu zeichnen' : 'Reviergrenze zeichnen', () => setModus({ art: 'grenze' }), k.istInhaber)}
+                {eintrag('Zone zeichnen', () => setModus({ art: 'zone', zoneId: null, name: '' }), k.istInhaber)}
+                {eintrag('Pirschweg zeichnen', route('pirschweg'))}
+                {eintrag('Treiberroute zeichnen', route('treiberroute'), k.istInhaber)}
+                {eintrag('WTE-Route zeichnen', route('wte_route'))}
+                <p className="menue-gruppe">Aufzeichnen</p>
+                {eintrag('Pirschweg per GPS aufzeichnen', () => aufzeichnungStarten('pirschweg'))}
+                {eintrag('WTE-Route per GPS aufzeichnen', () => aufzeichnungStarten('wte_route'))}
+              </>
+            );
+          })()}
+        </div>
+      )}
+      {sheetArt && (
+        <ZeichnenSheet
+          art={sheetArt}
+          revierId={k.revierId}
+          zonen={zonen}
+          ebenen={kartenEbenen}
+          hatGrenze={!!daten?.grenze}
+          info={`${punkte.length} Punkte`}
+          speichert={sheetSpeichert}
+          fehler={sheetFehler}
+          onSpeichern={(w) => void zeichnungSpeichern(w)}
+          onAbbrechen={() => setSheetArt(null)}
+        />
+      )}
+      {modus?.art === 'einrichtung' && (
+        <div className="wte-leiste" role="status">
+          <strong>Einrichtung</strong>
+          <span>Karte antippen, um die Position zu setzen</span>
+          <button type="button" className="link" onClick={() => setModus(null)}>
+            Beenden
           </button>
-          {wte ? (
-            <button type="button" role="menuitem" onClick={() => setWte(false)}>
-              Wildtiererfassung beenden
-            </button>
-          ) : (
-            <button type="button" role="menuitem" onClick={() => setWte(true)}>
-              Wildtiererfassung starten
-            </button>
-          )}
         </div>
       )}
       {wte && (
