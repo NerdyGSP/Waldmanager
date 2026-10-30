@@ -1,4 +1,4 @@
-import { Feld, Segmente } from '../../components/ui';
+import { Segmente } from '../../components/ui';
 
 export type Flaechenmodus = 'strecke' | 'zonen';
 export const STANDARD_BREITE_M = 400;
@@ -10,12 +10,11 @@ export function FlaechenmodusWahl({
   modus,
   breite,
   onModus,
-  onBreite,
 }: {
   modus: Flaechenmodus;
   breite: number;
   onModus: (m: Flaechenmodus) => void;
-  onBreite: (b: number) => void;
+  onBreite?: (b: number) => void;
 }) {
   return (
     <>
@@ -30,14 +29,8 @@ export function FlaechenmodusWahl({
       />
       {modus === 'strecke' && (
         <>
-          <Feld
-            label="Streifenbreite (m)"
-            inputMode="numeric"
-            value={String(breite)}
-            onChange={(e) => onBreite(Math.min(2000, Math.max(0, Math.floor(Number(e.target.value) || 0))))}
-          />
           <p className="gruppe-fuss" style={{ margin: 0 }}>
-            Die Breite gilt beidseits der Route ({breite / 2} m links und rechts). Doppelt befahrene Strecken zählen nicht doppelt, Flächen außerhalb des Reviers entfallen. Für die Berechnung wird eine WTE-Route benötigt (zeichnen, per GPS aufzeichnen oder importieren).
+            Die Breite ist fest {breite} m ({breite / 2} m links und rechts der Route). Doppelt befahrene Strecken zählen nicht doppelt, Flächen außerhalb des Reviers entfallen. Für die Berechnung wird eine WTE-Route benötigt (zeichnen, per GPS aufzeichnen oder importieren).
           </p>
         </>
       )}

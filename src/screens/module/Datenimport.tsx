@@ -81,6 +81,8 @@ export function Datenimport({ k }: { k: RevierKontext }) {
   const [zonenWahl, setZonenWahl] = useState<Record<string, string>>({});
   const [sitz, setSitz] = useState<Sitzungsdaten>(() => leereSitzungsdaten(heute()));
   const datum = sitz.datum;
+  const [flModus, setFlModus] = useState<'zonen' | 'strecke'>('zonen');
+  const [streckeKm, setStreckeKm] = useState('');
   const [mitte, setMitte] = useState<[number, number] | null>(null);
   useEffect(() => {
     // Reviermitte für die Wetter-Vorauswahl
@@ -295,9 +297,12 @@ export function Datenimport({ k }: { k: RevierKontext }) {
             .from('zaehlsitzungen')
             .insert(
               tage.map((datum) => {
+                // Flächenmodus gilt nur bei einer einzelnen Zählung; Strecke × 400 m = km × 40 ha (ohne Verschnitt an der Reviergrenze)
+                const km = flModus === 'strecke' ? Number(streckeKm.replace(',', '.')) : null;
+                const flaeche = km && km > 0 ? { flaechenmodus: 'strecke', streifenbreite_m: 400, strecke_km: km, flaeche_ha: Math.round(km * 40 * 100) / 100 } : {};
                 if (!einzeltag) return { revier_id: k.revierId, datum, status: 'abgeschlossen' as const, bemerkung: marke, erstellt_von: k.userId };
                 const z = alsSitzungsZeile({ ...sitz, datum });
-                return { revier_id: k.revierId, status: 'abgeschlossen' as const, erstellt_von: k.userId, ...z, bemerkung: z.bemerkung ? `${marke} – ${z.bemerkung}` : marke };
+                return { revier_id: k.revierId, status: 'abgeschlossen' as const, erstellt_von: k.userId, ...z, ...flaeche, bemerkung: z.bemerkung ? `${marke} – ${z.bemerkung}` : marke };
               }),
             )
             .select('id, datum');
@@ -629,6 +634,14 @@ export function Datenimport({ k }: { k: RevierKontext }) {
                   mitte={mitte}
                   datumAenderbar={matrix}
                 />
+              )}
+              {typ === 'zaehlung' && (matrix || tage.length === 1) && (
+                <Gruppe titel="5. Gezählte Fläche" fuss={flModus === 'strecke' ? 'Fläche = Strecke × 400 m (ohne Verschnitt an der Reviergrenze). Ohne Angabe bleibt die Zählung ohne festgeschriebene Fläche.' : 'Die Fläche ergibt sich aus den erfassten Zonen.'}>
+                  <div style={{ padding: '8px var(--abstand)' }}>
+                    <Segmente label="Fläche berechnen nach" wert={flModus} onAendern={setFlModus} optionen={[{ wert: 'zonen', label: 'Zonenfläche' }, { wert: 'strecke', label: 'Strecke × 400 m' }]} />
+                  </div>
+                  {flModus === 'strecke' && <Feld label="Gefahrene Strecke (km)" inputMode="decimal" value={streckeKm} onChange={(e) => setStreckeKm(e.target.value)} />}
+                </Gruppe>
               )}
               {typ === 'zaehlung' && !matrix && tage.length > 1 && (
                 <Leer>Die Datei enthält {tage.length} Zähltage – je Tag entsteht eine Zählung. Wetter und Uhrzeiten lassen sich danach in jeder Zählung nachtragen.</Leer>
