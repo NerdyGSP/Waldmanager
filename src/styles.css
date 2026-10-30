@@ -1069,3 +1069,12 @@ button.kachel:active { transform: none; }
 .matrix-karte { background: var(--flaeche); border-radius: var(--radius); padding: 10px 12px; display: grid; gap: 4px; }
 .matrix-karte ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
 .matrix-karte li { display: flex; justify-content: space-between; }
+
+/* Teilnehmerübersicht: ⋯-Menü, Kacheln auf dem iPhone zweispaltig */
+.bj-menue { position: relative; }
+.bj-menue > summary { list-style: none; cursor: pointer; padding: 2px 10px; border-radius: var(--radius); font-size: 1.2rem; line-height: 1; }
+.bj-menue > summary::-webkit-details-marker { display: none; }
+.bj-menue[open] > summary { background: var(--linie); }
+.bj-menue-inhalt { position: absolute; right: 0; z-index: 5; min-width: 200px; background: var(--flaeche); border: 1px solid var(--linie); border-radius: var(--radius); padding: 8px; }
+.bj-menue-inhalt .bj-zeile-aktionen { flex-direction: column; align-items: stretch; gap: 6px; }
+@media (max-width: 899px) { .bj-zaehler { display: grid; grid-template-columns: 1fr 1fr; } }

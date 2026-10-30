@@ -64,12 +64,6 @@ export function BjTeilnehmerUebersicht({
   const [offenZeile, setOffenZeile] = useState<string | null>(null);
 
   const anstellerListe = tn.filter((t) => t.ist_ansteller && t.aktiv);
-  const zaehler = {
-    gesamt: tn.length,
-    zu: tn.filter((t) => t.status === 'zugesagt').length,
-    ab: tn.filter((t) => t.status === 'abgesagt').length,
-    offen: tn.filter((t) => t.aktiv && t.status === 'eingeladen').length,
-  };
 
   const sichtbar = useMemo(() => {
     const q = suche.trim().toLocaleLowerCase('de');
@@ -212,7 +206,14 @@ export function BjTeilnehmerUebersicht({
         <td>{t.auto_vorhanden ? `ja, ${t.mitfahrplaetze ?? 0} Pl.` : '–'}</td>
         {schuesseltreiben && <td>{ja(t.schuesseltreiben_teilnahme)}</td>}
         <td>{mailText(t)}</td>
-        <td>{aktionen(t)}</td>
+        <td>
+          {offen && (
+            <details className="bj-menue">
+              <summary aria-label={`Aktionen für ${t.name}`}>⋯</summary>
+              <div className="bj-menue-inhalt">{aktionen(t)}</div>
+            </details>
+          )}
+        </td>
       </tr>
       {offenZeile === t.id && (
         <tr>
@@ -253,12 +254,6 @@ export function BjTeilnehmerUebersicht({
 
   return (
     <>
-      <div className="bj-zaehler" style={{ padding: '10px var(--abstand) 0' }}>
-        <div><strong>{zaehler.gesamt}</strong><span>Gesamt</span></div>
-        <div><strong>{zaehler.zu}</strong><span>Zusagen</span></div>
-        <div><strong>{zaehler.ab}</strong><span>Absagen</span></div>
-        <div><strong>{zaehler.offen}</strong><span>Ohne Antwort</span></div>
-      </div>
       <div className="bj-filter" style={{ padding: '10px var(--abstand)' }}>
         <input type="search" placeholder="Suchen (Name, E-Mail, Telefon)" aria-label="Teilnehmer suchen" value={suche} onChange={(e) => setSuche(e.target.value)} />
         <select aria-label="Status filtern" value={status} onChange={(e) => setStatus(e.target.value as StatusFilter)}>

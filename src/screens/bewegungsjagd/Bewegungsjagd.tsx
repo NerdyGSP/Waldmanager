@@ -778,6 +778,7 @@ function Auswertung({ k, id }: { k: RevierKontext; id: string }) {
       {fehler && <Hinweis art="fehler">{fehler}</Hinweis>}
 
       <div className="bj-zaehler">
+        <div><strong>{tn.length}</strong><span>Gesamt</span></div>
         <div><strong>{z.zu}</strong><span>Zusagen</span></div>
         <div><strong>{z.ab}</strong><span>Absagen</span></div>
         <div><strong>{z.offen}</strong><span>Ohne Antwort</span></div>
@@ -791,11 +792,11 @@ function Auswertung({ k, id }: { k: RevierKontext; id: string }) {
 
       <Gruppe titel="Teilnehmer">
         <div className="bj-ja-nein" style={{ padding: '10px var(--abstand) 0' }}>
-          <span>{tn.length} Einträge</span>
+          <span />
           <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            <Knopf variante="ghost" onClick={() => setDruck('liste')}>Teilnehmerliste drucken</Knopf>
-            <Knopf variante="ghost" onClick={() => setDruck('info')}>Teilnehmerinfo drucken</Knopf>
-            <Knopf variante="ghost" onClick={() => setDruck('mappe')}>Jagdtag-Mappe drucken</Knopf>
+            <Knopf variante="sekundaer" onClick={() => setDruck('liste')}>Teilnehmerliste drucken</Knopf>
+            <Knopf variante="sekundaer" onClick={() => setDruck('info')}>Teilnehmerinfo drucken</Knopf>
+            <Knopf variante="sekundaer" onClick={() => setDruck('mappe')}>Jagdtag-Mappe drucken</Knopf>
             {offen && <Knopf variante="sekundaer" onClick={() => setNachOffen((o) => !o)}>{nachOffen ? 'Schließen' : '+ Teilnehmer hinzufügen'}</Knopf>}
           </span>
         </div>
