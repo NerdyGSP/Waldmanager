@@ -30,6 +30,9 @@ import { EinrichtungsIcon, einrichtungsBild } from '../../lib/einrichtungsIcons'
 import type { Enums, Json } from '../../lib/database.types';
 import type { RevierKontext } from './kontext';
 import { Symbol } from '../../components/symbole';
+import { EinrichtungsOptionen } from '../../components/EinrichtungsOptionen';
+import { EinrichtungSheet, VerschiebeLeiste, type EinrichtungInfo } from './EinrichtungSheet';
+import { speichernOderMerken } from '../../lib/offline';
 import { GpsImport } from './GpsImport';
 import { ZeichnenSheet, type SheetArt, type SheetWerte } from './ZeichnenSheet';
 
@@ -204,6 +207,10 @@ export default function Karte({
   });
   const [modus, setModusState] = useState<Modus>(null);
   const [gpsImport, setGpsImport] = useState(false);
+  const [einrSheet, setEinrSheet] = useState<EinrichtungInfo | null>(null);
+  const [verschiebe, setVerschiebe] = useState<{ einr: EinrichtungInfo; lng: number; lat: number } | null>(null);
+  const [verschiebeLaeuft, setVerschiebeLaeuft] = useState(false);
+  const verschiebeAktiv = useRef(false);
   const [sheetArt, setSheetArt] = useState<SheetArt | null>(null);
   const [sheetFehler, setSheetFehler] = useState<string | null>(null);
   const [sheetSpeichert, setSheetSpeichert] = useState(false);
@@ -699,6 +706,7 @@ export default function Karte({
         }
         return;
       }
+      if (verschiebeAktiv.current) return; // beim Verschieben nur der Marker
       if (aktiv?.art === 'einrichtung') {
         setNeueEinrichtung(pos);
         return;
@@ -717,12 +725,22 @@ export default function Karte({
       }
       if (aktiv) return;
       const treffer = m.queryRenderedFeatures(e.point, { layers: ['einrichtungen-punkt', 'abschuesse-punkt', 'pirschwege-linie', 'treiberrouten-linie', 'wte-routen-linie', 'zonen-flaeche'] });
-      const f = treffer[0];
+      // Einrichtungen haben Vorrang vor allem, was darunter liegt (z. B. Zonen)
+      const f = treffer.find((x) => x.layer.id === 'einrichtungen-punkt') ?? treffer[0];
       if (!f) {
         setGewaehlteZone(null);
+        setEinrSheet(null);
+        return;
+      }
+      if (f.layer.id === 'einrichtungen-punkt' && f.geometry.type === 'Point') {
+        const p = f.properties ?? {};
+        const [lng, lat] = f.geometry.coordinates as [number, number];
+        setGewaehlteZone(null);
+        setEinrSheet({ id: String(p.id), name: (p.name as string | null) || null, typ: p.typ as Enums<'einrichtung_typ'>, bemerkung: (p.bemerkung as string | null) || null, lng, lat });
         return;
       }
       if (f.layer.id === 'zonen-flaeche') {
+        setEinrSheet(null);
         const p = f.properties ?? {};
         setGewaehlteZone({
           id: String(p.id),
@@ -1094,6 +1112,55 @@ export default function Karte({
     if (aufzeichnung.current !== null) navigator.geolocation.clearWatch(aufzeichnung.current);
     aufzeichnung.current = null;
   }
+
+  // Position einer Einrichtung speichern (einmessen oder verschieben); offline über die Warteschlange
+  async function einrichtungPosition(id: string, lng: number, lat: number): Promise<'gespeichert' | 'gemerkt'> {
+    const r = await speichernOderMerken({ tabelle: 'einrichtungen', daten: { id, geom: punktEWKT(lng, lat) } });
+    setDaten((d) =>
+      d && {
+        ...d,
+        einrichtungen: d.einrichtungen.map((f) => (f.properties?.id === id ? { ...f, geometry: { type: 'Point', coordinates: [lng, lat] } } : f)),
+      },
+    );
+    if (r === 'gespeichert') await laden();
+    return r;
+  }
+
+  async function verschiebenBestaetigen() {
+    if (!verschiebe) return;
+    setVerschiebeLaeuft(true);
+    try {
+      const r = await einrichtungPosition(verschiebe.einr.id, verschiebe.lng, verschiebe.lat);
+      setMeldung({ art: 'erfolg', text: r === 'gemerkt' ? 'Neue Position auf dem Gerät gespeichert – wird übertragen, sobald du online bist' : 'Einrichtung verschoben' });
+      setVerschiebe(null);
+    } catch (err) {
+      setMeldung({ art: 'fehler', text: fehlertext(err) });
+    } finally {
+      setVerschiebeLaeuft(false);
+    }
+  }
+
+  // Marker zum Verschieben: Original ausblenden, Ersatzmarker ziehbar
+  useEffect(() => {
+    const m = karte.current;
+    verschiebeAktiv.current = !!verschiebe;
+    if (!m || !bereit || !verschiebe) return;
+    const id = verschiebe.einr.id;
+    const el = document.createElement('div');
+    el.className = 'verschiebe-marker';
+    el.setAttribute('aria-label', 'Einrichtung verschieben');
+    const marker = new Marker({ element: el, draggable: true }).setLngLat([verschiebe.einr.lng, verschiebe.einr.lat]).addTo(m);
+    marker.on('dragend', () => {
+      const p = marker.getLngLat();
+      setVerschiebe((v) => v && { ...v, lng: p.lng, lat: p.lat });
+    });
+    if (m.getLayer('einrichtungen-punkt')) m.setFilter('einrichtungen-punkt', ['!=', ['get', 'id'], id]);
+    return () => {
+      marker.remove();
+      if (m.getLayer('einrichtungen-punkt')) m.setFilter('einrichtungen-punkt', null);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [verschiebe?.einr.id, bereit]);
 
   async function einrichtungSpeichern(typ: Enums<'einrichtung_typ'>, name: string, bemerkung: string) {
     if (!neueEinrichtung) return;
@@ -1511,7 +1578,35 @@ export default function Karte({
         />
       )}
 
-      {gewaehlteZone && !modus && <ZonenInfo zone={gewaehlteZone} onSchliessen={() => setGewaehlteZone(null)} onBearbeiten={k.istInhaber ? () => zoneBearbeiten(gewaehlteZone.id, gewaehlteZone.name) : undefined} />}
+      {einrSheet && !modus && !verschiebe && !wte && (
+        <EinrichtungSheet
+          key={einrSheet.id}
+          k={k}
+          einr={einrSheet}
+          vergebeneNamen={einrichtungsNamen}
+          onSchliessen={() => setEinrSheet(null)}
+          onGeaendert={(text) => {
+            setEinrSheet(null);
+            setMeldung({ art: 'erfolg', text });
+            void laden();
+          }}
+          onVerschieben={() => {
+            setVerschiebe({ einr: einrSheet, lng: einrSheet.lng, lat: einrSheet.lat });
+            setEinrSheet(null);
+          }}
+          onPosition={(lng, lat) => einrichtungPosition(einrSheet.id, lng, lat)}
+        />
+      )}
+      {verschiebe && (
+        <VerschiebeLeiste
+          name={verschiebe.einr.name || 'Einrichtung'}
+          laeuft={verschiebeLaeuft}
+          geaendert={verschiebe.lng !== verschiebe.einr.lng || verschiebe.lat !== verschiebe.einr.lat}
+          onOk={() => void verschiebenBestaetigen()}
+          onAbbrechen={() => setVerschiebe(null)}
+        />
+      )}
+      {gewaehlteZone && !modus && !einrSheet && <ZonenInfo zone={gewaehlteZone} onSchliessen={() => setGewaehlteZone(null)} onBearbeiten={k.istInhaber ? () => zoneBearbeiten(gewaehlteZone.id, gewaehlteZone.name) : undefined} />}
 
       {kartenFehler && (
         <div className="karte-fehler" role="alert">
@@ -1582,11 +1677,7 @@ function EinrichtungFormular({
     <div className="karte-dialog" role="dialog" aria-label="Neue Einrichtung">
       <strong>Neue Einrichtung</strong>
       <select value={typ} onChange={(e) => setTyp(e.target.value as Enums<'einrichtung_typ'>)}>
-        {EINRICHTUNGSTYPEN.map((t) => (
-          <option key={t.wert} value={t.wert}>
-            {t.label}
-          </option>
-        ))}
+        <EinrichtungsOptionen />
       </select>
       <input placeholder="Name, z. B. Eichenkanzel" value={name} onChange={(e) => setName(e.target.value)} />
       {name.trim() && nameVergeben(vergeben, name) && (

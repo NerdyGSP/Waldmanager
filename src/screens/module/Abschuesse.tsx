@@ -39,6 +39,7 @@ export function Abschuesse({ k, unterpfad = [] }: { k: RevierKontext; unterpfad?
   const [liste, setListe] = useState<Abschuss[]>([]);
   const [bearbeiten, setBearbeiten] = useState<Abschuss | 'neu' | null>(unterpfad[0] === 'fang' ? 'neu' : null);
   const startArt = unterpfad[0] === 'fang' ? 'fang' : 'abschuss';
+  const falleVor = unterpfad[0] === 'fang' ? (unterpfad[1] ?? '') : ''; // Falle aus dem Einrichtungs-Sheet vorbelegt
   const [fehler, setFehler] = useState<string | null>(null);
 
   const laden = useCallback(async () => {
@@ -81,6 +82,7 @@ export function Abschuesse({ k, unterpfad = [] }: { k: RevierKontext; unterpfad?
         k={k}
         vorlage={bearbeiten === 'neu' ? null : bearbeiten}
         startArt={startArt}
+        falleVor={falleVor}
         onFertig={async () => {
           setBearbeiten(null);
           await laden();
@@ -139,12 +141,12 @@ export function Abschuesse({ k, unterpfad = [] }: { k: RevierKontext; unterpfad?
   );
 }
 
-function AbschussFormular({ k, vorlage, startArt, onFertig }: { k: RevierKontext; vorlage: Abschuss | null; startArt: string; onFertig: () => Promise<void> }) {
+function AbschussFormular({ k, vorlage, startArt, falleVor = '', onFertig }: { k: RevierKontext; vorlage: Abschuss | null; startArt: string; falleVor?: string; onFertig: () => Promise<void> }) {
   const wildarten = useWildarten();
   const { zonen } = useZonen(k.revierId);
   const mitglieder = useMitglieder(k.revierId);
   const [art, setArt] = useState(vorlage?.art ?? startArt);
-  const [falleId, setFalleId] = useState(vorlage?.einrichtung_id ?? '');
+  const [falleId, setFalleId] = useState(vorlage?.einrichtung_id ?? falleVor);
   const [ergebnis, setErgebnis] = useState<'gefangen' | 'leer' | 'fehlfang'>((vorlage?.fang_ergebnis as 'gefangen' | 'leer' | 'fehlfang' | null) ?? 'gefangen');
   const [zustand, setZustand] = useState<'lebend' | 'tot'>((vorlage?.fang_zustand as 'lebend' | 'tot' | null) ?? 'tot');
   const [fallen, setFallen] = useState<Array<{ id: string; name: string | null }>>([]);

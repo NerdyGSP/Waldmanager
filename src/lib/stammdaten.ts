@@ -1,3 +1,4 @@
+import { EINRICHTUNGS_REIHENFOLGE } from './einrichtungsIcons';
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from './supabase';
 import type { Enums, Tables } from './database.types';
@@ -117,7 +118,7 @@ export const GESCHLECHTER: Array<{ wert: Enums<'geschlecht'>; label: string; kur
 
 export const ZONENFARBEN = ['#1e5c3a', '#b5651d', '#1f6fb2', '#8e44ad', '#c0392b', '#16a085', '#d4a017', '#5d6d7e'];
 
-export const EINRICHTUNGSTYPEN: Array<{ wert: Enums<'einrichtung_typ'>; label: string; farbe: string }> = [
+const EINRICHTUNGSTYPEN_UNSORTIERT: Array<{ wert: Enums<'einrichtung_typ'>; label: string; farbe: string }> = [
   { wert: 'hochsitz', label: 'Hochsitz', farbe: '#8b5a2b' },
   { wert: 'kanzel', label: 'Kanzel', farbe: '#5d3a1a' },
   { wert: 'ansitzleiter', label: 'Ansitzleiter', farbe: '#b07d4f' },
@@ -131,6 +132,9 @@ export const EINRICHTUNGSTYPEN: Array<{ wert: Enums<'einrichtung_typ'>; label: s
   { wert: 'drueckjagdbock', label: 'Drückjagdbock', farbe: '#c0392b' },
   { wert: 'sonstiges', label: 'Sonstiges', farbe: '#5d6d7e' },
 ];
+
+// In der festen Gruppenreihenfolge (siehe einrichtungsIcons.tsx)
+export const EINRICHTUNGSTYPEN = [...EINRICHTUNGSTYPEN_UNSORTIERT].sort((a, b) => EINRICHTUNGS_REIHENFOLGE.indexOf(a.wert) - EINRICHTUNGS_REIHENFOLGE.indexOf(b.wert));
 
 // n gut unterscheidbare Zufallsfarben (Goldener Winkel, zufälliger Startton)
 export function zufallsFarben(n: number): string[] {

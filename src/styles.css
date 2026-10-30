@@ -961,3 +961,6 @@ button.kachel:active { transform: none; }
 .wte-menue .menue-gruppe { margin: 6px 12px 2px; font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-leise, #667); }
 .wte-menue button:disabled { opacity: .45; cursor: default; }
 .wte-menue { max-height: calc(100% - 90px); overflow-y: auto; }
+.einr-aktionen { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 4px; }
+.einr-aktionen .knopf { flex: 1 1 220px; text-align: center; text-decoration: none; }
+.verschiebe-marker { width: 26px; height: 26px; border-radius: 50%; background: #e8863c; border: 3px solid #fff; box-shadow: 0 0 0 2px #b3261e, 0 2px 8px rgba(0,0,0,.4); cursor: grab; }

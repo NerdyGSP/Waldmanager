@@ -3,6 +3,15 @@ import { EINRICHTUNGS_PFADE_512 } from './einrichtungsPfade';
 
 type Typ = Enums<'einrichtung_typ'>;
 
+// Feste Reihenfolge der Einrichtungstypen, gruppiert (gilt für Auswahllisten, Filter und Legende)
+export const EINRICHTUNGS_GRUPPEN: Array<{ name: string; typen: Typ[] }> = [
+  { name: 'Ansitz', typen: ['hochsitz', 'kanzel', 'ansitzleiter', 'bodensitz', 'drueckjagdbock'] },
+  { name: 'Revierpflege', typen: ['kirrung', 'salzlecke', 'fuetterung', 'wildacker'] },
+  { name: 'Technik und Fang', typen: ['wildkamera', 'falle'] },
+  { name: 'Sonstiges', typen: ['sonstiges'] },
+];
+export const EINRICHTUNGS_REIHENFOLGE: Typ[] = EINRICHTUNGS_GRUPPEN.flatMap((g) => g.typen);
+
 // game-icons.net (CC BY 3.0) – weiß auf farbigem Grund
 export const EINRICHTUNGS_PFADE = EINRICHTUNGS_PFADE_512 as Record<Typ, string>;
 

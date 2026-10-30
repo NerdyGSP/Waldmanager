@@ -14,7 +14,8 @@ import {
   type Pruefschritt,
   type Ziel,
 } from '../../lib/geoimport';
-import { EINRICHTUNGSTYPEN, nameVergeben, useZonen, useZonenEbenen, ZONENFARBEN } from '../../lib/stammdaten';
+import { EinrichtungsOptionen } from '../../components/EinrichtungsOptionen';
+import { nameVergeben, useZonen, useZonenEbenen, ZONENFARBEN } from '../../lib/stammdaten';
 import type { Enums, Json } from '../../lib/database.types';
 import { Auswahl, Gruppe, Hinweis, Knopf, Leer } from '../../components/ui';
 import type { RevierKontext } from './kontext';
@@ -348,11 +349,7 @@ export function Geoimport({ k }: { k: RevierKontext }) {
             )}
             {ziel === 'einrichtungen' && (
               <Auswahl label="Art der Einrichtungen" value={typ} onChange={(e) => setTyp(e.target.value as Enums<'einrichtung_typ'>)}>
-                {EINRICHTUNGSTYPEN.map((t) => (
-                  <option key={t.wert} value={t.wert}>
-                    {t.label}
-                  </option>
-                ))}
+                <EinrichtungsOptionen />
               </Auswahl>
             )}
           </Gruppe>

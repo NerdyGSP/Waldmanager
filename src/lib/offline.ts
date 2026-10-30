@@ -6,7 +6,8 @@ import type { TablesInsert } from './database.types';
 // Datensätze tragen eine clientseitige UUID; das Senden ist per Upsert idempotent.
 type Eintrag =
   | { tabelle: 'beobachtungen'; daten: TablesInsert<'beobachtungen'> & { id: string } }
-  | { tabelle: 'zaehlungen'; daten: TablesInsert<'zaehlungen'> & { id: string } };
+  | { tabelle: 'zaehlungen'; daten: TablesInsert<'zaehlungen'> & { id: string } }
+  | { tabelle: 'einrichtungen'; daten: { id: string; geom: string } }; // Position einmessen/verschieben
 
 const SCHLUESSEL = 'hegewerk.warteschlange';
 const EREIGNIS = 'hegewerk:warteschlange';
@@ -38,7 +39,9 @@ async function senden(e: Eintrag): Promise<{ ok: boolean; netz: boolean; fehler?
     const { error } =
       e.tabelle === 'beobachtungen'
         ? await supabase.from('beobachtungen').upsert(e.daten, { onConflict: 'id' })
-        : await supabase.from('zaehlungen').upsert(e.daten, { onConflict: 'id' });
+        : e.tabelle === 'einrichtungen'
+          ? await supabase.from('einrichtungen').update({ geom: e.daten.geom }).eq('id', e.daten.id)
+          : await supabase.from('zaehlungen').upsert(e.daten, { onConflict: 'id' });
     if (!error) return { ok: true, netz: false };
     return { ok: false, netz: istNetzfehler(error), fehler: error.message };
   } catch (err) {

@@ -5,6 +5,7 @@ import { fehlertext } from '../../lib/fehler';
 import { navigieren } from '../../lib/router';
 import { punktEWKT } from '../../lib/geo';
 import { datumDE, heuteISO } from '../../lib/zeit';
+import { EinrichtungsOptionen } from '../../components/EinrichtungsOptionen';
 import { EINRICHTUNGSTYPEN, useMitglieder } from '../../lib/stammdaten';
 import { TeilnehmerInfoDruck, TeilnehmerListeDruck, JagdtagMappeDruck } from './BjDruck';
 import { JagdleitungBlock, RettungspunkteBlock, StandKartenDialog, useBjVorbereitung } from './BjVorbereitung';
@@ -486,11 +487,7 @@ function Assistent({ k }: { k: RevierKontext }) {
       {schritt === 3 && (
         <Gruppe titel="Stände zuweisen" fuss={`Es gibt ${einrichtungen.filter((e) => e.typ === 'drueckjagdbock').length} Drückjagdböcke im Revier. Die Zuweisung ist optional.`}>
           <Auswahl label="Einrichtungstyp" value={filterTyp} onChange={(e) => setFilterTyp(e.target.value)}>
-            {EINRICHTUNGSTYPEN.map((t) => (
-              <option key={t.wert} value={t.wert}>
-                {t.label} ({einrichtungen.filter((e) => e.typ === t.wert).length})
-              </option>
-            ))}
+            <EinrichtungsOptionen bockZuerst zaehler={(t) => einrichtungen.filter((e) => e.typ === t).length} />
           </Auswahl>
           <div className="bj-ja-nein">
             <span />
