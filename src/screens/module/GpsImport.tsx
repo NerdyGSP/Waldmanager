@@ -10,7 +10,7 @@ import { fehlertext } from '../../lib/fehler';
 import { linieEWKT } from '../../lib/geo';
 import { nameVergeben } from '../../lib/stammdaten';
 import { datumDE } from '../../lib/zeit';
-import { Auswahl, Feld, Hinweis, Knopf } from '../../components/ui';
+import { Auswahl, Einklappbar, Feld, Hinweis, Knopf } from '../../components/ui';
 import type { GpsRoh } from '../../lib/gpsParser';
 import { berichtErstellen, reduzieren, type TrackBericht } from '../../lib/gpsPruefung';
 import type { RevierKontext } from './kontext';
@@ -282,11 +282,10 @@ export function GpsImport({ k, onZu, onFertig, standardSitzungId }: { k: RevierK
                 <input type="range" min={1} max={20} step={1} value={toleranz} onChange={(e) => setToleranz(Number(e.target.value))} aria-label="Toleranz der Punktreduktion in Metern" />
                 <strong>{toleranz} m</strong>
               </label>
-              <details>
-                <summary>Weitere Optionen</summary>
+              <Einklappbar variante="inline" titel="Weitere Optionen">
                 <Feld label="Mindestabstand zwischen Punkten (m, 0 = aus)" inputMode="numeric" value={String(minAbstand)} onChange={(e) => setMinAbstand(Math.max(0, Number(e.target.value.replace(',', '.')) || 0))} />
                 <Feld label="Höchstzahl Punkte je Linie (0 = unbegrenzt)" inputMode="numeric" value={String(maxPunkte)} onChange={(e) => setMaxPunkte(Math.max(0, Math.floor(Number(e.target.value) || 0)))} />
-              </details>
+              </Einklappbar>
             </div>
             <div ref={el} style={{ height: 300, borderRadius: 12, overflow: 'hidden', border: '1px solid var(--color-border-input)' }} aria-label="Vorschau: Original hell, reduzierte Linie kräftig" />
             <p className="gruppe-fuss" style={{ margin: 0 }}>

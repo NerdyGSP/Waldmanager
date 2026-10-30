@@ -165,7 +165,7 @@ export function RettungspunkteBlock({ jagd, rettung, grenze, treffpunkt, aenderb
       )}
       {aenderbar && offen && (
         <div style={{ padding: '0 var(--abstand) 10px' }}>
-          <p style={{ margin: '8px 0', fontSize: '.85rem', color: 'var(--color-text-muted)' }}>Auf die Karte tippen, um den Punkt zu setzen, dann benennen.</p>
+          <p style={{ margin: '8px 0', fontSize: 'var(--fs-sm)', color: 'var(--color-text-muted)' }}>Auf die Karte tippen, um den Punkt zu setzen, dann benennen.</p>
           <Suspense fallback={kartenLaden}>
             <BjKarte className="bj-karte bj-karte-hoch" marker={marker} grenze={grenze} waehlbar onWaehlen={(lng, lat) => setPunkt([lng, lat])} />
           </Suspense>
@@ -204,7 +204,7 @@ export function StandKartenDialog({ teilnehmer, alle, staende, grenze, onWaehlen
     <div className="bj-dialog-hintergrund" role="dialog" aria-modal="true" aria-label="Stand wählen">
       <div className="bj-dialog" style={{ width: 'min(760px, 96vw)' }}>
         <strong>Stand für {teilnehmer.name} wählen</strong>
-        <p style={{ margin: 0, color: 'var(--color-text-muted)', fontSize: '.85rem' }}>Grün = frei, grau = belegt (mit Namen), orange = aktueller Stand. Antippen weist den Stand zu.</p>
+        <p style={{ margin: 0, color: 'var(--color-text-muted)', fontSize: 'var(--fs-sm)' }}>Grün = frei, grau = belegt (mit Namen), orange = aktueller Stand. Antippen weist den Stand zu.</p>
         <Suspense fallback={kartenLaden}>
           <BjKarte className="bj-karte bj-karte-hoch" marker={marker} grenze={grenze} onMarkerKlick={klick} />
         </Suspense>

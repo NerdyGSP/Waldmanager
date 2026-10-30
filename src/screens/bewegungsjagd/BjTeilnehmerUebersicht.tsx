@@ -3,7 +3,7 @@ import { useBreit } from '../../lib/useBreit';
 import { codeAnzeigen } from '../../lib/bewegungsjagd';
 import { nachAnstellern } from '../../lib/bjGruppen';
 import type { Tables } from '../../lib/database.types';
-import { Knopf, Leer } from '../../components/ui';
+import { Aktionsmenue, Chevron, Knopf, Leer } from '../../components/ui';
 
 type Teilnehmer = Tables<'bewegungsjagd_teilnehmer'>;
 type Stand = { id: string; label: string };
@@ -192,7 +192,7 @@ export function BjTeilnehmerUebersicht({
       <tr className={t.aktiv ? '' : 'inaktiv'}>
         <th scope="row" style={{ paddingLeft: eingerueckt ? 24 : undefined }}>
           <button type="button" className="link" aria-expanded={offenZeile === t.id} onClick={() => setOffenZeile(offenZeile === t.id ? null : t.id)}>
-            {offenZeile === t.id ? '▾' : '▸'} {t.name}
+            <Chevron offen={offenZeile === t.id} /> {t.name}
           </button>
           {t.ist_ansteller && <span className="badge"> Ansteller</span>}
         </th>
@@ -208,10 +208,7 @@ export function BjTeilnehmerUebersicht({
         <td>{mailText(t)}</td>
         <td>
           {offen && (
-            <details className="bj-menue">
-              <summary aria-label={`Aktionen für ${t.name}`}>⋯</summary>
-              <div className="bj-menue-inhalt">{aktionen(t)}</div>
-            </details>
+            <Aktionsmenue label={`Aktionen für ${t.name}`}>{aktionen(t)}</Aktionsmenue>
           )}
         </td>
       </tr>
@@ -300,7 +297,7 @@ export function BjTeilnehmerUebersicht({
                     <tr className="bj-gruppe-zeile">
                       <td colSpan={spaltenAnzahl}>
                         <button type="button" className="link" aria-expanded={!zu} onClick={() => umschalten(key)}>
-                          {zu ? '▸' : '▾'} {text}
+                          <Chevron offen={!zu} /> {text}
                         </button>
                       </td>
                     </tr>
@@ -324,7 +321,7 @@ export function BjTeilnehmerUebersicht({
             <div key={key}>
               <div className="bj-gruppe-kopf">
                 <button onClick={() => umschalten(key)} aria-expanded={!zu}>
-                  {zu ? '▸' : '▾'} {text}
+                  <Chevron offen={!zu} /> {text}
                 </button>
               </div>
               {!zu && (

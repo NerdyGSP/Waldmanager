@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { codeFormatieren, fehlertext } from '../lib/fehler';
 import { navigieren } from '../lib/router';
 import type { Mitgliedschaft, NutzerKontext } from '../lib/useNutzerKontext';
-import { Auswahl, Feld, Gruppe, Hinweis, Knopf, PasswortFeld, Seite, Segmente, Zeile } from '../components/ui';
+import { Auswahl, Einklappbar, Feld, Gruppe, Hinweis, Knopf, PasswortFeld, Seite, Segmente, Zeile } from '../components/ui';
 import { BUNDESLAENDER } from '../lib/jagdzeiten';
 import { useDarstellung, type Darstellung } from '../lib/darstellung';
 import { EREIGNIS_GRUPPEN } from '../lib/ereignisse';
@@ -25,13 +25,12 @@ export function Einstellungen({
 }) {
   return (
     <Seite titel="Einstellungen">
-      <details className="einklappbar">
-        <summary>Konto</summary>
+      <Einklappbar titel="Konto" speicher="einstellungen.konto">
         <Konto name={kontext.name} email={kontext.email} onGeaendert={() => nachAenderung()} />
         <p className="gruppe-fuss" style={{ padding: '0 var(--abstand)' }}>
           Datenschutz: Inhaber deiner Reviere sehen, wann du dich zuletzt angemeldet bzw. die App zuletzt genutzt hast (nur der Zeitpunkt, keine Orte oder Geräte).
         </p>
-      </details>
+      </Einklappbar>
       <DarstellungWahl />
       <BenachrichtigungenWahl userId={userId} istInhaber={istInhaber} />
       <KartenSpeicher />

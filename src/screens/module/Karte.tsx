@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Einklappbar } from '../../components/ui';
 import { ZonenInfo, type GewaehlteZone } from './ZonenInfo';
 import { WetterPanel } from './WetterPanel';
 import { WteSichtung, type WteSitzung, type WteZone } from './WteSichtung';
@@ -1827,10 +1828,9 @@ export default function Karte({
 
 function Abschnitt({ titel, offen = false, children }: { titel: string; offen?: boolean; children: ReactNode }) {
   return (
-    <details className="werkzeug-abschnitt" open={offen}>
-      <summary>{titel}</summary>
-      <div className="werkzeug-inhalt">{children}</div>
-    </details>
+    <Einklappbar variante="abschnitt" titel={titel} offen={offen} speicher={`karte.abschnitt.${titel}`}>
+      {children}
+    </Einklappbar>
   );
 }
 

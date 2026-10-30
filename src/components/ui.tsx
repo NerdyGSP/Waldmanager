@@ -1,4 +1,6 @@
 import { navigieren } from '../lib/router';
+import { createPortal } from 'react-dom';
+import { Symbol } from './symbole';
 import { Fragment, createContext, useCallback, useContext, useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from 'react';
 
 export function Gruppe({ titel, fuss, children }: { titel?: string; fuss?: ReactNode; children: ReactNode }) {
@@ -284,6 +286,144 @@ export function WildartOptionen({ wildarten }: { wildarten: Array<{ id: string; 
           <option value={w.id}>{w.name}</option>
         </Fragment>
       ))}
+    </>
+  );
+}
+
+// ---------- Einklappen: ein Muster für die ganze App ----------
+
+/** Pfeil für aufgeklappt/zugeklappt – dasselbe Symbol wie in Zonen & Routen */
+export function Chevron({ offen }: { offen: boolean }) {
+  return (
+    <span className="chevron" aria-hidden="true">
+      <Symbol name={offen ? 'runter' : 'ausklappen'} className="symbol klein" />
+    </span>
+  );
+}
+
+const EINKLAPP_PRAEFIX = 'hegewerk.auf.';
+
+/** Offen/zu-Zustand; mit `speicher` je Gerät in localStorage gemerkt */
+export function useGemerkt(speicher: string | undefined, standard: boolean): [boolean, (v: boolean) => void] {
+  const [offen, setOffen] = useState<boolean>(() => {
+    if (!speicher) return standard;
+    try {
+      const w = localStorage.getItem(EINKLAPP_PRAEFIX + speicher);
+      return w === null ? standard : w === '1';
+    } catch {
+      return standard;
+    }
+  });
+  const setzen = useCallback(
+    (v: boolean) => {
+      setOffen(v);
+      if (!speicher) return;
+      try {
+        localStorage.setItem(EINKLAPP_PRAEFIX + speicher, v ? '1' : '0');
+      } catch {
+        /* Speicher voll oder gesperrt – Zustand gilt nur für diese Sitzung */
+      }
+    },
+    [speicher],
+  );
+  return [offen, setzen];
+}
+
+/**
+ * Einklappbarer Abschnitt.
+ * variante: 'karte' (Rahmen, z. B. Einstellungen), 'abschnitt' (Überschrift in Versalien, z. B. Kartenwerkzeuge),
+ * 'inline' (leise Zusatzoptionen). Inhalt bleibt im DOM (Eingaben gehen beim Zuklappen nicht verloren).
+ */
+export function Einklappbar({
+  titel,
+  offen: startOffen = false,
+  speicher,
+  variante = 'karte',
+  children,
+}: {
+  titel: ReactNode;
+  offen?: boolean;
+  speicher?: string;
+  variante?: 'karte' | 'abschnitt' | 'inline';
+  children: ReactNode;
+}) {
+  const [offen, setOffen] = useGemerkt(speicher, startOffen);
+  const id = useId();
+  return (
+    <section className={`einklappbar ev-${variante}`}>
+      <button type="button" className="einklappbar-kopf" aria-expanded={offen} aria-controls={id} onClick={() => setOffen(!offen)}>
+        <Chevron offen={offen} />
+        <span className="einklappbar-titel">{titel}</span>
+      </button>
+      <div id={id} className="einklappbar-inhalt" hidden={!offen}>
+        {children}
+      </div>
+    </section>
+  );
+}
+
+/**
+ * „⋯“-Menü für Zeilenaktionen. Das Menü wird an `body` gehängt (wird nie von Tabellen/Scroll-Containern
+ * abgeschnitten), schließt bei Klick daneben, Escape, Scrollen, Größenänderung und nach einer gewählten Aktion.
+ */
+export function Aktionsmenue({ label, children }: { label: string; children: ReactNode }) {
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
+  const knopf = useRef<HTMLButtonElement>(null);
+  const menue = useRef<HTMLDivElement>(null);
+  const schliessen = useCallback(() => setPos(null), []);
+
+  useEffect(() => {
+    if (!pos) return;
+    const aussen = (e: PointerEvent) => {
+      const ziel = e.target as Node;
+      if (menue.current?.contains(ziel) || knopf.current?.contains(ziel)) return;
+      schliessen();
+    };
+    const taste = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        schliessen();
+        knopf.current?.focus();
+      }
+    };
+    document.addEventListener('pointerdown', aussen);
+    document.addEventListener('keydown', taste);
+    window.addEventListener('resize', schliessen);
+    window.addEventListener('scroll', schliessen, true);
+    return () => {
+      document.removeEventListener('pointerdown', aussen);
+      document.removeEventListener('keydown', taste);
+      window.removeEventListener('resize', schliessen);
+      window.removeEventListener('scroll', schliessen, true);
+    };
+  }, [pos, schliessen]);
+
+  const umschalten = () => {
+    if (pos) return schliessen();
+    const r = knopf.current?.getBoundingClientRect();
+    if (r) setPos({ top: r.bottom + 4, right: Math.max(8, window.innerWidth - r.right) });
+  };
+
+  return (
+    <>
+      <button ref={knopf} type="button" className="aktionsmenue-knopf" aria-label={label} aria-haspopup="menu" aria-expanded={pos !== null} onClick={umschalten}>
+        ⋯
+      </button>
+      {pos &&
+        createPortal(
+          <div
+            ref={menue}
+            className="aktionsmenue"
+            role="menu"
+            style={{ top: pos.top, right: pos.right }}
+            onClick={(e) => {
+              // Klick auf einen Knopf im Menü führt die Aktion aus und schließt das Menü
+              if ((e.target as HTMLElement).closest('button, a')) schliessen();
+            }}
+          >
+            {children}
+          </div>,
+          document.body,
+        )}
     </>
   );
 }

@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { fehlertext } from '../../lib/fehler';
 import { useWildarten, wildartName } from '../../lib/stammdaten';
 import { aktuellesJagdjahr, jagdjahr } from '../../lib/zeit';
-import { Gruppe, Hinweis, Knopf, Leer, Segmente } from '../../components/ui';
+import { Einklappbar, Gruppe, Hinweis, Knopf, Leer, Segmente } from '../../components/ui';
 import { Verlauf } from '../../components/diagramme';
 import { Druckrahmen } from '../bewegungsjagd/BjDruck';
 import type { RevierKontext } from './kontext';
@@ -196,7 +196,7 @@ function Inhalt({ d, o, jahre, strecke, zaehl, zaehlArten, diagrammArt, name, au
     );
     return (
       <Fragment key={a}>
-        <h3 style={{ margin: '10px 0 4px', fontSize: '1rem', color: ausdruck ? '#000' : undefined }}>{ARTEN.find((x) => x.art === a)!.titel}</h3>
+        <h3 style={{ margin: '10px 0 4px', fontSize: 'var(--fs-base)', color: ausdruck ? '#000' : undefined }}>{ARTEN.find((x) => x.art === a)!.titel}</h3>
         {rahmen(
           <table className={tab}>
             <thead>
@@ -224,7 +224,7 @@ function Inhalt({ d, o, jahre, strecke, zaehl, zaehlArten, diagrammArt, name, au
             </tfoot>
           </table>,
         )}
-        {ausdruck ? <div style={{ marginTop: 6 }}>{rahmen(detailTab)}</div> : <details style={{ margin: '6px 0' }}><summary>Aufschlüsselung nach Geschlecht und Altersklasse</summary>{rahmen(detailTab)}</details>}
+        {ausdruck ? <div style={{ marginTop: 6 }}>{rahmen(detailTab)}</div> : <Einklappbar variante="inline" titel="Aufschlüsselung nach Geschlecht und Altersklasse">{rahmen(detailTab)}</Einklappbar>}
       </Fragment>
     );
   };
@@ -302,7 +302,7 @@ function Inhalt({ d, o, jahre, strecke, zaehl, zaehlArten, diagrammArt, name, au
                   </select>
                 </label>
               )}
-              <strong style={{ fontSize: '.9rem' }}>Zählwert je 100 ha über die Jagdjahre · {name(aktArt)}</strong>
+              <strong style={{ fontSize: 'var(--fs-md)' }}>Zählwert je 100 ha über die Jagdjahre · {name(aktArt)}</strong>
               <Verlauf titel={`${name(aktArt)}: Zählwert je 100 ha`} punkte={verlauf} />
             </div>
           )}

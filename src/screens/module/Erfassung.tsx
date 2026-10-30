@@ -173,6 +173,21 @@ export function Erfassung({ k }: { k: RevierKontext }) {
             ))}
           </Auswahl>
         )}
+      </Gruppe>
+
+      <Gruppe titel="Ort">
+        <Knopf variante="sekundaer" onClick={ortBestimmen}>
+          <Symbol name="position" className="symbol klein" /> Aktuelle Position verwenden
+        </Knopf>
+        <PositionWaehlen
+          revierId={k.revierId}
+          wert={position}
+          onWaehlen={(p) => {
+            setPosition({ lon: p.lon, lat: p.lat, genauigkeit: 0 });
+            setOrtStatus('Position auf der Karte gewählt');
+            if (navigator.onLine) void supabase.rpc('zone_an_position', { p_revier_id: k.revierId, p_lon: p.lon, p_lat: p.lat }).then(({ data }) => data && setZoneId(data));
+          }}
+        />
         <Auswahl label="Zone" value={zoneId} onChange={(e) => setZoneId(e.target.value)}>
           <option value="">–</option>
           {zonen.map((z) => (
@@ -188,18 +203,6 @@ export function Erfassung({ k }: { k: RevierKontext }) {
       <Knopf onClick={speichern}>
         {anzahl} × {wildartName(wildarten, wildartId)} erfassen
       </Knopf>
-      <Knopf variante="sekundaer" onClick={ortBestimmen}>
-        <Symbol name="position" className="symbol klein" /> Aktuelle Position verwenden
-      </Knopf>
-      <PositionWaehlen
-        revierId={k.revierId}
-        wert={position}
-        onWaehlen={(p) => {
-          setPosition({ lon: p.lon, lat: p.lat, genauigkeit: 0 });
-          setOrtStatus('Position auf der Karte gewählt');
-          if (navigator.onLine) void supabase.rpc('zone_an_position', { p_revier_id: k.revierId, p_lon: p.lon, p_lat: p.lat }).then(({ data }) => data && setZoneId(data));
-        }}
-      />
 
       <Gruppe titel="Zuletzt erfasst">
         {liste.length === 0 && <Zeile label="Noch keine Beobachtungen" />}

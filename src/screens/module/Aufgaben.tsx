@@ -307,26 +307,11 @@ function AufgabeFormular({
     <Seite titel={vorlage ? 'Aufgabe bearbeiten' : 'Neue Aufgabe'} zurueck={() => void onFertig()}>
       {vorlage && <AuditZeile tabelle="aufgaben" id={vorlage.id} />}
       <form onSubmit={speichern}>
-        <Gruppe>
+        <Gruppe titel="Aufgabe">
           <Feld label="Titel" required placeholder="z. B. Hochsitz Eichenkanzel reparieren" value={titel} onChange={(e) => setTitel(e.target.value)} />
           <Feld label="Beschreibung" placeholder="optional" value={beschreibung} onChange={(e) => setBeschreibung(e.target.value)} />
-          <Feld label="Fällig am" type="date" value={faellig} onChange={(e) => setFaellig(e.target.value)} />
-          <Auswahl label="Zuständig" value={zugewiesen} onChange={(e) => setZugewiesen(e.target.value)}>
-            <option value="">niemand bestimmt</option>
-            {mitglieder.map((m) => (
-              <option key={m.user_id} value={m.user_id}>
-                {m.name}
-              </option>
-            ))}
-          </Auswahl>
-          <Auswahl label="Einrichtung" value={einrichtung} onChange={(e) => setEinrichtung(e.target.value)}>
-            <option value="">–</option>
-            {einrichtungen.map((x) => (
-              <option key={x.id} value={x.id}>
-                {einrichtungLabel(x)}
-              </option>
-            ))}
-          </Auswahl>
+        </Gruppe>
+        <Gruppe titel="Planung">
           <Auswahl label="Liste" value={listeId} onChange={(e) => setListeId(e.target.value)}>
             <option value="">ohne Liste</option>
             {listen.map((l) => (
@@ -335,10 +320,29 @@ function AufgabeFormular({
               </option>
             ))}
           </Auswahl>
+          <Auswahl label="Zuständig" value={zugewiesen} onChange={(e) => setZugewiesen(e.target.value)}>
+            <option value="">niemand bestimmt</option>
+            {mitglieder.map((m) => (
+              <option key={m.user_id} value={m.user_id}>
+                {m.name}
+              </option>
+            ))}
+          </Auswahl>
+          <Feld label="Fällig am" type="date" value={faellig} onChange={(e) => setFaellig(e.target.value)} />
           <Auswahl label="Status" value={status} onChange={(e) => setStatus(e.target.value)}>
             {STATUS.map((s) => (
               <option key={s.wert} value={s.wert}>
                 {s.label}
+              </option>
+            ))}
+          </Auswahl>
+        </Gruppe>
+        <Gruppe titel="Bezug">
+          <Auswahl label="Einrichtung" value={einrichtung} onChange={(e) => setEinrichtung(e.target.value)}>
+            <option value="">–</option>
+            {einrichtungen.map((x) => (
+              <option key={x.id} value={x.id}>
+                {einrichtungLabel(x)}
               </option>
             ))}
           </Auswahl>

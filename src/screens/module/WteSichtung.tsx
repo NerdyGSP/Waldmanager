@@ -40,7 +40,6 @@ export function WteSichtung({
   const [datum, setDatum] = useState(heuteISO());
   const [ebeneId, setEbeneId] = useState(zone.ebeneId ?? '');
   const [modus, setModus] = useState<Flaechenmodus>('zonen');
-  const [breite, setBreite] = useState(STANDARD_BREITE_M);
   const [fehler, setFehler] = useState<string | null>(null);
   const [laeuft, setLaeuft] = useState(false);
   const klassen = wildarten.find((w) => w.id === wildartId)?.altersklassen ?? [];
@@ -81,7 +80,7 @@ export function WteSichtung({
           mondphase: `${mond.name} (${mond.beleuchtung} %)`,
           ebene_id: ebeneId || null,
           flaechenmodus: modus,
-          streifenbreite_m: breite || STANDARD_BREITE_M,
+          streifenbreite_m: STANDARD_BREITE_M,
         });
         // 23505: In diesem Revier läuft bereits eine Zählung (z. B. von einem anderen Gerät gestartet) – diese verwenden
         if (error && error.code !== '23505') throw error;
@@ -152,7 +151,7 @@ export function WteSichtung({
               ))}
             </Auswahl>
           )}
-          <FlaechenmodusWahl modus={modus} breite={breite} onModus={setModus} onBreite={setBreite} />
+          <FlaechenmodusWahl modus={modus} onModus={setModus} />
           {fehler && <Hinweis art="fehler">{fehler}</Hinweis>}
           <Knopf variante="akzent" onClick={() => void speichern(true)} disabled={laeuft || !datum}>
             {laeuft ? 'Starte …' : 'Zählung starten und eintragen'}

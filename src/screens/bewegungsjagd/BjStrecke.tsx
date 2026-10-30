@@ -5,7 +5,7 @@ import { GESCHLECHTER, useWildarten, wildartName } from '../../lib/stammdaten';
 import { jagdzeitWarnung, useJagdzeiten } from '../../lib/jagdzeiten';
 import { punktEWKT } from '../../lib/geo';
 import type { Enums } from '../../lib/database.types';
-import { Auswahl, Feld, Gruppe, Hinweis, Knopf, Segmente, WildartOptionen } from '../../components/ui';
+import { Auswahl, Einklappbar, Feld, Gruppe, Hinweis, Knopf, Segmente, WildartOptionen } from '../../components/ui';
 import { PositionWaehlen } from '../../components/PositionWaehlen';
 import { AuditZeile } from '../../components/AuditZeile';
 
@@ -345,11 +345,10 @@ export function BjStrecke({
         <p className="gruppe-fuss" style={{ margin: 0, padding: '4px var(--abstand) 8px' }}>Noch keine Strecke erfasst.</p>
       ) : (
         <div style={{ padding: '4px var(--abstand) 8px' }}>
-          <p style={{ margin: '0 0 6px', fontSize: '.9rem' }}>
+          <p style={{ margin: '0 0 6px', fontSize: 'var(--fs-md)' }}>
             <strong>{liste.length} Stück</strong>: {summe.map(([w, n]) => `${n} ${wname(w)}`).join(', ')}
           </p>
-          <details>
-            <summary>Einzeleinträge ({liste.length})</summary>
+          <Einklappbar variante="inline" titel={`Einzeleinträge (${liste.length})`}>
             <ul style={{ listStyle: 'none', margin: '6px 0 0', padding: 0, display: 'grid', gap: 4 }}>
               {liste.map((e) => (
                 <li key={e.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
@@ -375,7 +374,7 @@ export function BjStrecke({
                 </li>
               ))}
             </ul>
-          </details>
+          </Einklappbar>
         </div>
       )}
     </Gruppe>

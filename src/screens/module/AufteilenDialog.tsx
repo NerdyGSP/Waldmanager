@@ -120,7 +120,7 @@ export function AufteilenDialog({ revierId, onZu, onAngelegt }: { revierId: stri
     <div className="bj-dialog-hintergrund" role="dialog" aria-modal="true" aria-label="Revier in Zonen aufteilen">
       <div className="bj-dialog" style={{ width: 'min(820px, 96vw)', maxHeight: '94dvh', overflow: 'auto' }}>
         <strong>Revier in gleich große Zonen aufteilen</strong>
-        <p style={{ margin: 0, color: 'var(--color-text-muted)', fontSize: '.85rem' }}>
+        <p style={{ margin: 0, color: 'var(--color-text-muted)', fontSize: 'var(--fs-sm)' }}>
           Die Zonen haben die gleiche Fläche (nicht gleichen Wildbestand oder Waldanteil) und folgen keinen Wegen oder Feldkanten. Sie landen in einer eigenen Zonenebene und lassen sich danach wie andere Zonen bearbeiten oder mit der Ebene löschen.
         </p>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>

@@ -30,6 +30,14 @@
   --control-h: 34px;
   --control-h-touch: 40px;
 
+  /* Schriftskala (rem): alle Textgrößen der App nutzen diese Stufen */
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.82rem;
+  --fs-md: 0.9rem;
+  --fs-base: 1rem;
+  --fs-h2: 1.25rem;
+  --fs-h1: 1.6rem;
+
   --font-sans: 'Inter Variable', 'Inter', 'IBM Plex Sans', system-ui, sans-serif;
 }
 

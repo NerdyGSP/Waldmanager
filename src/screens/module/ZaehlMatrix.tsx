@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { wildartName, type Wildart, type Zone, type ZonenEbene } from '../../lib/stammdaten';
 import { useBreit } from '../../lib/useBreit';
-import { Leer } from '../../components/ui';
+import { Chevron, Leer } from '../../components/ui';
 
 export type MatrixZeile = { zone_id: string | null; wildart_id: string; anzahl: number };
 export type MatrixSitzung = { ebene_id: string | null; flaechenmodus: string; streifenbreite_m: number; strecke_km: number | null; flaeche_ha: number | null };
@@ -82,7 +82,7 @@ export function ZaehlMatrix({ revierId, sitzung, zeilen, zonen, ebenen, wildarte
                       <tr className="matrix-gruppe">
                         <th scope="row">
                           <button type="button" className="link" aria-expanded={!geschlossen} onClick={() => umschalten(g.id)}>
-                            {geschlossen ? '▸' : '▾'} {g.name}
+                            <Chevron offen={!geschlossen} /> {g.name}
                           </button>
                         </th>
                         {arten.map((a) => <td key={a} className="zahl leise">{zeileZelle(ids, a)}</td>)}

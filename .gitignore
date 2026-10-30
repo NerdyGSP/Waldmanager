@@ -6,3 +6,7 @@ dist
 .dev.vars
 *.log
 .DS_Store
+# kompilierte Ausgabe (tsc läuft nur mit noEmit)
+src/**/*.js
+vite.config.js
+*.tsbuildinfo

@@ -246,7 +246,7 @@ function AbschussFormular({ k, vorlage, startArt, falleVor = '', onFertig }: { k
       <form onSubmit={speichern}>
         <Segmente label="Art" wert={art} onAendern={setArt} optionen={[{ wert: 'abschuss', label: 'Abschuss' }, { wert: 'fallwild', label: 'Fallwild' }, { wert: 'fang', label: 'Fang' }]} />
         {art === 'fang' ? (
-          <Gruppe>
+          <Gruppe titel="Fang">
             <Auswahl label="Falle" required value={falleId} onChange={(e) => setFalleId(e.target.value)}>
               <option value="">– bitte wählen –</option>
               {fallen.map((f) => (
@@ -283,7 +283,7 @@ function AbschussFormular({ k, vorlage, startArt, falleVor = '', onFertig }: { k
             <Feld label="Kontrolle am" type="datetime-local" required value={zeitpunkt} onChange={(e) => setZeitpunkt(e.target.value)} />
           </Gruppe>
         ) : (
-        <Gruppe>
+        <Gruppe titel={fallwild ? 'Fallwild' : 'Abschuss'}>
           <Auswahl
             label="Wildart"
             value={wildartId}
@@ -327,7 +327,21 @@ function AbschussFormular({ k, vorlage, startArt, falleVor = '', onFertig }: { k
         </Gruppe>
         )}
 
-        <Gruppe>
+        <Gruppe titel="Ort & Zuordnung">
+          <Knopf type="button" variante="sekundaer" onClick={ortUebernehmen}>
+            <Symbol name="position" className="symbol klein" /> Aktuelle Position als {art === 'fang' ? 'Fangort' : fallwild ? 'Fundort' : 'Erlegeort'}
+          </Knopf>
+          <PositionWaehlen
+            revierId={k.revierId}
+            wert={position}
+            onWaehlen={async (p) => {
+              setPosition(p);
+              const { data } = await supabase.rpc('zone_an_position', { p_revier_id: k.revierId, p_lon: p.lon, p_lat: p.lat });
+              if (data) setZoneId(data);
+              setOrtStatus(`${fallwild ? 'Fundort' : 'Erlegeort'} auf der Karte gewählt${data ? ', Zone automatisch gesetzt' : ''}`);
+            }}
+          />
+          {ortStatus && <Leer>{ortStatus}</Leer>}
           {art === 'abschuss' && (
           <Auswahl label="Erleger" value={erlegerId} onChange={(e) => setErlegerId(e.target.value)}>
             <option value="">–</option>
@@ -348,21 +362,6 @@ function AbschussFormular({ k, vorlage, startArt, falleVor = '', onFertig }: { k
           </Auswahl>
           <Feld label="Bemerkung" value={bemerkung} onChange={(e) => setBemerkung(e.target.value)} />
         </Gruppe>
-
-        <Knopf type="button" variante="sekundaer" onClick={ortUebernehmen}>
-          <Symbol name="position" className="symbol klein" /> Aktuelle Position als {art === 'fang' ? 'Fangort' : fallwild ? 'Fundort' : 'Erlegeort'}
-        </Knopf>
-        <PositionWaehlen
-          revierId={k.revierId}
-          wert={position}
-          onWaehlen={async (p) => {
-            setPosition(p);
-            const { data } = await supabase.rpc('zone_an_position', { p_revier_id: k.revierId, p_lon: p.lon, p_lat: p.lat });
-            if (data) setZoneId(data);
-            setOrtStatus(`${fallwild ? 'Fundort' : 'Erlegeort'} auf der Karte gewählt${data ? ', Zone automatisch gesetzt' : ''}`);
-          }}
-        />
-        {ortStatus && <Leer>{ortStatus}</Leer>}
 
         {jzWarnung && <Hinweis art={jzWarnung.art === 'warnung' ? 'warnung' : 'info'}>{jzWarnung.text} (Hinweis, kein Speicherverbot – verbindlich ist die Landesverordnung.)</Hinweis>}
         {fehler && <Hinweis art="fehler">{fehler}</Hinweis>}

@@ -5,7 +5,7 @@ import { fehlertext } from '../../lib/fehler';
 import { useWildarten, useZonen } from '../../lib/stammdaten';
 import { datumDE, heuteISO } from '../../lib/zeit';
 import type { Tables } from '../../lib/database.types';
-import { Auswahl, Feld, Gruppe, Hinweis, Knopf, Leer, Seite, Zeile } from '../../components/ui';
+import { Auswahl, Einklappbar, Feld, Gruppe, Hinweis, Knopf, Leer, Seite, Zeile } from '../../components/ui';
 import type { RevierKontext } from './kontext';
 
 type Schein = Omit<Tables<'begehungsscheine'>, 'revier_id' | 'geloescht_am' | 'erstellt_am' | 'aktualisiert_am' | 'ausgestellt_von' | 'geaendert_von'>;
@@ -241,8 +241,7 @@ function ScheinFormular({ k, vorlage, onFertig }: { k: RevierKontext; vorlage: S
             ))}
           </datalist>
         </Gruppe>
-        <details className="werkzeug-abschnitt">
-          <summary>Wildarten ({arten.length ? `${arten.length} gewählt` : 'alle nach Absprache'})</summary>
+        <Einklappbar variante="abschnitt" titel={`Wildarten (${arten.length ? `${arten.length} gewählt` : 'alle nach Absprache'})`}>
           <div className="wildarten-wahl">
             {wildarten.map((w, i) => (
               <label key={w.id} className="ebene" style={i === 8 ? { borderTop: '1px solid var(--color-border)', paddingTop: 8, marginTop: 4 } : undefined}>
@@ -255,7 +254,7 @@ function ScheinFormular({ k, vorlage, onFertig }: { k: RevierKontext; vorlage: S
               </label>
             ))}
           </div>
-        </details>
+        </Einklappbar>
         <Gruppe>
           <Feld label="Bedingungen" placeholder="z. B. Abschussmeldung innerhalb 24 h" value={bedingungen} onChange={(e) => setBedingungen(e.target.value)} />
           {vorlage && <Feld label="Widerrufen am" type="date" value={widerrufen} onChange={(e) => setWiderrufen(e.target.value)} />}

@@ -52,7 +52,7 @@ export function WteRoutenWahl({
   return (
     <div style={{ padding: '4px var(--abstand) 8px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <strong style={{ fontSize: '0.9rem' }}>WTE-Routen dieser Zählung</strong>
+        <strong style={{ fontSize: 'var(--fs-md)' }}>WTE-Routen dieser Zählung</strong>
         <button type="button" className="glocke-alle" onClick={() => onAendern(alle ? [] : routen.map((r) => r.id))}>
           {alle ? 'Keine' : 'Alle'}
         </button>

@@ -107,7 +107,7 @@ function SitzungsZeile({ s }: { s: Sitzung & { summe: number } }) {
         <small>
           {s.summe} Stück gezählt
           {s.mondphase ? ` · ${s.mondphase}` : ''}
-          {s.flaeche_ha !== null ? ` · ${s.flaeche_ha.toLocaleString('de-DE')} ha (${modusText(s.flaechenmodus === 'strecke' ? 'strecke' : 'zonen', s.streifenbreite_m)})` : ''}
+          {s.flaeche_ha !== null ? ` · ${s.flaeche_ha.toLocaleString('de-DE')} ha (${modusText(s.flaechenmodus === 'strecke' ? 'strecke' : 'zonen')})` : ''}
           {s.bemerkung ? ` · ${s.bemerkung}` : ''}
         </small>
       </span>
@@ -124,7 +124,6 @@ function NeueSitzung({ k, onAbbrechen }: { k: RevierKontext; onAbbrechen: () => 
   const [datum, setDatum] = useState(heuteISO());
   const [bemerkung, setBemerkung] = useState('');
   const [modus, setModus] = useState<Flaechenmodus>('zonen');
-  const [breite, setBreite] = useState(STANDARD_BREITE_M);
   const [wetter, setWetter] = useState<Wetter | null>(null);
   const [wetterStatus, setWetterStatus] = useState('Wetter wird abgerufen …');
   const [fehler, setFehler] = useState<string | null>(null);
@@ -167,7 +166,7 @@ function NeueSitzung({ k, onAbbrechen }: { k: RevierKontext; onAbbrechen: () => 
         bemerkung: bemerkung.trim() || null,
         ebene_id: ebeneId || null,
         flaechenmodus: modus,
-        streifenbreite_m: breite || STANDARD_BREITE_M,
+        streifenbreite_m: STANDARD_BREITE_M,
       })
       .select('id')
       .single();
@@ -199,7 +198,7 @@ function NeueSitzung({ k, onAbbrechen }: { k: RevierKontext; onAbbrechen: () => 
               ))}
             </Auswahl>
           )}
-          <FlaechenmodusWahl modus={modus} breite={breite} onModus={setModus} onBreite={setBreite} />
+          <FlaechenmodusWahl modus={modus} onModus={setModus} />
           {modus === 'strecke' && <WteRoutenWahl routen={wteRouten} gewaehlt={routenIds} onAendern={setRoutenIds} />}
           <Zeile label="Wetter" wert={wetterStatus} />
           <Zeile label="Mond" wert={`${mond.name}, ${mond.beleuchtung} % beleuchtet`} />
@@ -254,19 +253,18 @@ function SitzungBearbeiten({ k, sitzung, onFertig }: { k: RevierKontext; sitzung
 // Gezählte Fläche der Zählung: Modus, Strecke und Fläche – änderbar, auch nach dem Abschluss
 function FlaechenGruppe({ sitzung, revierId, onGeaendert, onRouten }: { sitzung: Sitzung; revierId: string; onGeaendert: () => void; onRouten?: (n: number) => void }) {
   const [modus, setModus] = useState<Flaechenmodus>(sitzung.flaechenmodus === 'strecke' ? 'strecke' : 'zonen');
-  const [breite, setBreite] = useState(sitzung.streifenbreite_m);
   const [vorschau, setVorschau] = useState<{ strecke_km: number | null; flaeche_ha: number | null; routen: number } | null>(null);
   const [fehler, setFehler] = useState<string | null>(null);
   const [laeuft, setLaeuft] = useState(false);
   const [neuLadenZaehler, setNeuLadenZaehler] = useState(0);
   const routenListe = useWteRouten(revierId, modus === 'strecke');
   const [gewaehlt, setGewaehlt] = useState<string[]>([]);
-  const geaendert = modus !== sitzung.flaechenmodus || breite !== sitzung.streifenbreite_m;
+  const geaendert = modus !== sitzung.flaechenmodus;
   const abgeschlossen = sitzung.status === 'abgeschlossen';
 
   useEffect(() => {
     let aktiv = true;
-    void supabase.rpc('sitzung_flaeche_berechnen', { p_sitzung_id: sitzung.id, p_modus: modus, p_breite_m: breite || STANDARD_BREITE_M }).then(({ data, error }) => {
+    void supabase.rpc('sitzung_flaeche_berechnen', { p_sitzung_id: sitzung.id, p_modus: modus, p_breite_m: STANDARD_BREITE_M }).then(({ data, error }) => {
       if (!aktiv) return;
       const z = data?.[0];
       if (error || !z) return;
@@ -275,7 +273,7 @@ function FlaechenGruppe({ sitzung, revierId, onGeaendert, onRouten }: { sitzung:
     return () => {
       aktiv = false;
     };
-  }, [sitzung.id, modus, breite, sitzung.status, neuLadenZaehler]);
+  }, [sitzung.id, modus, sitzung.status, neuLadenZaehler]);
 
   // Zugeordnete Routen dieser Zählung
   useEffect(() => {
@@ -315,7 +313,7 @@ function FlaechenGruppe({ sitzung, revierId, onGeaendert, onRouten }: { sitzung:
   async function speichern() {
     setLaeuft(true);
     setFehler(null);
-    const { error } = await supabase.from('zaehlsitzungen').update({ flaechenmodus: modus, streifenbreite_m: breite || STANDARD_BREITE_M }).eq('id', sitzung.id);
+    const { error } = await supabase.from('zaehlsitzungen').update({ flaechenmodus: modus, streifenbreite_m: STANDARD_BREITE_M }).eq('id', sitzung.id);
     setLaeuft(false);
     if (error) setFehler(fehlertext(error));
     else onGeaendert();
@@ -327,7 +325,7 @@ function FlaechenGruppe({ sitzung, revierId, onGeaendert, onRouten }: { sitzung:
 
   return (
     <Gruppe titel="Gezählte Fläche" fuss={abgeschlossen ? 'Die Fläche wird beim Abschluss festgeschrieben. Ändern von Modus oder Breite berechnet sie neu.' : 'Wird beim Abschluss der Zählung festgeschrieben.'}>
-      <FlaechenmodusWahl modus={modus} breite={breite} onModus={setModus} onBreite={setBreite} />
+      <FlaechenmodusWahl modus={modus} onModus={setModus} />
       {fehltRoute && (
         <Hinweis art="warnung">Dieser Zählung ist noch keine WTE-Route zugeordnet. Im Modus „Strecke × Breite“ lässt sie sich so nicht abschließen. Wähle unten vorhandene WTE-Routen aus oder zeichne, zeichne per GPS auf oder importiere eine über das Menü „+ NEU“ auf der Karte.</Hinweis>
       )}
@@ -337,10 +335,10 @@ function FlaechenGruppe({ sitzung, revierId, onGeaendert, onRouten }: { sitzung:
         wert={
           (gespeichert ? sitzung.flaeche_ha : vorschau?.flaeche_ha ?? null) === null
             ? '–'
-            : `${zahlDE(gespeichert ? sitzung.flaeche_ha : vorschau?.flaeche_ha ?? null)} ha${modus === 'strecke' ? ` (${zahlDE(gespeichert ? sitzung.strecke_km : vorschau?.strecke_km ?? null, 2)} km × ${breite} m)` : ''}`
+            : `${zahlDE(gespeichert ? sitzung.flaeche_ha : vorschau?.flaeche_ha ?? null)} ha${modus === 'strecke' ? ` (${zahlDE(gespeichert ? sitzung.strecke_km : vorschau?.strecke_km ?? null, 2)} km × ${STANDARD_BREITE_M} m)` : ''}`
         }
       />
-      {!gespeichert && vorschau && <p className="gruppe-fuss" style={{ margin: 0 }}>Vorschau – {modusText(modus, breite)}.</p>}
+      {!gespeichert && vorschau && <p className="gruppe-fuss" style={{ margin: 0 }}>Vorschau – {modusText(modus)}.</p>}
       {fehler && <Hinweis art="fehler">{fehler}</Hinweis>}
       {geaendert && (
         <Knopf variante="sekundaer" disabled={laeuft || fehltRoute} onClick={() => void speichern()}>

@@ -368,7 +368,7 @@ function Assistent({ k }: { k: RevierKontext }) {
         <div className="bj-dialog-hintergrund" role="dialog" aria-modal="true" aria-label="Treffpunkt wählen">
           <div className="bj-dialog" style={{ maxWidth: 720 }}>
             <strong>Treffpunkt wählen</strong>
-            <p style={{ margin: 0, fontSize: '.88rem', color: 'var(--color-text-muted)' }}>Tippe auf die Karte, um den Treffpunkt zu setzen.</p>
+            <p style={{ margin: 0, fontSize: 'var(--fs-md)', color: 'var(--color-text-muted)' }}>Tippe auf die Karte, um den Treffpunkt zu setzen.</p>
             <Suspense fallback={kartenLaden}>
               <BjKarte className="bj-karte bj-karte-hoch" marker={marker} grenze={grenze} waehlbar onWaehlen={(lng, lat) => setTreffpunkt([lng, lat])} />
             </Suspense>
@@ -803,7 +803,7 @@ function Auswertung({ k, id }: { k: RevierKontext; id: string }) {
         {nachMeldung && <Hinweis>{nachMeldung}</Hinweis>}
         {nachOffen && offen && (
           <div style={{ padding: '0 var(--abstand)' }}>
-            <p style={{ margin: '8px 0', fontSize: '.85rem', color: 'var(--color-text-muted)' }}>Neue Teilnehmer erhalten einen eigenen Code. Die Einladung geht nur an die neu Ergänzten.</p>
+            <p style={{ margin: '8px 0', fontSize: 'var(--fs-sm)', color: 'var(--color-text-muted)' }}>Neue Teilnehmer erhalten einen eigenen Code. Die Einladung geht nur an die neu Ergänzten.</p>
             <Feld label="Name" value={nName} onChange={(e) => setNName(e.target.value)} />
             <Feld label="E-Mail" type="email" value={nMail} onChange={(e) => setNMail(e.target.value)} />
             <Feld label="Telefon (optional)" type="tel" value={nTel} onChange={(e) => setNTel(e.target.value)} />
@@ -906,7 +906,7 @@ function Auswertung({ k, id }: { k: RevierKontext; id: string }) {
         <div className="bj-dialog-hintergrund" role="dialog" aria-modal="true" aria-label="Strecke prüfen">
           <div className="bj-dialog">
             <strong>{strecke.length ? 'Strecke so übernehmen?' : 'Keine Strecke erfasst, trotzdem abschließen?'}</strong>
-            <p style={{ margin: 0, color: 'var(--color-text-muted)', fontSize: '.9rem' }}>
+            <p style={{ margin: 0, color: 'var(--color-text-muted)', fontSize: 'var(--fs-md)' }}>
               {strecke.length
                 ? `${streckeText(strecke, (w) => wildartName(wildarten, w))}. Die Einträge sind danach normale Abschüsse unter „Strecke“.`
                 : 'Die Strecke lässt sich auch später unter „Strecke“ eintragen.'}
@@ -923,7 +923,7 @@ function Auswertung({ k, id }: { k: RevierKontext; id: string }) {
         <div className="bj-dialog-hintergrund" role="dialog" aria-modal="true" aria-label="Jagd abschließen">
           <div className="bj-dialog">
             <strong>Kommentare speichern?</strong>
-            <p style={{ margin: 0, color: 'var(--color-text-muted)', fontSize: '.9rem' }}>Nach dem Abschluss sind keine Zu- oder Absagen mehr möglich.</p>
+            <p style={{ margin: 0, color: 'var(--color-text-muted)', fontSize: 'var(--fs-md)' }}>Nach dem Abschluss sind keine Zu- oder Absagen mehr möglich.</p>
             <label className="bj-text" style={{ padding: 0 }}>
               <span>Abschlusskommentar (optional)</span>
               <textarea value={kommentar} onChange={(e) => setKommentar(e.target.value)} />

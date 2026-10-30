@@ -115,7 +115,7 @@ export function ZaehlReport({ revierId, revierName, sitzung, ebeneName, zeilen, 
                 </tr>
               </tfoot>
             </table>
-            <p className="art" style={{ marginTop: 8, fontSize: '.8rem' }}>
+            <p className="art" style={{ marginTop: 8, fontSize: 'var(--fs-sm)' }}>
               {streckeModus ? `Bezugsfläche „je 100 ha“ = gezählte Fläche (${modusZeile}); die Zonenzeilen zeigen Zählwerte.` : 'Bezugsfläche „je 100 ha“ = Summe der erfassten Zonen.'} Erstellt am {new Date().toLocaleDateString('de-DE')} mit Hegewerk.
             </p>
           </>
