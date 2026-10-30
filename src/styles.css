@@ -902,3 +902,6 @@ button.kachel:active { transform: none; }
 .jz-heute { border-color: var(--text, #111); font-weight: 700; }
 .hinweis-warnung { background: #fff3d6; color: #6b4600; border: 1px solid #f0c36d; }
 @media (prefers-color-scheme: dark) { .hinweis-warnung { background: #3a2c0c; color: #f5d58a; border-color: #7a5a14; } }
+.bj-zeile-aussen { border-top: 1px solid var(--color-border); padding-right: var(--abstand); }
+.bj-zeile-aussen:first-child { border-top: 0; }
+.bj-zeile-aussen .bj-zeile { border-top: 0; }

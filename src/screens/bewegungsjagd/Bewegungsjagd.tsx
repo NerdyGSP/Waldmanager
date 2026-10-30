@@ -77,6 +77,19 @@ export function BewegungsjagdListe({ k }: { k: RevierKontext }) {
     })();
   }, [k.revierId, k.istInhaber]);
 
+  // Abgeschlossene Jagd entfernen: Jagd und Aufgabenliste werden ausgeblendet, die Teilnehmerdaten (Namen, E-Mail, Telefon) endgültig gelöscht
+  async function loeschen(j: Jagd) {
+    if (!window.confirm(`Abgeschlossene Bewegungsjagd „${j.titel}“ (${datumDE(j.datum)}) wirklich löschen?\n\nDie Teilnehmerliste mit allen Kontaktdaten wird dabei endgültig entfernt.`)) return;
+    setFehler(null);
+    const jetzt = new Date().toISOString();
+    const t = await supabase.from('bewegungsjagd_teilnehmer').delete().eq('bewegungsjagd_id', j.id);
+    if (t.error) return setFehler(fehlertext(t.error));
+    await supabase.from('aufgabenlisten').update({ geloescht_am: jetzt }).eq('bewegungsjagd_id', j.id);
+    const r = await supabase.from('bewegungsjagden').update({ geloescht_am: jetzt }).eq('id', j.id);
+    if (r.error) return setFehler(fehlertext(r.error));
+    setListe((alt) => (alt ?? []).filter((x) => x.id !== j.id));
+  }
+
   if (!k.istInhaber) return <Seite titel="Bewegungsjagd"><Leer>Bewegungsjagden plant der Revierinhaber.</Leer></Seite>;
 
   return (
@@ -87,16 +100,23 @@ export function BewegungsjagdListe({ k }: { k: RevierKontext }) {
       {!!liste?.length && (
         <Gruppe>
           {liste.map((j) => (
-            <button key={j.id} className="bj-zeile" style={{ background: 'none', border: 0, textAlign: 'left', width: '100%', cursor: 'pointer', color: 'inherit', font: 'inherit' }} onClick={() => navigieren(`/bewegungsjagd/${j.id}`)}>
-              <span>
-                <strong>{j.titel}</strong>
-                <br />
-                <small>
-                  {j.art} · {datumDE(j.datum)} · {zahlen[j.id]?.zu ?? 0} von {zahlen[j.id]?.gesamt ?? 0} zugesagt
-                </small>
-              </span>
-              <span className={`badge ${j.status === 'offen' ? 'badge-gruen' : ''}`}>{j.status === 'offen' ? 'Offen' : 'Abgeschlossen'}</span>
-            </button>
+            <div key={j.id} className="bj-zeile-aussen" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button className="bj-zeile" style={{ background: 'none', border: 0, textAlign: 'left', flex: 1, cursor: 'pointer', color: 'inherit', font: 'inherit' }} onClick={() => navigieren(`/bewegungsjagd/${j.id}`)}>
+                <span>
+                  <strong>{j.titel}</strong>
+                  <br />
+                  <small>
+                    {j.art} · {datumDE(j.datum)} · {zahlen[j.id]?.zu ?? 0} von {zahlen[j.id]?.gesamt ?? 0} zugesagt
+                  </small>
+                </span>
+                <span className={`badge ${j.status === 'offen' ? 'badge-gruen' : ''}`}>{j.status === 'offen' ? 'Offen' : 'Abgeschlossen'}</span>
+              </button>
+              {j.status === 'abgeschlossen' && (
+                <Knopf variante="ghost" onClick={() => void loeschen(j)} aria-label={`${j.titel} löschen`}>
+                  Löschen
+                </Knopf>
+              )}
+            </div>
           ))}
         </Gruppe>
       )}
