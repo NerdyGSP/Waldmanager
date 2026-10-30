@@ -837,3 +837,15 @@ button.kachel:active { transform: none; }
 .wte-sheet-kopf { display: flex; justify-content: space-between; align-items: center; padding-bottom: 6px; }
 .wte-neue-zaehlung { display: grid; gap: 6px; }
 @media (max-width: 899px) { .wte-menue { top: auto; right: 0; left: 0; bottom: 0; border-radius: 16px 16px 0 0; padding-bottom: calc(10px + env(safe-area-inset-bottom)); } .wte-menue button { padding: 16px 12px; } }
+
+/* Wetter-Chip und Panel */
+.wind-haupt { display: flex; align-items: center; gap: 10px; background: none; border: 0; padding: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.wetter-panel { position: absolute; z-index: 9; top: 64px; left: 12px; width: min(380px, calc(100% - 24px)); max-height: calc(100% - 140px); overflow: auto; display: grid; gap: 10px; background: var(--color-bg); border: 1px solid var(--color-border-input); border-radius: var(--radius-lg, 12px); padding: 12px; box-shadow: 0 8px 28px rgba(0,0,0,.25); }
+.wetter-kopf { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.wetter-werte { display: grid; gap: 4px; margin: 0; }
+.wetter-werte > div { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--color-border); }
+.wetter-werte dt { color: var(--text-leise); } .wetter-werte dd { margin: 0; text-align: right; } .wetter-werte small { color: var(--text-leise); margin-left: 6px; }
+.wetter-stunden { display: grid; font-size: 0.85rem; }
+.wetter-stunden > div { display: grid; grid-template-columns: 1.4fr .6fr 1.2fr .7fr .8fr; gap: 6px; padding: 4px 0; border-bottom: 1px solid var(--color-border); }
+.wetter-stunden .kopf { color: var(--text-leise); font-weight: 600; }
+@media (max-width: 899px) { .wetter-panel { top: 56px; } }

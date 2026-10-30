@@ -12,7 +12,7 @@ import type { RevierKontext } from './kontext';
 type Abschuss = {
   id: string;
   erlegt_am: string;
-  wildart_id: string;
+  wildart_id: string | null;
   geschlecht: Enums<'geschlecht'>;
   altersklasse: string | null;
   gewicht_kg: number | null;
@@ -21,6 +21,9 @@ type Abschuss = {
   erfasst_von: string | null;
   bemerkung: string | null;
   art: string;
+  einrichtung_id: string | null;
+  fang_ergebnis: string | null;
+  fang_zustand: string | null;
 };
 
 export function Abschuesse({ k, unterpfad = [] }: { k: RevierKontext; unterpfad?: string[] }) {
@@ -36,7 +39,7 @@ export function Abschuesse({ k, unterpfad = [] }: { k: RevierKontext; unterpfad?
   const laden = useCallback(async () => {
     const { data, error } = await supabase
       .from('abschuesse')
-      .select('id, erlegt_am, wildart_id, geschlecht, altersklasse, gewicht_kg, zone_id, erleger_id, erfasst_von, bemerkung, art')
+      .select('id, erlegt_am, wildart_id, geschlecht, altersklasse, gewicht_kg, zone_id, erleger_id, erfasst_von, bemerkung, art, einrichtung_id, fang_ergebnis, fang_zustand')
       .eq('revier_id', k.revierId)
       .is('geloescht_am', null)
       .gte('erlegt_am', `${jahr.von}T00:00:00`)
@@ -52,12 +55,12 @@ export function Abschuesse({ k, unterpfad = [] }: { k: RevierKontext; unterpfad?
 
   const strecke = useMemo(() => {
     const m = new Map<string, { gesamt: number; m: number; w: number }>();
-    for (const a of liste.filter((x) => x.art === 'abschuss')) {
-      const s = m.get(a.wildart_id) ?? { gesamt: 0, m: 0, w: 0 };
+    for (const a of liste.filter((x) => x.art === 'abschuss' && x.wildart_id)) {
+      const s = m.get(a.wildart_id!) ?? { gesamt: 0, m: 0, w: 0 };
       s.gesamt++;
       if (a.geschlecht === 'maennlich') s.m++;
       if (a.geschlecht === 'weiblich') s.w++;
-      m.set(a.wildart_id, s);
+      m.set(a.wildart_id!, s);
     }
     return [...m.entries()].sort((a, b) => b[1].gesamt - a[1].gesamt);
   }, [liste]);
@@ -111,7 +114,7 @@ export function Abschuesse({ k, unterpfad = [] }: { k: RevierKontext; unterpfad?
         {liste.map((a) => (
           <button key={a.id} className="zeile zeile-knopf" onClick={() => setBearbeiten(a)}>
             <span className="zeile-label">
-              {a.art === 'fang' ? '🪤 ' : ''}{wildartName(wildarten, a.wildart_id)} {GESCHLECHTER.find((g) => g.wert === a.geschlecht)?.kurz}{a.art === 'fang' ? ' · Fang' : ''}
+              {a.art === 'fang' ? `🪤 Fang · ${a.fang_ergebnis === 'leer' ? 'leer' : `${a.wildart_id ? wildartName(wildarten, a.wildart_id) : ''}${a.fang_ergebnis === 'fehlfang' ? ' (Fehlfang)' : a.fang_zustand ? ` (${a.fang_zustand})` : ''}`}` : `${wildartName(wildarten, a.wildart_id ?? '')} ${GESCHLECHTER.find((g) => g.wert === a.geschlecht)?.kurz}`}
               {a.altersklasse ? ` · ${a.altersklasse}` : ''}
               <small>
                 {datumZeitDE(a.erlegt_am)} · {name(a.erleger_id)}
@@ -134,6 +137,13 @@ function AbschussFormular({ k, vorlage, startArt, onFertig }: { k: RevierKontext
   const { zonen } = useZonen(k.revierId);
   const mitglieder = useMitglieder(k.revierId);
   const [art, setArt] = useState(vorlage?.art ?? startArt);
+  const [falleId, setFalleId] = useState(vorlage?.einrichtung_id ?? '');
+  const [ergebnis, setErgebnis] = useState<'gefangen' | 'leer' | 'fehlfang'>((vorlage?.fang_ergebnis as 'gefangen' | 'leer' | 'fehlfang' | null) ?? 'gefangen');
+  const [zustand, setZustand] = useState<'lebend' | 'tot'>((vorlage?.fang_zustand as 'lebend' | 'tot' | null) ?? 'tot');
+  const [fallen, setFallen] = useState<Array<{ id: string; name: string | null }>>([]);
+  useEffect(() => {
+    void supabase.from('einrichtungen').select('id, name').eq('revier_id', k.revierId).eq('typ', 'falle').is('geloescht_am', null).order('name').then(({ data }) => setFallen(data ?? []));
+  }, [k.revierId]);
   const [wildartId, setWildartId] = useState(vorlage?.wildart_id ?? 'rehwild');
   const [geschlecht, setGeschlecht] = useState<Enums<'geschlecht'>>(vorlage?.geschlecht ?? 'unbekannt');
   const [altersklasse, setAltersklasse] = useState(vorlage?.altersklasse ?? '');
@@ -171,17 +181,25 @@ function AbschussFormular({ k, vorlage, startArt, onFertig }: { k: RevierKontext
       setFehler('Bitte ein gültiges Gewicht angeben.');
       return;
     }
+    if (art === 'fang' && !falleId) {
+      setFehler('Bitte die Falle auswählen.');
+      return;
+    }
     setSpeichert(true);
+    const fang = art === 'fang';
     const daten = {
       revier_id: k.revierId,
       art,
-      wildart_id: wildartId,
-      geschlecht,
-      altersklasse: altersklasse || null,
+      wildart_id: fang && ergebnis === 'leer' ? null : wildartId,
+      geschlecht: fang ? ('unbekannt' as const) : geschlecht,
+      altersklasse: fang ? null : altersklasse || null,
       erlegt_am: new Date(zeitpunkt).toISOString(),
-      gewicht_kg: kg,
+      gewicht_kg: fang ? null : kg,
       zone_id: zoneId || null,
-      erleger_id: erlegerId || null,
+      erleger_id: fang ? k.userId : erlegerId || null,
+      einrichtung_id: fang ? falleId : null,
+      fang_ergebnis: fang ? ergebnis : null,
+      fang_zustand: fang && ergebnis === 'gefangen' ? zustand : null,
       bemerkung: bemerkung.trim() || null,
       ...(position ? { geom: punktEWKT(position.lon, position.lat) } : {}),
     };
@@ -204,6 +222,40 @@ function AbschussFormular({ k, vorlage, startArt, onFertig }: { k: RevierKontext
     <Seite titel={`${art === 'fang' ? 'Fang' : 'Abschuss'} ${vorlage ? 'bearbeiten' : 'erfassen'}`} zurueck={() => void onFertig()}>
       <form onSubmit={speichern}>
         <Segmente label="Art" wert={art} onAendern={setArt} optionen={[{ wert: 'abschuss', label: 'Abschuss' }, { wert: 'fang', label: 'Fang' }]} />
+        {art === 'fang' ? (
+          <Gruppe>
+            <Auswahl label="Falle" required value={falleId} onChange={(e) => setFalleId(e.target.value)}>
+              <option value="">– bitte wählen –</option>
+              {fallen.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name ?? 'Falle ohne Namen'}
+                </option>
+              ))}
+            </Auswahl>
+            {fallen.length === 0 && <Leer>Noch keine Einrichtung vom Typ „Falle“ angelegt (Karte → WTE → Einrichtung anlegen).</Leer>}
+            <div className="zeile">
+              <span className="zeile-label">Ergebnis</span>
+              <Segmente
+                label="Ergebnis"
+                wert={ergebnis}
+                onAendern={setErgebnis}
+                optionen={[{ wert: 'gefangen', label: 'Gefangen' }, { wert: 'leer', label: 'Leer' }, { wert: 'fehlfang', label: 'Fehlfang' }]}
+              />
+            </div>
+            {ergebnis !== 'leer' && (
+              <Auswahl label="Wildart" value={wildartId} onChange={(e) => setWildartId(e.target.value)}>
+                <WildartOptionen wildarten={wildarten} />
+              </Auswahl>
+            )}
+            {ergebnis === 'gefangen' && (
+              <div className="zeile">
+                <span className="zeile-label">Zustand</span>
+                <Segmente label="Zustand" wert={zustand} onAendern={setZustand} optionen={[{ wert: 'lebend', label: 'Lebend' }, { wert: 'tot', label: 'Tot' }]} />
+              </div>
+            )}
+            <Feld label="Kontrolle am" type="datetime-local" required value={zeitpunkt} onChange={(e) => setZeitpunkt(e.target.value)} />
+          </Gruppe>
+        ) : (
         <Gruppe>
           <Auswahl
             label="Wildart"
@@ -239,8 +291,10 @@ function AbschussFormular({ k, vorlage, startArt, onFertig }: { k: RevierKontext
           <Feld label="Erlegt am" type="datetime-local" required value={zeitpunkt} onChange={(e) => setZeitpunkt(e.target.value)} />
           <Feld label="Gewicht (kg)" inputMode="decimal" placeholder="aufgebrochen, optional" value={gewicht} onChange={(e) => setGewicht(e.target.value)} />
         </Gruppe>
+        )}
 
         <Gruppe>
+          {art !== 'fang' && (
           <Auswahl label="Erleger" value={erlegerId} onChange={(e) => setErlegerId(e.target.value)}>
             <option value="">–</option>
             {mitglieder.map((m) => (
@@ -249,6 +303,7 @@ function AbschussFormular({ k, vorlage, startArt, onFertig }: { k: RevierKontext
               </option>
             ))}
           </Auswahl>
+          )}
           <Auswahl label="Zone" value={zoneId} onChange={(e) => setZoneId(e.target.value)}>
             <option value="">–</option>
             {zonen.map((z) => (

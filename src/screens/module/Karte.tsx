@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ZonenInfo, type GewaehlteZone } from './ZonenInfo';
+import { WetterPanel } from './WetterPanel';
 import { WteSichtung, type WteSitzung, type WteZone } from './WteSichtung';
 import { createPortal } from 'react-dom';
 import {
@@ -110,6 +111,7 @@ type KartenDaten = {
   beobachtungen: Feature[];
   abschuesse: Feature[];
   zaehlungen: Feature[];
+  mitte: [number, number] | null;
 };
 
 const HEATNAMEN = { zaehlungen: 'Zählungen', beobachtungen: 'Beobachtungen', abschuesse: 'Abschüsse' } as const;
@@ -171,6 +173,8 @@ export default function Karte({
   const [punkte, setPunkte] = useState<Position[]>([]);
   const [neueEinrichtung, setNeueEinrichtung] = useState<Position | null>(null);
   const [wind, setWind] = useState<Wetter | null>(null);
+  const [wetterOffen, setWetterOffen] = useState(false);
+  const [wetterOrt, setWetterOrt] = useState<[number, number]>([0, 0]);
   const [panelOffen, setPanelOffen] = useState(false);
   const [kartenFehler, setKartenFehler] = useState<string | null>(null);
   const [meldung, setMeldung] = useState<{ art: 'fehler' | 'erfolg' | 'info'; text: string } | null>(null);
@@ -265,6 +269,7 @@ export default function Karte({
       beobachtungen: d.beobachtungen ?? [],
       abschuesse: d.abschuesse ?? [],
       zaehlungen: d.zaehlungen ?? [],
+      mitte: ((d as { mitte?: { coordinates?: number[] } | null }).mitte?.coordinates as [number, number] | undefined) ?? null,
     });
   }, [k.revierId]);
 
@@ -655,6 +660,7 @@ export default function Karte({
     const m = karte.current;
     if (!m) return;
     const c = m.getCenter();
+    setWetterOrt([c.lat, c.lng]);
     setWind(await aktuellesWetter(c.lat, c.lng));
   }, []);
   useEffect(() => {
@@ -1079,19 +1085,22 @@ export default function Karte({
       <div ref={container} className="karte" />
 
       {wind && (
-        <div className="wind" title="Aktueller Wind am Kartenmittelpunkt (Open-Meteo)">
-          <span className="wind-pfeil" style={{ transform: `rotate(${wind.windRichtung + 180}deg)` }} aria-hidden="true">
-            ↑
-          </span>
-          <span>
-            <strong>{Math.round(wind.windKmh)} km/h</strong> aus {himmelsrichtung(wind.windRichtung)}
-            <small>{Math.round(wind.temperatur)} °C</small>
-          </span>
+        <div className="wind" title="Wetter, Sonne und Mond">
+          <button type="button" className="wind-haupt" aria-expanded={wetterOffen} aria-haspopup="dialog" onClick={() => setWetterOffen((o) => !o)}>
+            <span className="wind-pfeil" style={{ transform: `rotate(${wind.windRichtung + 180}deg)` }} aria-hidden="true">
+              ↑
+            </span>
+            <span>
+              <strong>{Math.round(wind.windKmh)} km/h</strong> aus {himmelsrichtung(wind.windRichtung)}
+              <small>{Math.round(wind.temperatur)} °C · Wetter ▾</small>
+            </span>
+          </button>
           <button className="link" onClick={windLaden} aria-label="Wind aktualisieren">
             ↻
           </button>
         </div>
       )}
+      {wind && wetterOffen && <WetterPanel lat={wetterOrt[0]} lon={wetterOrt[1]} mitte={daten?.mitte ?? null} onSchliessen={() => setWetterOffen(false)} />}
 
       {zeichnet && (
         <div className="zeichen-leiste">

@@ -68,7 +68,7 @@ export function Monitoring({ k, breit = false, abgedockt = false }: { k: RevierK
         }),
       );
       const st: Record<string, number> = {};
-      for (const x of a.data ?? []) st[x.wildart_id] = (st[x.wildart_id] ?? 0) + 1;
+      for (const x of a.data ?? []) if (x.wildart_id) st[x.wildart_id] = (st[x.wildart_id] ?? 0) + 1;
       setStrecke(st);
       setBeobachtungen(b.count ?? 0);
       setVergleich(v.data ?? []);
@@ -281,7 +281,7 @@ function Jahresvergleich({ k, wildarten }: { k: RevierKontext; wildarten: Return
           return { id: x.id, datum: x.datum, arten };
         }),
       );
-      setAbschuesse(a.data ?? []);
+      setAbschuesse((a.data ?? []).filter((x): x is { wildart_id: string; erlegt_am: string } => !!x.wildart_id));
       setLaedt(false);
     })();
     return () => {

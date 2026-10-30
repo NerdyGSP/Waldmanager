@@ -274,7 +274,7 @@ export function Datenimport({ k }: { k: RevierKontext }) {
           .limit(10000);
         if (e0) throw e0;
         const schluessel = (w: string, t: string, g: string) => `${w}|${new Date(t).getTime()}|${g}`;
-        const bekannt = new Set((vorhanden ?? []).map((x) => schluessel(x.wildart_id, x.erlegt_am, x.geschlecht)));
+        const bekannt = new Set((vorhanden ?? []).map((x) => schluessel(x.wildart_id ?? '', x.erlegt_am, x.geschlecht)));
         const neu = importierbar
           .map((z) => ({
             revier_id: k.revierId,

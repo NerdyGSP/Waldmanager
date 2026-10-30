@@ -17,6 +17,8 @@ export type Database = {
     Tables: {
       abschuesse: {
         Row: {
+          fang_ergebnis: string | null
+          fang_zustand: string | null
           art: string
           aktualisiert_am: string
           altersklasse: string | null
@@ -32,10 +34,12 @@ export type Database = {
           gewicht_kg: number | null
           id: string
           revier_id: string
-          wildart_id: string
+          wildart_id: string | null
           zone_id: string | null
         }
         Insert: {
+          fang_ergebnis?: string | null
+          fang_zustand?: string | null
           art?: string
           aktualisiert_am?: string
           altersklasse?: string | null
@@ -51,10 +55,12 @@ export type Database = {
           gewicht_kg?: number | null
           id?: string
           revier_id: string
-          wildart_id: string
+          wildart_id?: string | null
           zone_id?: string | null
         }
         Update: {
+          fang_ergebnis?: string | null
+          fang_zustand?: string | null
           art?: string
           aktualisiert_am?: string
           altersklasse?: string | null
@@ -70,7 +76,7 @@ export type Database = {
           gewicht_kg?: number | null
           id?: string
           revier_id?: string
-          wildart_id?: string
+          wildart_id?: string | null
           zone_id?: string | null
         }
         Relationships: [
