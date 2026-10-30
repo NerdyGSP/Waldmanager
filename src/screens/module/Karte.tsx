@@ -643,7 +643,7 @@ export default function Karte({
           // Handy: gröbere Auflösung spart Daten (Zoom 18 ≈ 0,4 m/Pixel); Tablet/PC bis zur Originalauflösung des Orthofotos
           maxzoom: ISTHANDY ? 18 : 19,
           ...(ISTHANDY && bb ? { bounds: [bb.getWest() - rand, bb.getSouth() - rand, bb.getEast() + rand, bb.getNorth() + rand] as [number, number, number, number] } : {}),
-          attribution: 'Luftbild © LGLN',
+          attribution: `Luftbild © GeoBasis-DE/LGLN ${new Date().getFullYear()}, Daten geändert`,
         });
         m.addLayer(
           { id: 'luftbild', type: 'raster', source: 'luftbild', layout: { visibility: ebenen.luftbild ? 'visible' : 'none' } },
@@ -1682,14 +1682,14 @@ export default function Karte({
                 <p className="menue-gruppe">Zeichnen</p>
                 {eintrag(daten?.grenze ? 'Reviergrenze neu zeichnen' : 'Reviergrenze zeichnen', () => setModus({ art: 'grenze' }), k.istInhaber)}
                 {eintrag('Zone zeichnen', () => setModus({ art: 'zone', zoneId: null, name: '' }), k.istInhaber)}
-                {eintrag('Pirschweg zeichnen', route('pirschweg'))}
+                {eintrag('Pirschweg zeichnen', route('pirschweg'), k.istInhaber)}
                 {eintrag('Treiberroute zeichnen', route('treiberroute'), k.istInhaber)}
-                {eintrag('WTE-Route zeichnen', route('wte_route'))}
+                {eintrag('WTE-Route zeichnen', route('wte_route'), k.istInhaber)}
                 <p className="menue-gruppe">Aufzeichnen</p>
-                {eintrag('Pirschweg per GPS aufzeichnen', () => aufzeichnungStarten('pirschweg'))}
-                {eintrag('WTE-Route per GPS aufzeichnen', () => aufzeichnungStarten('wte_route'))}
+                {eintrag('Pirschweg per GPS aufzeichnen', () => aufzeichnungStarten('pirschweg'), k.istInhaber)}
+                {eintrag('WTE-Route per GPS aufzeichnen', () => aufzeichnungStarten('wte_route'), k.istInhaber)}
                 <p className="menue-gruppe">Import</p>
-                {eintrag('GPS-Datei (Smartwatch)', () => setGpsImport(true))}
+                {eintrag('GPS-Datei (Smartwatch)', () => setGpsImport(true), k.istInhaber)}
               </>
             );
           })()}

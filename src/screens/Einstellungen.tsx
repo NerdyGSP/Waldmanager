@@ -36,7 +36,7 @@ export function Einstellungen({
       <BenachrichtigungenWahl userId={userId} istInhaber={istInhaber} />
       <KartenSpeicher />
       <Gruppe titel="Lizenzen" fuss="Navigationsicons: Material Symbols (Google, Apache 2.0). Einrichtungssymbole: game-icons.net (Lorc, Delapouite u. a., CC BY 3.0).">
-        <Zeile label="Kartendaten © OpenStreetMap-Mitwirkende, Luftbild © LGLN" />
+        <Zeile label="Kartendaten © OpenStreetMap-Mitwirkende, Luftbild © GeoBasis-DE/LGLN, Daten geändert" />
       </Gruppe>
 
       <Knopf variante="gefahr" onClick={() => supabase.auth.signOut()}>

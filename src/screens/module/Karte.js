@@ -575,7 +575,7 @@ export default function Karte({ k, eingebettet = false, panelZiel = null, aktual
                     // Handy: gröbere Auflösung spart Daten (Zoom 18 ≈ 0,4 m/Pixel); Tablet/PC bis zur Originalauflösung des Orthofotos
                     maxzoom: ISTHANDY ? 18 : 19,
                     ...(ISTHANDY && bb ? { bounds: [bb.getWest() - rand, bb.getSouth() - rand, bb.getEast() + rand, bb.getNorth() + rand] } : {}),
-                    attribution: 'Luftbild © LGLN',
+                    attribution: `Luftbild © GeoBasis-DE/LGLN ${new Date().getFullYear()}, Daten geändert`,
                 });
                 m.addLayer({ id: 'luftbild', type: 'raster', source: 'luftbild', layout: { visibility: ebenen.luftbild ? 'visible' : 'none' } }, 'zonen-flaeche');
             }
@@ -1364,7 +1364,7 @@ export default function Karte({ k, eingebettet = false, panelZiel = null, aktual
                                 : eintrag('Wildtiererfassung starten', () => setWte(true)), eintrag('Fang melden', () => navigieren('/abschuesse/fang')), eintrag('Einrichtung anlegen', () => {
                                 setWte(false);
                                 setModus({ art: 'einrichtung' });
-                            }, k.istInhaber), _jsx("p", { className: "menue-gruppe", children: "Zeichnen" }), eintrag(daten?.grenze ? 'Reviergrenze neu zeichnen' : 'Reviergrenze zeichnen', () => setModus({ art: 'grenze' }), k.istInhaber), eintrag('Zone zeichnen', () => setModus({ art: 'zone', zoneId: null, name: '' }), k.istInhaber), eintrag('Pirschweg zeichnen', route('pirschweg')), eintrag('Treiberroute zeichnen', route('treiberroute'), k.istInhaber), eintrag('WTE-Route zeichnen', route('wte_route')), _jsx("p", { className: "menue-gruppe", children: "Aufzeichnen" }), eintrag('Pirschweg per GPS aufzeichnen', () => aufzeichnungStarten('pirschweg')), eintrag('WTE-Route per GPS aufzeichnen', () => aufzeichnungStarten('wte_route')), _jsx("p", { className: "menue-gruppe", children: "Import" }), eintrag('GPS-Datei (Smartwatch)', () => setGpsImport(true))] }));
+                            }, k.istInhaber), _jsx("p", { className: "menue-gruppe", children: "Zeichnen" }), eintrag(daten?.grenze ? 'Reviergrenze neu zeichnen' : 'Reviergrenze zeichnen', () => setModus({ art: 'grenze' }), k.istInhaber), eintrag('Zone zeichnen', () => setModus({ art: 'zone', zoneId: null, name: '' }), k.istInhaber), eintrag('Pirschweg zeichnen', route('pirschweg'), k.istInhaber), eintrag('Treiberroute zeichnen', route('treiberroute'), k.istInhaber), eintrag('WTE-Route zeichnen', route('wte_route'), k.istInhaber), _jsx("p", { className: "menue-gruppe", children: "Aufzeichnen" }), eintrag('Pirschweg per GPS aufzeichnen', () => aufzeichnungStarten('pirschweg'), k.istInhaber), eintrag('WTE-Route per GPS aufzeichnen', () => aufzeichnungStarten('wte_route'), k.istInhaber), _jsx("p", { className: "menue-gruppe", children: "Import" }), eintrag('GPS-Datei (Smartwatch)', () => setGpsImport(true), k.istInhaber)] }));
                 })() })), gpsImport && (_jsx(GpsImport, { k: k, standardSitzungId: wteSitzung?.id ?? null, onZu: () => setGpsImport(false), onFertig: (text) => {
                     setGpsImport(false);
                     setMeldung({ art: 'erfolg', text });

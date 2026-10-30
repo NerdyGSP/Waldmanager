@@ -170,7 +170,7 @@ export function DruckKarte({
             </text>
           </g>
           <text x={breiteMm - 1.5} y={hoeheMm - 1.5} textAnchor="end" style={{ fontSize: 2.6, fontFamily: 'Arial, Helvetica, sans-serif', stroke: '#fff', strokeWidth: 0.9, paintOrder: 'stroke' }} fill="#000">
-            © LGLN
+            © GeoBasis-DE/LGLN {new Date().getFullYear()}, Daten geändert
           </text>
         </svg>
       </div>
