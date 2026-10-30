@@ -1326,9 +1326,6 @@ export default function Karte({
                 </button>
               </div>
             )}
-            <button type="button" className={`karte-chip chip-knopf ${wte ? 'an' : ''}`} aria-pressed={wte} aria-label="Neu: Einrichtung, Fang, Wildtiererfassung" aria-haspopup="menu" aria-expanded={wteMenue} onClick={() => setWteMenue((o) => !o)}>
-              <Symbol name="neu" className="symbol klein" /> NEU
-            </button>
             <button
               type="button"
               className={`karte-chip chip-knopf ${windpfeile ? 'an' : ''}`}
@@ -1338,6 +1335,9 @@ export default function Karte({
               onClick={() => setWindpfeile(!windpfeile)}
             >
               <Symbol name="wind" className="symbol klein" /> Windpfeile
+            </button>
+            <button type="button" className={`karte-chip chip-knopf ${wte ? 'an' : ''}`} aria-pressed={wte} aria-label="Neu: Einrichtung, Fang, Wildtiererfassung" aria-haspopup="menu" aria-expanded={wteMenue} onClick={() => setWteMenue((o) => !o)}>
+              <Symbol name="neu" className="symbol klein" /> NEU
             </button>
           </div>
           {wind && wetterOffen && <WetterPanel lat={wetterOrt[0]} lon={wetterOrt[1]} mitte={daten?.mitte ?? null} onSchliessen={() => setWetterOffen(false)} />}
