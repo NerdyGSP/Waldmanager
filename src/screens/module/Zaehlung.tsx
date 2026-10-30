@@ -10,6 +10,8 @@ import type { Enums, Json } from '../../lib/database.types';
 import { Auswahl, Feld, Gruppe, Hinweis, Knopf, Leer, Seite, Zaehler, Zeile, useRadHorizontal, WildartOptionen } from '../../components/ui';
 import type { RevierKontext } from './kontext';
 import { ZaehlReport } from './ZaehlReport';
+import { SitzungsdatenFormular } from './SitzungsdatenFormular';
+import { alsSitzungsZeile, vonSitzungsZeile } from '../../lib/sitzungsdaten';
 
 type Sitzung = {
   id: string;
@@ -180,12 +182,46 @@ function NeueSitzung({ k, onAbbrechen }: { k: RevierKontext; onAbbrechen: () => 
 
 // ---------- Laufende oder abgeschlossene Sitzung ----------
 
+function SitzungBearbeiten({ k, sitzung, onFertig }: { k: RevierKontext; sitzung: Sitzung; onFertig: (geaendert: boolean) => void }) {
+  const [wert, setWert] = useState(() => vonSitzungsZeile(sitzung));
+  const [mitte, setMitte] = useState<[number, number] | null>(null);
+  const [fehler, setFehler] = useState<string | null>(null);
+  const [laeuft, setLaeuft] = useState(false);
+  useEffect(() => {
+    void supabase.rpc('karte_daten', { p_revier_id: k.revierId, p_tage: 1 }).then(({ data }) => {
+      const m = (data as { mitte?: { coordinates?: number[] } | null } | null)?.mitte?.coordinates;
+      if (m && m.length >= 2) setMitte([m[0]!, m[1]!]);
+    });
+  }, [k.revierId]);
+
+  async function speichern() {
+    setLaeuft(true);
+    setFehler(null);
+    const { datum: _datum, ...z } = alsSitzungsZeile(wert);
+    const { error } = await supabase.from('zaehlsitzungen').update(z).eq('id', sitzung.id);
+    setLaeuft(false);
+    if (error) setFehler(fehlertext(error));
+    else onFertig(true);
+  }
+
+  return (
+    <Seite titel={`Zählung ${datumDE(sitzung.datum)}`} untertitel="Sitzungsdaten bearbeiten" zurueck={() => onFertig(false)}>
+      {fehler && <Hinweis art="fehler">{fehler}</Hinweis>}
+      <SitzungsdatenFormular wert={wert} onAendern={setWert} mitte={mitte} datumAenderbar={false} autoVorbelegen={false} />
+      <Knopf variante="akzent" disabled={laeuft} onClick={() => void speichern()}>
+        {laeuft ? 'Speichern …' : 'Speichern'}
+      </Knopf>
+    </Seite>
+  );
+}
+
 function SitzungAnsicht({ k, sitzungId }: { k: RevierKontext; sitzungId: string }) {
   const wildarten = useWildarten();
   const tabsRef = useRadHorizontal<HTMLDivElement>();
   const { zonen: alleZonen } = useZonen(k.revierId);
   const { ebenen } = useZonenEbenen(k.revierId);
   const [report, setReport] = useState(false);
+  const [bearbeiten, setBearbeiten] = useState(false);
   const [sitzung, setSitzung] = useState<Sitzung | null>(null);
   // Ist die Zählung auf eine Zonenebene beschränkt, nur deren Zonen anbieten
   const zonen = useMemo(
@@ -280,6 +316,19 @@ function SitzungAnsicht({ k, sitzungId }: { k: RevierKontext; sitzungId: string 
     .join(' · ');
   const darfLoeschen = k.istInhaber || sitzung.erstellt_von === k.userId;
 
+  if (bearbeiten) {
+    return (
+      <SitzungBearbeiten
+        k={k}
+        sitzung={sitzung}
+        onFertig={(geaendert) => {
+          setBearbeiten(false);
+          if (geaendert) void laden();
+        }}
+      />
+    );
+  }
+
   if (uebersicht) {
     return (
       <Seite titel={titel} untertitel={untertitel} zurueck={() => navigieren('/zaehlung')}>
@@ -298,6 +347,11 @@ function SitzungAnsicht({ k, sitzungId }: { k: RevierKontext; sitzungId: string 
             <Knopf variante="akzent" onClick={() => setReport(true)}>
               Report drucken
             </Knopf>
+            {darfLoeschen && (
+              <Knopf variante="sekundaer" onClick={() => setBearbeiten(true)}>
+                Sitzungsdaten bearbeiten (Wetter, Zeiten)
+              </Knopf>
+            )}
             <Knopf variante="sekundaer" onClick={wiederOeffnen}>
               Zählung wieder öffnen
             </Knopf>

@@ -68,6 +68,19 @@ export function himmelsrichtung(grad: number): string {
   return namen[Math.round((((grad % 360) + 360) % 360) / 45) % 8] ?? 'N';
 }
 
-export function wetterText(w: Wetter): string {
-  return `${Math.round(w.temperatur)} °C · Wind ${Math.round(w.windKmh)} km/h aus ${himmelsrichtung(w.windRichtung)} · Bewölkung ${w.bewoelkung} %`;
+export type WetterTeil = Partial<Wetter> & { beschreibung?: string | null };
+
+// Teilweise ausgefüllte Wetterdaten (z. B. nachgetragen) werden ohne leere Angaben ausgegeben
+export function wetterText(w: WetterTeil): string {
+  const teile: string[] = [];
+  if (w.beschreibung) teile.push(w.beschreibung);
+  if (typeof w.temperatur === 'number') teile.push(`${Math.round(w.temperatur)} °C`);
+  if (typeof w.windKmh === 'number') {
+    teile.push(`Wind ${Math.round(w.windKmh)} km/h${typeof w.windRichtung === 'number' ? ` aus ${himmelsrichtung(w.windRichtung)}` : ''}`);
+  } else if (typeof w.windRichtung === 'number') {
+    teile.push(`Wind aus ${himmelsrichtung(w.windRichtung)}`);
+  }
+  if (typeof w.niederschlag === 'number' && w.niederschlag > 0) teile.push(`Niederschlag ${w.niederschlag.toLocaleString('de-DE')} mm`);
+  if (typeof w.bewoelkung === 'number') teile.push(`Bewölkung ${w.bewoelkung} %`);
+  return teile.join(' · ');
 }

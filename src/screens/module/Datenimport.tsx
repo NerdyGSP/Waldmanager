@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { fehlertext } from '../../lib/fehler';
 import { csvLesen, datumLesen, geschlechtLesen, normalisieren, textAusDatei, uhrzeitLesen, wildartFinden, zahlLesen } from '../../lib/csv';
@@ -8,6 +8,8 @@ import type { Enums } from '../../lib/database.types';
 import { Feld, Gruppe, Hinweis, Knopf, Leer, Seite, Segmente, WildartOptionen } from '../../components/ui';
 import { VorlageGruppe } from './ImportVorlage';
 import { Geoimport } from './Geoimport';
+import { SitzungsdatenFormular } from './SitzungsdatenFormular';
+import { alsSitzungsZeile, leereSitzungsdaten, type Sitzungsdaten } from '../../lib/sitzungsdaten';
 import type { RevierKontext } from './kontext';
 
 type Typ = 'zaehlung' | 'abschuss';
@@ -76,7 +78,16 @@ export function Datenimport({ k }: { k: RevierKontext }) {
   const [artZuordnung, setArtZuordnung] = useState<Record<string, string>>({});
   const [zonenAnlegen, setZonenAnlegen] = useState(false);
   const [zonenWahl, setZonenWahl] = useState<Record<string, string>>({});
-  const [datum, setDatum] = useState(heute);
+  const [sitz, setSitz] = useState<Sitzungsdaten>(() => leereSitzungsdaten(heute()));
+  const datum = sitz.datum;
+  const [mitte, setMitte] = useState<[number, number] | null>(null);
+  useEffect(() => {
+    // Reviermitte für die Wetter-Vorauswahl
+    void supabase.rpc('karte_daten', { p_revier_id: k.revierId, p_tage: 1 }).then(({ data }) => {
+      const m = (data as { mitte?: { coordinates?: number[] } | null } | null)?.mitte?.coordinates;
+      if (m && m.length >= 2) setMitte([m[0]!, m[1]!]);
+    });
+  }, [k.revierId]);
   const [fehler, setFehler] = useState<string | null>(null);
   const [meldung, setMeldung] = useState<string | null>(null);
   const [laeuft, setLaeuft] = useState(false);
@@ -228,6 +239,8 @@ export function Datenimport({ k }: { k: RevierKontext }) {
     !!roh && !zonen.some((x) => normalisieren(x.name) === normalisieren(roh)) && !zonenAnlegen && wahlFuer(roh) === ZONE_UEBERSPRINGEN;
 
   const importierbar = auswertung.ok.filter((z) => artFuer(z.wildartRoh) && !zoneUebersprungen(z.zoneRoh));
+  const tage = useMemo(() => [...new Set(importierbar.map((z) => z.datum))].sort(), [importierbar]);
+  const einzeltag = typ === 'zaehlung' && (matrix || tage.length === 1);
   const datumVon = importierbar.reduce((a, z) => (a === '' || z.datum < a ? z.datum : a), '');
   const datumBis = importierbar.reduce((a, z) => (z.datum > a ? z.datum : a), '');
 
@@ -268,7 +281,7 @@ export function Datenimport({ k }: { k: RevierKontext }) {
           .from('zaehlsitzungen')
           .select('datum')
           .eq('revier_id', k.revierId)
-          .eq('bemerkung', marke)
+          .like('bemerkung', `${marke.replace(/[%_\\]/g, '\\$&')}%`)
           .is('geloescht_am', null)
           .in('datum', [...nachDatum.keys()]);
         if (e0) throw e0;
@@ -278,7 +291,13 @@ export function Datenimport({ k }: { k: RevierKontext }) {
         for (const tage of stuecke(neueTage, 100)) {
           const { data: sitzungen, error } = await supabase
             .from('zaehlsitzungen')
-            .insert(tage.map((datum) => ({ revier_id: k.revierId, datum, status: 'abgeschlossen' as const, bemerkung: marke, erstellt_von: k.userId })))
+            .insert(
+              tage.map((datum) => {
+                if (!einzeltag) return { revier_id: k.revierId, datum, status: 'abgeschlossen' as const, bemerkung: marke, erstellt_von: k.userId };
+                const z = alsSitzungsZeile({ ...sitz, datum });
+                return { revier_id: k.revierId, status: 'abgeschlossen' as const, erstellt_von: k.userId, ...z, bemerkung: z.bemerkung ? `${marke} – ${z.bemerkung}` : marke };
+              }),
+            )
             .select('id, datum');
           if (error) throw error;
           const zeilen = (sitzungen ?? []).flatMap((s) =>
@@ -444,9 +463,7 @@ export function Datenimport({ k }: { k: RevierKontext }) {
       {tabelle && (
         <>
           {matrix && (
-            <Gruppe titel={`1. Zählung · ${dateiname}`} fuss={`Matrixformat erkannt: ${(tabelle.length - 1).toLocaleString('de-DE')} Zeilen (Zonen) × ${kopf.length - 1} Spalten. Summenzeilen und -spalten werden ignoriert, das Geschlecht wird als „unbekannt“ gespeichert.`}>
-              <Feld label="Datum der Zählung *" type="date" value={datum} onChange={(e) => setDatum(e.target.value)} />
-            </Gruppe>
+            <Hinweis art="info">{`Matrixformat erkannt: ${(tabelle.length - 1).toLocaleString('de-DE')} Zeilen (Zonen) × ${kopf.length - 1} Spalten. Summenzeilen und -spalten werden ignoriert, das Geschlecht wird als „unbekannt“ gespeichert. Datei: ${dateiname}.`}</Hinweis>
           )}
           {!matrix && (
           <Gruppe titel={`1. Spalten zuordnen · ${dateiname}`} fuss={`${(tabelle.length - 1).toLocaleString('de-DE')} Datenzeilen gefunden`}>
@@ -581,6 +598,19 @@ export function Datenimport({ k }: { k: RevierKontext }) {
                   </table>
                 </div>
               </Gruppe>
+
+              {typ === 'zaehlung' && (matrix || tage.length === 1) && (
+                <SitzungsdatenFormular
+                  titel="4. Sitzungsdaten"
+                  wert={matrix ? sitz : { ...sitz, datum: tage[0]! }}
+                  onAendern={(w) => setSitz(matrix ? w : { ...w, datum: tage[0]! })}
+                  mitte={mitte}
+                  datumAenderbar={matrix}
+                />
+              )}
+              {typ === 'zaehlung' && !matrix && tage.length > 1 && (
+                <Leer>Die Datei enthält {tage.length} Zähltage – je Tag entsteht eine Zählung. Wetter und Uhrzeiten lassen sich danach in jeder Zählung nachtragen.</Leer>
+              )}
 
               <Knopf variante="akzent" disabled={laeuft || importierbar.length === 0} onClick={() => void importieren()}>
                 {laeuft ? 'Import läuft …' : `${importierbar.length.toLocaleString('de-DE')} ${typ === 'zaehlung' ? 'Zählwerte' : 'Abschüsse'} importieren`}
