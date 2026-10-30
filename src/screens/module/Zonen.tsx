@@ -6,11 +6,13 @@ import { navigieren } from '../../lib/router';
 import { Auswahl, Farbwahl, Feld, Gruppe, Hinweis, Knopf, Leer, Seite, Zeile } from '../../components/ui';
 import type { RevierKontext } from './kontext';
 import { Symbol } from '../../components/symbole';
+import { AufteilenDialog } from './AufteilenDialog';
 
 export function Zonen({ k }: { k: RevierKontext }) {
   const { zonen, laedt, laden } = useZonen(k.revierId);
   const { ebenen, laden: ebenenLaden } = useZonenEbenen(k.revierId);
   const [fehler, setFehler] = useState<string | null>(null);
+  const [aufteilen, setAufteilen] = useState(false);
   // eingeklappte Gruppen (je Gerät gemerkt)
   const [zu, setZu] = useState<Set<string>>(() => {
     try {
@@ -208,6 +210,12 @@ export function Zonen({ k }: { k: RevierKontext }) {
       <Knopf variante="sekundaer" onClick={() => navigieren('/karte')}>
         Zonen auf der Karte zeichnen
       </Knopf>
+      {k.istInhaber && (
+        <Knopf variante="sekundaer" onClick={() => setAufteilen(true)}>
+          Revier in gleich große Zonen aufteilen
+        </Knopf>
+      )}
+      {aufteilen && <AufteilenDialog revierId={k.revierId} onZu={() => setAufteilen(false)} onAngelegt={alleNeuLaden} />}
     </Seite>
   );
 }

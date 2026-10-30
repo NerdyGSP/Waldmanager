@@ -1522,6 +1522,14 @@ export type Database = {
           zaehlsitzungen: number
         }[]
       }
+      revier_aufteilen: {
+        Args: { p_anzahl: number; p_name?: string; p_revier_id: string }
+        Returns: string
+      }
+      revier_aufteilen_vorschau: {
+        Args: { p_anzahl: number; p_revier_id: string }
+        Returns: Json
+      }
       zone_an_position: {
         Args: { p_lat: number; p_lon: number; p_revier_id: string }
         Returns: string
