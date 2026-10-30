@@ -239,23 +239,9 @@ function DesktopLayout({
       return false;
     }
   });
-  const [navZu, setNavZu] = useState(() => {
-    try {
-      return localStorage.getItem('hegewerk.navzu') === '1';
-    } catch {
-      return false;
-    }
-  });
-  function navUmschalten() {
-    setNavZu((z) => {
-      try {
-        localStorage.setItem('hegewerk.navzu', z ? '0' : '1');
-      } catch {
-        /* nur für diese Sitzung */
-      }
-      return !z;
-    });
-  }
+  // Nach Modulwahl klappen die übrigen Module ein, das aktive bleibt sichtbar
+  const [navZu, setNavZu] = useState(true);
+  const navUmschalten = () => setNavZu((z) => !z);
   const titel = NAVIGATION.find((n) => n.pfad === modul)?.titel ?? '';
   // Monitoring kann die ganze Breite einnehmen (Karte ausgeblendet) – Adresse /monitoring/voll
   const urlVoll = modul === 'monitoring' && unterpfad[0] === 'voll';
@@ -327,7 +313,7 @@ function DesktopLayout({
 
         {!voll && !eingeklappt && (
           <button className="desk-nav-schalter" onClick={navUmschalten} aria-expanded={!navZu} aria-controls="desk-nav">
-            <span>{navZu ? 'Module einblenden' : 'Module ausblenden'}</span>
+            <span>{navZu ? 'Alle Module zeigen' : 'Nur aktives Modul'}</span>
             <span aria-hidden="true">{navZu ? '▾' : '▴'}</span>
           </button>
         )}
@@ -340,6 +326,7 @@ function DesktopLayout({
               onClick={() => {
                 // Im eingeklappten Menü öffnet ein Modul die Seitenleiste wieder (die Karte braucht sie nicht)
                 if (eingeklappt && n.pfad !== 'karte') einklappen(false);
+                setNavZu(true);
                 navigieren(`/${n.pfad}`);
               }}
             >

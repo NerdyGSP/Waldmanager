@@ -916,7 +916,7 @@ button.kachel:active { transform: none; }
 
 .desk-nav-schalter { display: flex; justify-content: space-between; align-items: center; margin: 2px 12px 0; padding: 6px 10px; border: 0; border-radius: var(--radius-sm); background: none; color: inherit; font: inherit; font-size: .85rem; opacity: .75; cursor: pointer; }
 .desk-nav-schalter:hover { background: var(--color-neutral-soft); opacity: 1; }
-.desk-nav-zu { display: none !important; }
+.desk-nav-zu button:not([aria-current='true']) { display: none !important; }
 
 /* WTE-Hinweis am unteren Bildschirmrand (Aussehen unverändert) */
 .wte-leiste { top: auto; bottom: calc(16px + env(safe-area-inset-bottom)); }
