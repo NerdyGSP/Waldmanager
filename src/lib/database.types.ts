@@ -571,7 +571,6 @@ export type Database = {
           anschrift: string | null
           ansteller_id: string | null
           antwort_am: string | null
-          anwesend: boolean
           auto_vorhanden: boolean | null
           bewegungsjagd_id: string
           einladungscode: string
@@ -579,7 +578,6 @@ export type Database = {
           erstellt_am: string
           hat_hornblaeser: boolean | null
           hat_hund: boolean | null
-          hegebeitrag_bezahlt: boolean
           id: string
           ist_ansteller: boolean
           mail_fehler: string | null
@@ -587,7 +585,6 @@ export type Database = {
           mail_status: string | null
           mitfahrplaetze: number | null
           name: string
-          schuesseltreiben_teilgenommen: boolean
           schuesseltreiben_teilnahme: boolean | null
           status: string
           telefon: string | null
@@ -599,7 +596,6 @@ export type Database = {
           anschrift?: string | null
           ansteller_id?: string | null
           antwort_am?: string | null
-          anwesend?: boolean
           auto_vorhanden?: boolean | null
           bewegungsjagd_id: string
           einladungscode?: string
@@ -607,7 +603,6 @@ export type Database = {
           erstellt_am?: string
           hat_hornblaeser?: boolean | null
           hat_hund?: boolean | null
-          hegebeitrag_bezahlt?: boolean
           id?: string
           ist_ansteller?: boolean
           mail_fehler?: string | null
@@ -615,7 +610,6 @@ export type Database = {
           mail_status?: string | null
           mitfahrplaetze?: number | null
           name: string
-          schuesseltreiben_teilgenommen?: boolean
           schuesseltreiben_teilnahme?: boolean | null
           status?: string
           telefon?: string | null
@@ -627,7 +621,6 @@ export type Database = {
           anschrift?: string | null
           ansteller_id?: string | null
           antwort_am?: string | null
-          anwesend?: boolean
           auto_vorhanden?: boolean | null
           bewegungsjagd_id?: string
           einladungscode?: string
@@ -635,7 +628,6 @@ export type Database = {
           erstellt_am?: string
           hat_hornblaeser?: boolean | null
           hat_hund?: boolean | null
-          hegebeitrag_bezahlt?: boolean
           id?: string
           ist_ansteller?: boolean
           mail_fehler?: string | null
@@ -643,7 +635,6 @@ export type Database = {
           mail_status?: string | null
           mitfahrplaetze?: number | null
           name?: string
-          schuesseltreiben_teilgenommen?: boolean
           schuesseltreiben_teilnahme?: boolean | null
           status?: string
           telefon?: string | null
