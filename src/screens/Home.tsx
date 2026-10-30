@@ -239,6 +239,23 @@ function DesktopLayout({
       return false;
     }
   });
+  const [navZu, setNavZu] = useState(() => {
+    try {
+      return localStorage.getItem('hegewerk.navzu') === '1';
+    } catch {
+      return false;
+    }
+  });
+  function navUmschalten() {
+    setNavZu((z) => {
+      try {
+        localStorage.setItem('hegewerk.navzu', z ? '0' : '1');
+      } catch {
+        /* nur für diese Sitzung */
+      }
+      return !z;
+    });
+  }
   const titel = NAVIGATION.find((n) => n.pfad === modul)?.titel ?? '';
   // Monitoring kann die ganze Breite einnehmen (Karte ausgeblendet) – Adresse /monitoring/voll
   const urlVoll = modul === 'monitoring' && unterpfad[0] === 'voll';
@@ -308,7 +325,13 @@ function DesktopLayout({
           </h1>
         </div>
 
-        <nav className="desk-nav" aria-label="Module">
+        {!voll && !eingeklappt && (
+          <button className="desk-nav-schalter" onClick={navUmschalten} aria-expanded={!navZu} aria-controls="desk-nav">
+            <span>{navZu ? 'Module einblenden' : 'Module ausblenden'}</span>
+            <span aria-hidden="true">{navZu ? '▾' : '▴'}</span>
+          </button>
+        )}
+        <nav id="desk-nav" className={`desk-nav ${navZu && !voll && !eingeklappt ? 'desk-nav-zu' : ''}`} aria-label="Module">
           {NAVIGATION.filter((n) => n.pfad !== 'masteradmin' || kontext.istMasteradmin).map((n) => (
             <button
               key={n.pfad}

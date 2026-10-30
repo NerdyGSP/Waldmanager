@@ -913,3 +913,7 @@ button.kachel:active { transform: none; }
 .bj-druck-eigener::after { content: ''; position: absolute; left: 50%; top: 100%; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: #1f6fb2; border: 2px solid #fff; box-shadow: 0 0 0 1px #000; }
 .bj-druck-seite.folge { margin-top: 24px; padding-top: 24px; border-top: 2px dashed #bbb; }
 @media print { .bj-druck-seite.folge { break-before: page; page-break-before: always; margin-top: 0; padding-top: 0; border-top: 0; } }
+
+.desk-nav-schalter { display: flex; justify-content: space-between; align-items: center; margin: 2px 12px 0; padding: 6px 10px; border: 0; border-radius: var(--radius-sm); background: none; color: inherit; font: inherit; font-size: .85rem; opacity: .75; cursor: pointer; }
+.desk-nav-schalter:hover { background: var(--color-neutral-soft); opacity: 1; }
+.desk-nav-zu { display: none !important; }
