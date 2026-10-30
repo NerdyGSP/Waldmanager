@@ -9,6 +9,9 @@ import type { Enums } from '../../lib/database.types';
 import { Auswahl, Feld, Gruppe, Hinweis, Knopf, Leer, Seite, Segmente, Zeile, WildartOptionen } from '../../components/ui';
 import type { RevierKontext } from './kontext';
 
+// Fangfähige Arten (Fang melden)
+const FANG_WILDARTEN = ['fuchs', 'waschbaer', 'dachs', 'marderhund', 'steinmarder', 'baummarder', 'iltis', 'hermelin', 'mink', 'nutria'];
+
 type Abschuss = {
   id: string;
   erlegt_am: string;
@@ -53,9 +56,11 @@ export function Abschuesse({ k, unterpfad = [] }: { k: RevierKontext; unterpfad?
     void laden();
   }, [laden]);
 
+  // Strecke = Abschüsse + tatsächlich gefangene Tiere
+  const zaehltZurStrecke = (x: { art: string; fang_ergebnis: string | null }) => x.art === 'abschuss' || (x.art === 'fang' && x.fang_ergebnis === 'gefangen');
   const strecke = useMemo(() => {
     const m = new Map<string, { gesamt: number; m: number; w: number }>();
-    for (const a of liste.filter((x) => x.art === 'abschuss' && x.wildart_id)) {
+    for (const a of liste.filter((x) => zaehltZurStrecke(x) && x.wildart_id)) {
       const s = m.get(a.wildart_id!) ?? { gesamt: 0, m: 0, w: 0 };
       s.gesamt++;
       if (a.geschlecht === 'maennlich') s.m++;
@@ -85,7 +90,7 @@ export function Abschuesse({ k, unterpfad = [] }: { k: RevierKontext; unterpfad?
   return (
     <Seite
       titel="Abschüsse & Fänge"
-      untertitel={`Jagdjahr ${jahr.label} · ${liste.filter((x) => x.art === 'abschuss').length} Stück Strecke${liste.some((x) => x.art === 'fang') ? ` · ${liste.filter((x) => x.art === 'fang').length} Fänge` : ''}`}
+      untertitel={`Jagdjahr ${jahr.label} · ${liste.filter(zaehltZurStrecke).length} Stück Strecke${liste.some((x) => x.art === 'fang') ? ` · ${liste.filter((x) => x.art === 'fang').length} Fangmeldungen` : ''}`}
       aktion={<Knopf onClick={() => setBearbeiten('neu')}>+ Erfassen</Knopf>}
     >
       <label className="filter">
@@ -144,7 +149,10 @@ function AbschussFormular({ k, vorlage, startArt, onFertig }: { k: RevierKontext
   useEffect(() => {
     void supabase.from('einrichtungen').select('id, name').eq('revier_id', k.revierId).eq('typ', 'falle').is('geloescht_am', null).order('name').then(({ data }) => setFallen(data ?? []));
   }, [k.revierId]);
-  const [wildartId, setWildartId] = useState(vorlage?.wildart_id ?? 'rehwild');
+  const [wildartId, setWildartId] = useState(vorlage?.wildart_id ?? ((vorlage?.art ?? startArt) === 'fang' ? FANG_WILDARTEN[0] : 'rehwild'));
+  useEffect(() => {
+    if (art === 'fang' && !FANG_WILDARTEN.includes(wildartId)) setWildartId(FANG_WILDARTEN[0]);
+  }, [art, wildartId]);
   const [geschlecht, setGeschlecht] = useState<Enums<'geschlecht'>>(vorlage?.geschlecht ?? 'unbekannt');
   const [altersklasse, setAltersklasse] = useState(vorlage?.altersklasse ?? '');
   const [zeitpunkt, setZeitpunkt] = useState(vorlage ? lokalDatumZeit(new Date(vorlage.erlegt_am)) : lokalDatumZeit());
@@ -244,7 +252,11 @@ function AbschussFormular({ k, vorlage, startArt, onFertig }: { k: RevierKontext
             </div>
             {ergebnis !== 'leer' && (
               <Auswahl label="Wildart" value={wildartId} onChange={(e) => setWildartId(e.target.value)}>
-                <WildartOptionen wildarten={wildarten} />
+                {FANG_WILDARTEN.map((id) => (
+                  <option key={id} value={id}>
+                    {wildartName(wildarten, id)}
+                  </option>
+                ))}
               </Auswahl>
             )}
             {ergebnis === 'gefangen' && (

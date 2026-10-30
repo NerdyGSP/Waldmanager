@@ -42,7 +42,7 @@ export function Monitoring({ k, breit = false, abgedockt = false }: { k: RevierK
         supabase
           .from('abschuesse')
           .select('wildart_id')
-          .eq('art', 'abschuss')
+          .or('art.eq.abschuss,and(art.eq.fang,fang_ergebnis.eq.gefangen)')
           .eq('revier_id', k.revierId)
           .is('geloescht_am', null)
           .gte('erlegt_am', `${jahr.von}T00:00:00`)
@@ -264,7 +264,7 @@ function Jahresvergleich({ k, wildarten }: { k: RevierKontext; wildarten: Return
         supabase
           .from('abschuesse')
           .select('wildart_id, erlegt_am')
-          .eq('art', 'abschuss')
+          .or('art.eq.abschuss,and(art.eq.fang,fang_ergebnis.eq.gefangen)')
           .eq('revier_id', k.revierId)
           .is('geloescht_am', null)
           .gte('erlegt_am', `${von}T00:00:00`)

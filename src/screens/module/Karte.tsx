@@ -1218,15 +1218,15 @@ export default function Karte({
                 setModus({ art: 'einrichtung' });
               }}
             >
-              🪜 Einrichtung anlegen
+              Einrichtung anlegen
             </button>
           )}
           <button type="button" role="menuitem" onClick={() => navigieren('/abschuesse/fang')}>
-            🪤 Fang melden
+            Fang melden
           </button>
           {wte ? (
             <button type="button" role="menuitem" onClick={() => setWte(false)}>
-              ⏹ Wildtiererfassung beenden
+              Wildtiererfassung beenden
             </button>
           ) : (
             <button type="button" role="menuitem" onClick={() => setWte(true)}>
