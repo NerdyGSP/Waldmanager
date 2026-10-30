@@ -31,6 +31,7 @@ type Abschuss = {
   fang_zustand: string | null;
   erleger_name: string | null;
   bewegungsjagd_id: string | null;
+  fallwild_ursache: string | null;
 };
 
 export function Abschuesse({ k, unterpfad = [] }: { k: RevierKontext; unterpfad?: string[] }) {
@@ -47,7 +48,7 @@ export function Abschuesse({ k, unterpfad = [] }: { k: RevierKontext; unterpfad?
   const laden = useCallback(async () => {
     const { data, error } = await supabase
       .from('abschuesse')
-      .select('id, erlegt_am, wildart_id, geschlecht, altersklasse, gewicht_kg, zone_id, erleger_id, erfasst_von, bemerkung, art, einrichtung_id, fang_ergebnis, fang_zustand, erleger_name, bewegungsjagd_id')
+      .select('id, erlegt_am, wildart_id, geschlecht, altersklasse, gewicht_kg, zone_id, erleger_id, erfasst_von, bemerkung, art, einrichtung_id, fang_ergebnis, fang_zustand, erleger_name, bewegungsjagd_id, fallwild_ursache')
       .eq('revier_id', k.revierId)
       .is('geloescht_am', null)
       .gte('erlegt_am', `${jahr.von}T00:00:00`)
@@ -148,6 +149,8 @@ function AbschussFormular({ k, vorlage, startArt, falleVor = '', onFertig }: { k
   const { zonen } = useZonen(k.revierId);
   const mitglieder = useMitglieder(k.revierId);
   const [art, setArt] = useState(vorlage?.art ?? startArt);
+  const [ursache, setUrsache] = useState(vorlage?.fallwild_ursache ?? 'verkehr');
+  const fallwild = art === 'fallwild';
   const [falleId, setFalleId] = useState(vorlage?.einrichtung_id ?? falleVor);
   const [ergebnis, setErgebnis] = useState<'gefangen' | 'leer' | 'fehlfang'>((vorlage?.fang_ergebnis as 'gefangen' | 'leer' | 'fehlfang' | null) ?? 'gefangen');
   const [zustand, setZustand] = useState<'lebend' | 'tot'>((vorlage?.fang_zustand as 'lebend' | 'tot' | null) ?? 'tot');
@@ -165,7 +168,7 @@ function AbschussFormular({ k, vorlage, startArt, falleVor = '', onFertig }: { k
   // Nur Hinweis, keine Sperre: Wildart und Datum gegen die hinterlegten Jagdzeiten halten
   const { zeilen: jagdzeiten } = useJagdzeiten(k.bundesland);
   const jzWarnung =
-    art === 'fang' && ergebnis === 'leer' ? null : jagdzeitWarnung(jagdzeiten, wildartId, new Date(zeitpunkt.length >= 10 ? zeitpunkt : Date.now()));
+    fallwild || (art === 'fang' && ergebnis === 'leer') ? null : jagdzeitWarnung(jagdzeiten, wildartId, new Date(zeitpunkt.length >= 10 ? zeitpunkt : Date.now()));
   const [gewicht, setGewicht] = useState(vorlage?.gewicht_kg ? String(vorlage.gewicht_kg).replace('.', ',') : '');
   const [zoneId, setZoneId] = useState(vorlage?.zone_id ?? '');
   const [erlegerId, setErlegerId] = useState(vorlage?.erleger_id ?? k.userId);
@@ -214,7 +217,9 @@ function AbschussFormular({ k, vorlage, startArt, falleVor = '', onFertig }: { k
       erlegt_am: new Date(zeitpunkt).toISOString(),
       gewicht_kg: fang ? null : kg,
       zone_id: zoneId || null,
-      erleger_id: fang ? k.userId : erlegerId || null,
+      erleger_id: fang ? k.userId : fallwild ? null : erlegerId || null,
+      fallwild_ursache: fallwild ? ursache : null,
+      ...(fallwild ? { erleger_name: null, erleger_teilnehmer_id: null } : {}),
       einrichtung_id: fang ? falleId : null,
       fang_ergebnis: fang ? ergebnis : null,
       fang_zustand: fang && ergebnis === 'gefangen' ? zustand : null,
@@ -310,13 +315,20 @@ function AbschussFormular({ k, vorlage, startArt, falleVor = '', onFertig }: { k
           ) : (
             <Feld label="Altersklasse" placeholder="optional" value={altersklasse} onChange={(e) => setAltersklasse(e.target.value)} />
           )}
-          <Feld label="Erlegt am" type="datetime-local" required value={zeitpunkt} onChange={(e) => setZeitpunkt(e.target.value)} />
+          {fallwild && (
+            <Auswahl label="Ursache" value={ursache} onChange={(e) => setUrsache(e.target.value)}>
+              <option value="verkehr">Verkehr</option>
+              <option value="krankheit">Krankheit</option>
+              <option value="sonstiges">Sonstiges</option>
+            </Auswahl>
+          )}
+          <Feld label={fallwild ? 'Fundzeitpunkt' : 'Erlegt am'} type="datetime-local" required value={zeitpunkt} onChange={(e) => setZeitpunkt(e.target.value)} />
           <Feld label="Gewicht (kg)" inputMode="decimal" placeholder="aufgebrochen, optional" value={gewicht} onChange={(e) => setGewicht(e.target.value)} />
         </Gruppe>
         )}
 
         <Gruppe>
-          {art !== 'fang' && (
+          {art === 'abschuss' && (
           <Auswahl label="Erleger" value={erlegerId} onChange={(e) => setErlegerId(e.target.value)}>
             <option value="">–</option>
             {mitglieder.map((m) => (
@@ -338,7 +350,7 @@ function AbschussFormular({ k, vorlage, startArt, falleVor = '', onFertig }: { k
         </Gruppe>
 
         <Knopf type="button" variante="sekundaer" onClick={ortUebernehmen}>
-          <Symbol name="position" className="symbol klein" /> Aktuelle Position als {art === 'fang' ? 'Fangort' : 'Erlegeort'}
+          <Symbol name="position" className="symbol klein" /> Aktuelle Position als {art === 'fang' ? 'Fangort' : fallwild ? 'Fundort' : 'Erlegeort'}
         </Knopf>
         <PositionWaehlen
           revierId={k.revierId}
@@ -347,7 +359,7 @@ function AbschussFormular({ k, vorlage, startArt, falleVor = '', onFertig }: { k
             setPosition(p);
             const { data } = await supabase.rpc('zone_an_position', { p_revier_id: k.revierId, p_lon: p.lon, p_lat: p.lat });
             if (data) setZoneId(data);
-            setOrtStatus(`Erlegeort auf der Karte gewählt${data ? ', Zone automatisch gesetzt' : ''}`);
+            setOrtStatus(`${fallwild ? 'Fundort' : 'Erlegeort'} auf der Karte gewählt${data ? ', Zone automatisch gesetzt' : ''}`);
           }}
         />
         {ortStatus && <Leer>{ortStatus}</Leer>}

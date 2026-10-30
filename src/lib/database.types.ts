@@ -28,6 +28,7 @@ export type Database = {
           erleger_teilnehmer_id: string | null
           erlegt_am: string
           erstellt_am: string
+          fallwild_ursache: string | null
           fang_ergebnis: string | null
           fang_zustand: string | null
           geaendert_von: string | null
@@ -53,6 +54,7 @@ export type Database = {
           erleger_teilnehmer_id?: string | null
           erlegt_am: string
           erstellt_am?: string
+          fallwild_ursache?: string | null
           fang_ergebnis?: string | null
           fang_zustand?: string | null
           geaendert_von?: string | null
@@ -78,6 +80,7 @@ export type Database = {
           erleger_teilnehmer_id?: string | null
           erlegt_am?: string
           erstellt_am?: string
+          fallwild_ursache?: string | null
           fang_ergebnis?: string | null
           fang_zustand?: string | null
           geaendert_von?: string | null

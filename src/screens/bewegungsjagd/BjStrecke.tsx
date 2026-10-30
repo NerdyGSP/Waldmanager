@@ -6,6 +6,7 @@ import { jagdzeitWarnung, useJagdzeiten } from '../../lib/jagdzeiten';
 import { punktEWKT } from '../../lib/geo';
 import type { Enums } from '../../lib/database.types';
 import { Auswahl, Feld, Gruppe, Hinweis, Knopf, Segmente, WildartOptionen } from '../../components/ui';
+import { PositionWaehlen } from '../../components/PositionWaehlen';
 import { AuditZeile } from '../../components/AuditZeile';
 
 export type StreckeEintrag = {
@@ -20,6 +21,7 @@ export type StreckeEintrag = {
   erleger_name: string | null;
   erlegt_am: string;
   bemerkung: string | null;
+  fallwild_ursache: string | null;
 };
 
 // Strecke einer Bewegungsjagd: direkt in `abschuesse` (mit bewegungsjagd_id), keine Kopie
@@ -28,7 +30,7 @@ export function useBjStrecke(jagdId: string) {
   const laden = useCallback(async () => {
     const { data } = await supabase
       .from('abschuesse')
-      .select('id, art, wildart_id, geschlecht, altersklasse, gewicht_kg, einrichtung_id, erleger_teilnehmer_id, erleger_name, erlegt_am, bemerkung')
+      .select('id, art, wildart_id, geschlecht, altersklasse, gewicht_kg, einrichtung_id, erleger_teilnehmer_id, erleger_name, erlegt_am, bemerkung, fallwild_ursache')
       .eq('bewegungsjagd_id', jagdId)
       .is('geloescht_am', null)
       .order('erlegt_am');
@@ -128,9 +130,11 @@ export function BjStrecke({
   // ---------- Einzeln ----------
   const leer = { art: 'abschuss', wildart: 'schwarzwild', geschlecht: 'unbekannt' as Enums<'geschlecht'>, alter: '', stand: '', erleger: '', freitext: '', uhr: '', gewicht: '', bemerkung: '' };
   const [f, setF] = useState(leer);
+  const [pos, setPos] = useState<{ lon: number; lat: number } | null>(null);
+  const [ursache, setUrsache] = useState('verkehr');
   const [bearbeitet, setBearbeitet] = useState<StreckeEintrag | null>(null);
   const klassen = wildarten.find((w) => w.id === f.wildart)?.altersklassen ?? [];
-  const warnung = jagdzeitWarnung(jagdzeiten, f.wildart, new Date(`${jagd.datum}T12:00:00`));
+  const warnung = f.art === 'fallwild' ? null : jagdzeitWarnung(jagdzeiten, f.wildart, new Date(`${jagd.datum}T12:00:00`));
   const zugesagt = teilnehmer.filter((t) => t.status === 'zugesagt');
 
   async function einzelnSpeichern() {
@@ -142,7 +146,7 @@ export function BjStrecke({
     }
     setLaeuft(true);
     const tn = f.erleger && f.erleger !== '_frei' ? zugesagt.find((t) => t.id === f.erleger) : null;
-    const geom = position(f.stand || null);
+    const geom = pos ? punktEWKT(pos.lon, pos.lat) : position(f.stand || null);
     const daten = {
       revier_id: revierId,
       art: f.art,
@@ -152,8 +156,9 @@ export function BjStrecke({
       altersklasse: f.alter || null,
       gewicht_kg: kg,
       einrichtung_id: f.stand || null,
-      erleger_teilnehmer_id: tn?.id ?? null,
-      erleger_name: tn ? tn.name : f.erleger === '_frei' ? f.freitext.trim() || null : null,
+      erleger_teilnehmer_id: f.art === 'fallwild' ? null : (tn?.id ?? null),
+      erleger_name: f.art === 'fallwild' ? null : tn ? tn.name : f.erleger === '_frei' ? f.freitext.trim() || null : null,
+      fallwild_ursache: f.art === 'fallwild' ? ursache : null,
       erlegt_am: zeit(f.uhr),
       bemerkung: f.bemerkung.trim() || null,
       ...(geom ? { geom } : {}),
@@ -166,12 +171,14 @@ export function BjStrecke({
     }
     setF({ ...leer, wildart: f.wildart, art: f.art });
     setBearbeitet(null);
+    setPos(null);
     await onGeaendert();
   }
 
   function bearbeiten(e: StreckeEintrag) {
     setModus('einzeln');
     setBearbeitet(e);
+    setUrsache((e as StreckeEintrag & { fallwild_ursache?: string | null }).fallwild_ursache ?? 'verkehr');
     const d = new Date(e.erlegt_am);
     setF({
       art: e.art,
@@ -295,7 +302,14 @@ export function BjStrecke({
               </option>
             ))}
           </Auswahl>
-          <Auswahl label="Erleger" value={f.erleger} onChange={(e) => setF({ ...f, erleger: e.target.value })}>
+          {f.art === 'fallwild' && (
+            <Auswahl label="Ursache" value={ursache} onChange={(e) => setUrsache(e.target.value)}>
+              <option value="verkehr">Verkehr</option>
+              <option value="krankheit">Krankheit</option>
+              <option value="sonstiges">Sonstiges</option>
+            </Auswahl>
+          )}
+          {f.art !== 'fallwild' && (<Auswahl label="Erleger" value={f.erleger} onChange={(e) => setF({ ...f, erleger: e.target.value })}>
             <option value="">– unbekannt –</option>
             {zugesagt.map((t) => (
               <option key={t.id} value={t.id}>
@@ -303,10 +317,12 @@ export function BjStrecke({
               </option>
             ))}
             <option value="_frei">Anderer (Freitext) …</option>
-          </Auswahl>
-          {f.erleger === '_frei' && <Feld label="Name des Erlegers" value={f.freitext} onChange={(e) => setF({ ...f, freitext: e.target.value })} />}
+          </Auswahl>)}
+          {f.art !== 'fallwild' && f.erleger === '_frei' && <Feld label="Name des Erlegers" value={f.freitext} onChange={(e) => setF({ ...f, freitext: e.target.value })} />}
           <Feld label="Uhrzeit" type="time" value={f.uhr} onChange={(e) => setF({ ...f, uhr: e.target.value })} />
           <Feld label="Gewicht (kg, optional)" inputMode="decimal" value={f.gewicht} onChange={(e) => setF({ ...f, gewicht: e.target.value })} />
+          <PositionWaehlen revierId={revierId} wert={pos} onWaehlen={(p) => setPos(p)} />
+          <p className="gruppe-fuss" style={{ margin: 0 }}>{pos ? 'Position per Karte gewählt.' : 'Ohne Auswahl: Position des Standes, sonst Treffpunkt.'}</p>
           <Feld label="Bemerkung" value={f.bemerkung} onChange={(e) => setF({ ...f, bemerkung: e.target.value })} />
           {warnung && <Hinweis art={warnung.art === 'warnung' ? 'warnung' : 'info'}>{warnung.text} (Hinweis, kein Speicherverbot.)</Hinweis>}
           <div className="bj-ja-nein">
