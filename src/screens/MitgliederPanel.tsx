@@ -109,16 +109,32 @@ export function EinladungErstellen({
   const [code, setCode] = useState<string | null>(null);
   const [fehler, setFehler] = useState<string | null>(null);
   const [laedt, setLaedt] = useState(false);
+  const [mailInfo, setMailInfo] = useState<string | null>(null);
 
   async function absenden(e: FormEvent) {
     e.preventDefault();
     setFehler(null);
     setCode(null);
+    setMailInfo(null);
     setLaedt(true);
+    const adresse = email.trim();
+    if (adresse) {
+      // Mit E-Mail-Adresse: Code erstellen und die Einladung per Mail versenden
+      const { data, error } = await supabase.functions.invoke('revier-einladen', {
+        body: { revier_id: revierId, rolle: festeRolle ?? rolle, email: adresse, tage },
+      });
+      setLaedt(false);
+      if (error || !data?.code) {
+        setFehler(data?.fehler ?? (error ? fehlertext(error) : 'Einladung konnte nicht erstellt werden.'));
+        return;
+      }
+      setCode(data.code);
+      setMailInfo(data.mail ? `Einladung per E-Mail an ${adresse} gesendet.` : `Code erstellt, aber die E-Mail konnte nicht gesendet werden (${data.fehler ?? 'unbekannter Fehler'}). Gib den Code selbst weiter.`);
+      return;
+    }
     const { data, error } = await supabase.rpc('einladung_erstellen', {
       p_revier_id: revierId,
       p_rolle: festeRolle ?? rolle,
-      p_email: email.trim() || undefined,
       p_gueltig_tage: tage,
     });
     setLaedt(false);
@@ -130,7 +146,7 @@ export function EinladungErstellen({
     <form onSubmit={absenden}>
       <Gruppe
         titel={titel}
-        fuss="Der Code ist einmal nutzbar. Mit E-Mail-Adresse kann ihn nur diese Person einlösen."
+        fuss="Der Code ist einmal nutzbar. Mit E-Mail-Adresse kann ihn nur diese Person einlösen, und die Einladung wird ihr per E-Mail geschickt."
       >
         {!festeRolle && (
           <Auswahl label="Rolle" value={rolle} onChange={(e) => setRolle(e.target.value as Enums<'revier_rolle'>)}>
@@ -147,6 +163,7 @@ export function EinladungErstellen({
         </Auswahl>
       </Gruppe>
       {fehler && <Hinweis art="fehler">{fehler}</Hinweis>}
+      {mailInfo && <Hinweis>{mailInfo}</Hinweis>}
       {code ? (
         <CodeAnzeige
           code={code}

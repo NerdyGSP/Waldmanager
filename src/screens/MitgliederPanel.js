@@ -60,15 +60,31 @@ export function EinladungErstellen({ revierId, festeRolle, titel = 'Jemanden ein
     const [code, setCode] = useState(null);
     const [fehler, setFehler] = useState(null);
     const [laedt, setLaedt] = useState(false);
+    const [mailInfo, setMailInfo] = useState(null);
     async function absenden(e) {
         e.preventDefault();
         setFehler(null);
         setCode(null);
+        setMailInfo(null);
         setLaedt(true);
+        const adresse = email.trim();
+        if (adresse) {
+            // Mit E-Mail-Adresse: Code erstellen und die Einladung per Mail versenden
+            const { data, error } = await supabase.functions.invoke('revier-einladen', {
+                body: { revier_id: revierId, rolle: festeRolle ?? rolle, email: adresse, tage },
+            });
+            setLaedt(false);
+            if (error || !data?.code) {
+                setFehler(data?.fehler ?? (error ? fehlertext(error) : 'Einladung konnte nicht erstellt werden.'));
+                return;
+            }
+            setCode(data.code);
+            setMailInfo(data.mail ? `Einladung per E-Mail an ${adresse} gesendet.` : `Code erstellt, aber die E-Mail konnte nicht gesendet werden (${data.fehler ?? 'unbekannter Fehler'}). Gib den Code selbst weiter.`);
+            return;
+        }
         const { data, error } = await supabase.rpc('einladung_erstellen', {
             p_revier_id: revierId,
             p_rolle: festeRolle ?? rolle,
-            p_email: email.trim() || undefined,
             p_gueltig_tage: tage,
         });
         setLaedt(false);
@@ -77,5 +93,5 @@ export function EinladungErstellen({ revierId, festeRolle, titel = 'Jemanden ein
         else
             setCode(data);
     }
-    return (_jsxs("form", { onSubmit: absenden, children: [_jsxs(Gruppe, { titel: titel, fuss: "Der Code ist einmal nutzbar. Mit E-Mail-Adresse kann ihn nur diese Person einl\u00F6sen.", children: [!festeRolle && (_jsxs(Auswahl, { label: "Rolle", value: rolle, onChange: (e) => setRolle(e.target.value), children: [_jsx("option", { value: "mitjaeger", children: "Mitj\u00E4ger" }), _jsx("option", { value: "inhaber", children: "Inhaber/P\u00E4chter" })] })), _jsx(Feld, { label: "E-Mail (optional)", type: "email", value: email, onChange: (e) => setEmail(e.target.value) }), _jsxs(Auswahl, { label: "G\u00FCltig", value: tage, onChange: (e) => setTage(Number(e.target.value)), children: [_jsx("option", { value: 7, children: "7 Tage" }), _jsx("option", { value: 14, children: "14 Tage" }), _jsx("option", { value: 30, children: "30 Tage" }), _jsx("option", { value: 90, children: "90 Tage" })] })] }), fehler && _jsx(Hinweis, { art: "fehler", children: fehler }), code ? (_jsx(CodeAnzeige, { code: code, beschreibung: `Gib diesen Code weiter. Registrierung unter ${window.location.origin} mit E-Mail, Name und Code.` })) : (_jsx(Knopf, { type: "submit", variante: "sekundaer", disabled: laedt, children: "Einladungscode erstellen" }))] }));
+    return (_jsxs("form", { onSubmit: absenden, children: [_jsxs(Gruppe, { titel: titel, fuss: "Der Code ist einmal nutzbar. Mit E-Mail-Adresse kann ihn nur diese Person einl\u00F6sen, und die Einladung wird ihr per E-Mail geschickt.", children: [!festeRolle && (_jsxs(Auswahl, { label: "Rolle", value: rolle, onChange: (e) => setRolle(e.target.value), children: [_jsx("option", { value: "mitjaeger", children: "Mitj\u00E4ger" }), _jsx("option", { value: "inhaber", children: "Inhaber/P\u00E4chter" })] })), _jsx(Feld, { label: "E-Mail (optional)", type: "email", value: email, onChange: (e) => setEmail(e.target.value) }), _jsxs(Auswahl, { label: "G\u00FCltig", value: tage, onChange: (e) => setTage(Number(e.target.value)), children: [_jsx("option", { value: 7, children: "7 Tage" }), _jsx("option", { value: 14, children: "14 Tage" }), _jsx("option", { value: 30, children: "30 Tage" }), _jsx("option", { value: 90, children: "90 Tage" })] })] }), fehler && _jsx(Hinweis, { art: "fehler", children: fehler }), mailInfo && _jsx(Hinweis, { children: mailInfo }), code ? (_jsx(CodeAnzeige, { code: code, beschreibung: `Gib diesen Code weiter. Registrierung unter ${window.location.origin} mit E-Mail, Name und Code.` })) : (_jsx(Knopf, { type: "submit", variante: "sekundaer", disabled: laedt, children: "Einladungscode erstellen" }))] }));
 }
