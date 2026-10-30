@@ -19,6 +19,7 @@ export function BjTeilnehmer({ jagdId }: { jagdId: string }) {
   const [warnung, setWarnung] = useState(false);
   const [name, setName] = useState('');
   const [anschrift, setAnschrift] = useState('');
+  const [telefon, setTelefon] = useState('');
   const [zusage, setZusage] = useState<boolean | null>(null);
   const [hund, setHund] = useState(false);
   const [horn, setHorn] = useState(false);
@@ -37,6 +38,7 @@ export function BjTeilnehmer({ jagdId }: { jagdId: string }) {
     setDaten(d);
     setName(d.ich.name);
     setAnschrift(d.ich.anschrift ?? '');
+    setTelefon(d.ich.telefon ?? '');
     setHund(!!d.ich.hat_hund);
     setHorn(!!d.ich.hat_hornblaeser);
     setAuto(!!d.ich.auto_vorhanden);
@@ -106,6 +108,7 @@ export function BjTeilnehmer({ jagdId }: { jagdId: string }) {
       p_code: code,
       p_name: name,
       p_anschrift: anschrift,
+      p_telefon: telefon,
       p_zusage: true,
       p_hund: hund,
       p_hornblaeser: horn,
@@ -146,6 +149,7 @@ export function BjTeilnehmer({ jagdId }: { jagdId: string }) {
           <Gruppe titel="1 · Deine Angaben">
             <Feld label="Name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" />
             <Feld label="Anschrift" value={anschrift} onChange={(e) => setAnschrift(e.target.value)} autoComplete="street-address" placeholder="Straße, PLZ Ort" />
+            <Feld label="Telefon (optional)" type="tel" value={telefon} onChange={(e) => setTelefon(e.target.value)} autoComplete="tel" placeholder="für Rückfragen am Jagdtag" />
           </Gruppe>
           <Knopf variante="akzent" disabled={!name.trim()} onClick={() => setSchritt(1)}>Weiter</Knopf>
         </>

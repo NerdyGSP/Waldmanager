@@ -6,6 +6,7 @@ import { navigieren } from '../../lib/router';
 import { punktEWKT } from '../../lib/geo';
 import { datumDE, heuteISO } from '../../lib/zeit';
 import { EINRICHTUNGSTYPEN, useMitglieder } from '../../lib/stammdaten';
+import { TeilnehmerInfoDruck, TeilnehmerListeDruck } from './BjDruck';
 import { codeAnzeigen, emailGueltig, JAGDARTEN, neuerEntwurf, teilnehmerCsv, type TeilnehmerEntwurf } from '../../lib/bewegungsjagd';
 import type { Tables } from '../../lib/database.types';
 import { Auswahl, Feld, Gruppe, Hinweis, Knopf, Leer, Segmente, Seite } from '../../components/ui';
@@ -159,6 +160,7 @@ function Assistent({ k }: { k: RevierKontext }) {
   const [teilnehmer, setTeilnehmer] = useState<TeilnehmerEntwurf[]>([]);
   const [neuName, setNeuName] = useState('');
   const [neuMail, setNeuMail] = useState('');
+  const [neuTelefon, setNeuTelefon] = useState('');
   // 3 Details
   const [text, setText] = useState('');
   const [st, setSt] = useState(false);
@@ -257,7 +259,7 @@ function Assistent({ k }: { k: RevierKontext }) {
     await supabase.from('aufgabenlisten').insert({ revier_id: k.revierId, name: `Jagd: ${titel.trim()}`, bewegungsjagd_id: j.id, erstellt_von: k.userId });
     const { data: tn, error: e2 } = await supabase
       .from('bewegungsjagd_teilnehmer')
-      .insert(teilnehmer.map((t) => ({ bewegungsjagd_id: j.id, name: t.name, email: t.email, aktiv: t.aktiv, zugeordnete_einrichtung_id: zuordnung[t.key] || null })))
+      .insert(teilnehmer.map((t) => ({ bewegungsjagd_id: j.id, name: t.name, email: t.email, telefon: t.telefon || null, aktiv: t.aktiv, zugeordnete_einrichtung_id: zuordnung[t.key] || null })))
       .select('*');
     setSpeichert(false);
     if (e2) {
@@ -330,7 +332,7 @@ function Assistent({ k }: { k: RevierKontext }) {
 
       {schritt === 1 && (
         <>
-          <Gruppe titel="Teilnehmer" fuss="CSV mit „Name;E-Mail“ je Zeile (Trennzeichen wird erkannt) oder einzeln hinzufügen.">
+          <Gruppe titel="Teilnehmer" fuss="CSV mit „Name;E-Mail“ (optional dritte Spalte Telefon) je Zeile (Trennzeichen wird erkannt) oder einzeln hinzufügen.">
             <div className="bj-ja-nein">
               <span>{teilnehmer.length} Einträge · {aktive.length} aktiv</span>
               <span>
@@ -342,6 +344,7 @@ function Assistent({ k }: { k: RevierKontext }) {
             </div>
             <Feld label="Name" value={neuName} onChange={(e) => setNeuName(e.target.value)} />
             <Feld label="E-Mail" type="email" value={neuMail} onChange={(e) => setNeuMail(e.target.value)} />
+            <Feld label="Telefon (optional)" type="tel" value={neuTelefon} onChange={(e) => setNeuTelefon(e.target.value)} />
             <div className="bj-ja-nein">
               <span />
               <Knopf
@@ -349,9 +352,10 @@ function Assistent({ k }: { k: RevierKontext }) {
                 variante="sekundaer"
                 disabled={!neuName.trim() || !neuMail.trim()}
                 onClick={() => {
-                  setTeilnehmer((a) => [...a, neuerEntwurf(neuName, neuMail)]);
+                  setTeilnehmer((a) => [...a, neuerEntwurf(neuName, neuMail, neuTelefon)]);
                   setNeuName('');
                   setNeuMail('');
+                  setNeuTelefon('');
                 }}
               >
                 Hinzufügen
@@ -496,7 +500,18 @@ function Assistent({ k }: { k: RevierKontext }) {
       <div className="bj-dialog-knoepfe">
         {schritt > 0 && schritt < 4 && (
           <Knopf variante="ghost" onClick={() => setSchritt(schritt - 1)} disabled={speichert}>
-            Zurück
+            ‹ Zurück
+          </Knopf>
+        )}
+        {schritt === 0 && (
+          <Knopf
+            variante="ghost"
+            onClick={() => {
+              if (!titel.trim() && !treffpunkt && !teilnehmer.length) return navigieren('/bewegungsjagd');
+              if (window.confirm('Anlage abbrechen? Deine Eingaben gehen verloren.')) navigieren('/bewegungsjagd');
+            }}
+          >
+            Abbrechen
           </Knopf>
         )}
         {schritt < 4 ? (
@@ -529,6 +544,15 @@ function Auswertung({ k, id }: { k: RevierKontext; id: string }) {
   const [aufgabeTitel, setAufgabeTitel] = useState('');
   const [aufgabeFaellig, setAufgabeFaellig] = useState('');
   const [aufgabeWer, setAufgabeWer] = useState('');
+  const [druck, setDruck] = useState<'info' | 'liste' | null>(null);
+  const [nachOffen, setNachOffen] = useState(false);
+  const [nName, setNName] = useState('');
+  const [nMail, setNMail] = useState('');
+  const [nTel, setNTel] = useState('');
+  const [nachEntwuerfe, setNachEntwuerfe] = useState<TeilnehmerEntwurf[]>([]);
+  const [nachMeldung, setNachMeldung] = useState<string | null>(null);
+  const [sendet, setSendet] = useState(false);
+  const nachDatei = useRef<HTMLInputElement>(null);
   const { grenze, einrichtungen } = useRevierKarte(k.revierId);
   const mitglieder = useMitglieder(k.revierId);
 
@@ -613,6 +637,61 @@ function Auswertung({ k, id }: { k: RevierKontext; id: string }) {
     setAufgabeWer('');
     await laden();
   }
+  // Einladungen (neu oder erneut) nur an bestimmte Teilnehmer senden
+  async function einladen(ids: string[]): Promise<string> {
+    const { data, error } = await supabase.functions.invoke('bj-einladen', { body: { jagd_id: id, teilnehmer_ids: ids } });
+    const res = data as { ergebnisse?: Array<{ ok: boolean; fehler?: string }>; fehler?: string } | null;
+    if (error || res?.fehler || !res?.ergebnisse) return res?.fehler ?? 'Der Versand ist fehlgeschlagen.';
+    const ok = res.ergebnisse.filter((r) => r.ok).length;
+    const bad = res.ergebnisse.filter((r) => !r.ok);
+    return `${ok} Einladung${ok === 1 ? '' : 'en'} gesendet${bad.length ? `, ${bad.length} Fehler (${bad[0]?.fehler ?? '?'})` : ''}.`;
+  }
+  async function erneutEinladen(t: Teilnehmer) {
+    setSendet(true);
+    setNachMeldung(`${t.name}: ${await einladen([t.id])}`);
+    setSendet(false);
+    await laden();
+  }
+  function nachCsv(f: File | undefined) {
+    if (!f) return;
+    void f.arrayBuffer().then((b) => {
+      try {
+        const neue = teilnehmerCsv(b);
+        if (!neue.length) throw new Error('leer');
+        setNachEntwuerfe((a) => [...a, ...neue]);
+        setFehler(null);
+      } catch {
+        setFehler('Die Datei konnte nicht gelesen werden. Erwartet wird „Name;E-Mail;Telefon“ je Zeile.');
+      }
+      if (nachDatei.current) nachDatei.current.value = '';
+    });
+  }
+  async function nachmelden() {
+    const vorhanden = new Set(tn.map((t) => t.email.toLowerCase()));
+    const alle = [...nachEntwuerfe, ...(nName.trim() && nMail.trim() ? [neuerEntwurf(nName, nMail, nTel)] : [])];
+    const gueltig = alle.filter((t) => t.name && emailGueltig(t.email) && !vorhanden.has(t.email.toLowerCase()));
+    const uebersprungen = alle.length - gueltig.length;
+    if (!gueltig.length) return setFehler('Keine neuen, gültigen Teilnehmer (Name und gültige E-Mail nötig, Duplikate werden übersprungen).');
+    setSendet(true);
+    setFehler(null);
+    const { data: neu, error } = await supabase
+      .from('bewegungsjagd_teilnehmer')
+      .insert(gueltig.map((t) => ({ bewegungsjagd_id: id, name: t.name, email: t.email, telefon: t.telefon || null, aktiv: true })))
+      .select('id');
+    if (error || !neu) {
+      setSendet(false);
+      return setFehler(fehlertext(error));
+    }
+    const ergebnis = await einladen(neu.map((n) => n.id));
+    setNachMeldung(`${gueltig.length} Teilnehmer ergänzt${uebersprungen ? `, ${uebersprungen} übersprungen (ungültig oder schon vorhanden)` : ''}. ${ergebnis}`);
+    setNachEntwuerfe([]);
+    setNName('');
+    setNMail('');
+    setNTel('');
+    setNachOffen(false);
+    setSendet(false);
+    await laden();
+  }
   async function aufgabeUmschalten(a: Aufgabe) {
     await supabase.from('aufgaben').update({ status: a.status === 'erledigt' ? 'offen' : 'erledigt' }).eq('id', a.id);
     await laden();
@@ -644,6 +723,33 @@ function Auswertung({ k, id }: { k: RevierKontext; id: string }) {
       </div>
 
       <Gruppe titel="Teilnehmer">
+        <div className="bj-ja-nein" style={{ padding: '10px var(--abstand) 0' }}>
+          <span>{tn.length} Einträge</span>
+          <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <Knopf variante="ghost" onClick={() => setDruck('liste')}>Teilnehmerliste drucken</Knopf>
+            <Knopf variante="ghost" onClick={() => setDruck('info')}>Teilnehmerinfo drucken</Knopf>
+            {offen && <Knopf variante="sekundaer" onClick={() => setNachOffen((o) => !o)}>{nachOffen ? 'Schließen' : '+ Teilnehmer hinzufügen'}</Knopf>}
+          </span>
+        </div>
+        {nachMeldung && <Hinweis>{nachMeldung}</Hinweis>}
+        {nachOffen && offen && (
+          <div style={{ padding: '0 var(--abstand)' }}>
+            <p style={{ margin: '8px 0', fontSize: '.85rem', color: 'var(--color-text-muted)' }}>Neue Teilnehmer erhalten einen eigenen Code. Die Einladung geht nur an die neu Ergänzten.</p>
+            <Feld label="Name" value={nName} onChange={(e) => setNName(e.target.value)} />
+            <Feld label="E-Mail" type="email" value={nMail} onChange={(e) => setNMail(e.target.value)} />
+            <Feld label="Telefon (optional)" type="tel" value={nTel} onChange={(e) => setNTel(e.target.value)} />
+            <div className="bj-ja-nein">
+              <span>{nachEntwuerfe.length ? `${nachEntwuerfe.length} aus CSV vorgemerkt` : 'oder CSV „Name;E-Mail;Telefon“'}</span>
+              <span style={{ display: 'flex', gap: 6 }}>
+                <input ref={nachDatei} type="file" accept=".csv,.txt,text/csv" hidden onChange={(e) => nachCsv(e.target.files?.[0])} />
+                <Knopf variante="ghost" onClick={() => nachDatei.current?.click()}>CSV wählen</Knopf>
+                <Knopf variante="akzent" disabled={sendet || (!nachEntwuerfe.length && !(nName.trim() && nMail.trim()))} onClick={() => void nachmelden()}>
+                  {sendet ? 'Sende …' : 'Hinzufügen & einladen'}
+                </Knopf>
+              </span>
+            </div>
+          </div>
+        )}
         <div style={{ padding: '10px var(--abstand)' }}>
           <Segmente<StatusFilter>
             label="Statusfilter"
@@ -659,7 +765,7 @@ function Auswertung({ k, id }: { k: RevierKontext; id: string }) {
               <strong>{t.name}</strong> <span className={`badge ${t.status === 'zugesagt' ? 'badge-gruen' : t.status === 'abgesagt' ? 'badge-rot' : ''}`}>{t.status === 'eingeladen' ? 'offen' : t.status}</span>
               <br />
               <small>
-                {t.email} · Code {codeAnzeigen(t.einladungscode)}
+                {t.email}{t.telefon ? ` · ${t.telefon}` : ''} · Code {codeAnzeigen(t.einladungscode)}
                 {t.mail_status && ` · Mail ${t.mail_status === 'gesendet' ? 'gesendet' : `Fehler (${t.mail_fehler ?? '?'})`}`}
               </small>
               {t.status === 'zugesagt' && (
@@ -682,6 +788,7 @@ function Auswertung({ k, id }: { k: RevierKontext; id: string }) {
                       </option>
                     ))}
                   </select>
+                  {t.aktiv && t.status === 'eingeladen' && <Knopf variante="ghost" disabled={sendet} onClick={() => void erneutEinladen(t)}>Erneut einladen</Knopf>}
                   <Knopf variante="ghost" onClick={() => void aendern(t, { aktiv: !t.aktiv })}>{t.aktiv ? 'Deaktivieren' : 'Aktivieren'}</Knopf>
                   <Knopf variante="gefahr" onClick={() => void entfernen(t)}>Löschen</Knopf>
                 </>
@@ -742,6 +849,9 @@ function Auswertung({ k, id }: { k: RevierKontext; id: string }) {
           <Knopf variante="akzent" onClick={() => setAbschluss(true)}>Jagd abschließen</Knopf>
         </div>
       )}
+
+      {druck === 'info' && <TeilnehmerInfoDruck jagd={jagd} boecke={einrichtungen.filter((e) => e.typ === 'drueckjagdbock').map((e) => ({ id: e.id, lng: e.lng, lat: e.lat, name: e.name }))} onZu={() => setDruck(null)} />}
+      {druck === 'liste' && <TeilnehmerListeDruck jagd={jagd} tn={tn} standName={(eid) => (stand(eid) ? einrLabel(stand(eid)!) : '')} onZu={() => setDruck(null)} />}
 
       {abschluss && (
         <div className="bj-dialog-hintergrund" role="dialog" aria-modal="true" aria-label="Jagd abschließen">

@@ -22,14 +22,19 @@ Deno.serve(async (req) => {
   });
 
   let jagdId: string;
+  let nurIds: string[] | null = null; // optional: nur an diese Teilnehmer senden (Nachmeldung, erneut einladen)
   try {
-    ({ jagd_id: jagdId } = await req.json());
+    const body = await req.json();
+    jagdId = body.jagd_id;
+    if (Array.isArray(body.teilnehmer_ids) && body.teilnehmer_ids.length) nurIds = body.teilnehmer_ids.map(String);
   } catch {
     return json({ fehler: 'Ungültige Anfrage.' }, 400);
   }
   const { data: jagd } = await supabase.from('bewegungsjagden').select('*').eq('id', jagdId).is('geloescht_am', null).maybeSingle();
   if (!jagd) return json({ fehler: 'Bewegungsjagd nicht gefunden oder keine Berechtigung.' }, 403);
-  const { data: teilnehmer } = await supabase.from('bewegungsjagd_teilnehmer').select('*').eq('bewegungsjagd_id', jagdId).eq('aktiv', true);
+  let tq = supabase.from('bewegungsjagd_teilnehmer').select('*').eq('bewegungsjagd_id', jagdId).eq('aktiv', true);
+  if (nurIds) tq = tq.in('id', nurIds);
+  const { data: teilnehmer } = await tq;
 
   const datum = new Date(jagd.datum + 'T12:00:00').toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
   const zeit = jagd.uhrzeit ? ` um ${String(jagd.uhrzeit).slice(0, 5)} Uhr` : '';

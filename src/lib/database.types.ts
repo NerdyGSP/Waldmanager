@@ -904,6 +904,7 @@ export type Database = {
       }
       bewegungsjagd_teilnehmer: {
         Row: {
+          telefon: string | null
           aktiv: boolean
           anschrift: string | null
           antwort_am: string | null
@@ -926,6 +927,7 @@ export type Database = {
           zugeordnete_einrichtung_id: string | null
         }
         Insert: {
+          telefon?: string | null
           aktiv?: boolean
           anschrift?: string | null
           antwort_am?: string | null
@@ -948,6 +950,7 @@ export type Database = {
           zugeordnete_einrichtung_id?: string | null
         }
         Update: {
+          telefon?: string | null
           aktiv?: boolean
           anschrift?: string | null
           antwort_am?: string | null
@@ -1176,6 +1179,7 @@ export type Database = {
           p_name: string
           p_plaetze: number
           p_schuesseltreiben: boolean
+          p_telefon?: string
           p_zusage: boolean
         }
         Returns: boolean

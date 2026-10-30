@@ -12,14 +12,14 @@ export function emailGueltig(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim());
 }
 
-export type TeilnehmerEntwurf = { key: string; name: string; email: string; aktiv: boolean };
+export type TeilnehmerEntwurf = { key: string; name: string; email: string; telefon: string; aktiv: boolean };
 
 let zaehler = 0;
-export function neuerEntwurf(name: string, email: string): TeilnehmerEntwurf {
-  return { key: `t${Date.now()}-${zaehler++}`, name: name.trim(), email: email.trim(), aktiv: true };
+export function neuerEntwurf(name: string, email: string, telefon = ''): TeilnehmerEntwurf {
+  return { key: `t${Date.now()}-${zaehler++}`, name: name.trim(), email: email.trim(), telefon: telefon.trim(), aktiv: true };
 }
 
-// CSV „Name;E-Mail“ (Trennzeichen automatisch, Kopfzeile wird erkannt)
+// CSV „Name;E-Mail[;Telefon]“ (Trennzeichen automatisch, Kopfzeile wird erkannt)
 export function teilnehmerCsv(puffer: ArrayBuffer): TeilnehmerEntwurf[] {
   const zeilen = csvLesen(textAusDatei(puffer));
   const erste = zeilen[0]?.map((f) => f.toLowerCase()) ?? [];
@@ -28,8 +28,8 @@ export function teilnehmerCsv(puffer: ArrayBuffer): TeilnehmerEntwurf[] {
     .filter((z) => z[0] || z[1])
     .map((z) => {
       // Reihenfolge tolerant: steht die Adresse vorn, wird getauscht
-      const [a = '', b = ''] = z;
-      return a.includes('@') && !b.includes('@') ? neuerEntwurf(b, a) : neuerEntwurf(a, b);
+      const [a = '', b = '', c = ''] = z;
+      return a.includes('@') && !b.includes('@') ? neuerEntwurf(b, a, c) : neuerEntwurf(a, b, c);
     });
 }
 
@@ -60,6 +60,7 @@ export type BjLadeErgebnis = {
   ich: {
     name: string;
     anschrift: string | null;
+    telefon?: string | null;
     status: string;
     hat_hund: boolean | null;
     hat_hornblaeser: boolean | null;
