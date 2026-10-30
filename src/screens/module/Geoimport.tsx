@@ -24,6 +24,8 @@ const ZIELE: Array<{ wert: Ziel; titel: string; text: string; geometrie: string 
   { wert: 'zonen', titel: 'Zonen', text: 'Legt je Fläche eine Zone an (ohne Zuschnitt auf die Reviergrenze).', geometrie: 'Flächen' },
   { wert: 'einrichtungen', titel: 'Einrichtungen', text: 'Hochsitze, Kirrungen u. a. als Punkte.', geometrie: 'Punkte' },
   { wert: 'pirschwege', titel: 'Pirschwege', text: 'Wege und Pfade als Linien.', geometrie: 'Linien' },
+  { wert: 'treiberrouten', titel: 'Treiberrouten', text: 'Laufwege der Treiber bei Bewegungsjagden als Linien.', geometrie: 'Linien' },
+  { wert: 'wte_routen', titel: 'WTE-Routen', text: 'Zählstrecken der Wildtiererfassung als Linien.', geometrie: 'Linien' },
 ];
 const ARTEN: Record<string, string> = {
   Point: 'Punkt',
@@ -198,19 +200,21 @@ export function Geoimport({ k }: { k: RevierKontext }) {
         }
         setMeldung(`${zeilen.length} Einrichtungen importiert` + (doppelt ? `; ${doppelt} mit bereits vergebenem Namen übersprungen` : '') + '.');
       } else {
-        const zeilen: Array<{ revier_id: string; name: string; geom: string }> = [];
+        const routeTyp = ziel === 'treiberrouten' ? 'treiberroute' : ziel === 'wte_routen' ? 'wte_route' : 'pirschweg';
+        const routeName = ziel === 'treiberrouten' ? 'Treiberroute' : ziel === 'wte_routen' ? 'WTE-Route' : 'Pirschweg';
+        const zeilen: Array<{ revier_id: string; name: string; typ: string; geom: string }> = [];
         for (const f of passend) {
           for (const g of einzelteile(f, ziel)) {
             const nr = zeilen.length + 1;
-            const name = nameVon(f, `Pirschweg ${nr}`);
-            zeilen.push({ revier_id: k.revierId, name, geom: linieEWKT((g as unknown as { coordinates: Array<[number, number]> }).coordinates) });
+            const name = nameVon(f, `${routeName} ${nr}`);
+            zeilen.push({ revier_id: k.revierId, name, typ: routeTyp, geom: linieEWKT((g as unknown as { coordinates: Array<[number, number]> }).coordinates) });
           }
         }
         for (const teil of stuecke(zeilen, 100)) {
           const { error } = await supabase.from('pirschwege').insert(teil);
           if (error) throw error;
         }
-        setMeldung(`${zeilen.length} Pirschwege importiert.`);
+        setMeldung(`${zeilen.length} ${ziel === 'treiberrouten' ? 'Treiberrouten' : ziel === 'wte_routen' ? 'WTE-Routen' : 'Pirschwege'} importiert.`);
       }
       zuruecksetzen();
     } catch (err) {
@@ -314,9 +318,9 @@ export function Geoimport({ k }: { k: RevierKontext }) {
                 </small>
               </span>
             </div>
-            {(ziel === 'zonen' || ziel === 'einrichtungen' || ziel === 'pirschwege') && schicht.felder.length > 0 && (
+            {(ziel === 'zonen' || ziel === 'einrichtungen' || ziel === 'pirschwege' || ziel === 'treiberrouten' || ziel === 'wte_routen') && schicht.felder.length > 0 && (
               <Auswahl
-                label={ziel === 'zonen' ? 'Zonenname aus Feld' : ziel === 'einrichtungen' ? 'Name aus Feld' : 'Name des Pirschwegs aus Feld'}
+                label={ziel === 'zonen' ? 'Zonenname aus Feld' : ziel === 'einrichtungen' ? 'Name aus Feld' : 'Name der Linie aus Feld'}
                 value={namensfeld}
                 onChange={(e) => setNamensfeld(e.target.value)}
               >
@@ -329,7 +333,7 @@ export function Geoimport({ k }: { k: RevierKontext }) {
                 ))}
               </Auswahl>
             )}
-            {(ziel === 'zonen' || ziel === 'einrichtungen' || ziel === 'pirschwege') && namensfeld && beispiele(namensfeld, 3).length > 0 && (
+            {(ziel === 'zonen' || ziel === 'einrichtungen' || ziel === 'pirschwege' || ziel === 'treiberrouten' || ziel === 'wte_routen') && namensfeld && beispiele(namensfeld, 3).length > 0 && (
               <small style={{ color: "var(--text-leise)" }}>Beispielwerte: {beispiele(namensfeld, 3).map((b) => `„${b}“`).join(', ')}</small>
             )}
             {ziel === 'zonen' && ebenen.length > 0 && (

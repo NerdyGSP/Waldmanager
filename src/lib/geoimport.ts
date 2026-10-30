@@ -577,8 +577,8 @@ function abschliessen(dateiname: string, format: Einlesung['format'], schichten:
 
 // ---------- Hilfen für den Dialog ----------
 
-export type Ziel = 'grenze' | 'zonen' | 'einrichtungen' | 'pirschwege';
-const ZIEL_ART: Record<Ziel, Flaechenart> = { grenze: 'Polygon', zonen: 'Polygon', einrichtungen: 'Point', pirschwege: 'LineString' };
+export type Ziel = 'grenze' | 'zonen' | 'einrichtungen' | 'pirschwege' | 'treiberrouten' | 'wte_routen';
+const ZIEL_ART: Record<Ziel, Flaechenart> = { grenze: 'Polygon', zonen: 'Polygon', einrichtungen: 'Point', pirschwege: 'LineString', treiberrouten: 'LineString', wte_routen: 'LineString' };
 
 export const artVon = (g: Geometry): Flaechenart => (g.type.endsWith('Polygon') ? 'Polygon' : g.type.endsWith('LineString') ? 'LineString' : 'Point');
 
@@ -590,6 +590,6 @@ export function passendeObjekte(schicht: GeoSchicht, ziel: Ziel): GeoFeature[] {
 export function einzelteile(f: GeoFeature, ziel: Ziel): Geometry[] {
   const g = f.geometry;
   if (ziel === 'einrichtungen' && g.type === 'MultiPoint') return g.coordinates.map((c) => ({ type: 'Point', coordinates: c }) as Geometry);
-  if (ziel === 'pirschwege' && g.type === 'MultiLineString') return g.coordinates.map((c) => ({ type: 'LineString', coordinates: c }) as Geometry);
+  if ((ziel === 'pirschwege' || ziel === 'treiberrouten' || ziel === 'wte_routen') && g.type === 'MultiLineString') return g.coordinates.map((c) => ({ type: 'LineString', coordinates: c }) as Geometry);
   return [g];
 }
