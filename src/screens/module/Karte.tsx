@@ -30,6 +30,7 @@ import { EinrichtungsIcon, einrichtungsBild } from '../../lib/einrichtungsIcons'
 import type { Enums, Json } from '../../lib/database.types';
 import type { RevierKontext } from './kontext';
 import { Symbol } from '../../components/symbole';
+import { GpsImport } from './GpsImport';
 import { ZeichnenSheet, type SheetArt, type SheetWerte } from './ZeichnenSheet';
 
 // ---------- Kartengrundlagen ----------
@@ -202,6 +203,7 @@ export default function Karte({
     abschuesse: false,
   });
   const [modus, setModusState] = useState<Modus>(null);
+  const [gpsImport, setGpsImport] = useState(false);
   const [sheetArt, setSheetArt] = useState<SheetArt | null>(null);
   const [sheetFehler, setSheetFehler] = useState<string | null>(null);
   const [sheetSpeichert, setSheetSpeichert] = useState(false);
@@ -1430,10 +1432,23 @@ export default function Karte({
                 <p className="menue-gruppe">Aufzeichnen</p>
                 {eintrag('Pirschweg per GPS aufzeichnen', () => aufzeichnungStarten('pirschweg'))}
                 {eintrag('WTE-Route per GPS aufzeichnen', () => aufzeichnungStarten('wte_route'))}
+                <p className="menue-gruppe">Import</p>
+                {eintrag('GPS-Datei (Smartwatch)', () => setGpsImport(true))}
               </>
             );
           })()}
         </div>
+      )}
+      {gpsImport && (
+        <GpsImport
+          k={k}
+          onZu={() => setGpsImport(false)}
+          onFertig={(text) => {
+            setGpsImport(false);
+            setMeldung({ art: 'erfolg', text });
+            void laden();
+          }}
+        />
       )}
       {sheetArt && (
         <ZeichnenSheet

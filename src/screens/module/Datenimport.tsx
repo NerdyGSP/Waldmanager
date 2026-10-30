@@ -8,6 +8,7 @@ import type { Enums } from '../../lib/database.types';
 import { Feld, Gruppe, Hinweis, Knopf, Leer, Seite, Segmente, WildartOptionen } from '../../components/ui';
 import { VorlageGruppe } from './ImportVorlage';
 import { Geoimport } from './Geoimport';
+import { GpsImport } from './GpsImport';
 import { SitzungsdatenFormular } from './SitzungsdatenFormular';
 import { alsSitzungsZeile, leereSitzungsdaten, type Sitzungsdaten } from '../../lib/sitzungsdaten';
 import type { RevierKontext } from './kontext';
@@ -91,6 +92,7 @@ export function Datenimport({ k }: { k: RevierKontext }) {
   const [fehler, setFehler] = useState<string | null>(null);
   const [meldung, setMeldung] = useState<string | null>(null);
   const [laeuft, setLaeuft] = useState(false);
+  const [gpsOffen, setGpsOffen] = useState(false);
 
   const kopf = tabelle?.[0] ?? [];
   // Matrixformat (Zeilen = Zonen, Spalten = Wildarten): mindestens zwei Spaltenköpfe sind Wildarten
@@ -400,6 +402,22 @@ export function Datenimport({ k }: { k: RevierKontext }) {
     return (
       <Seite titel="Datenimport" untertitel="Reviergrenze, Zonen, Einrichtungen und Pirschwege aus Shapefile oder GeoPackage">
         {bereichWahl}
+        {meldung && <Hinweis art="erfolg">{meldung}</Hinweis>}
+        <Gruppe titel="GPS-Datei (Smartwatch)" fuss="GPX, KML, KMZ oder FIT als Pirschweg, Treiberroute oder WTE-Route – mit Prüfbericht und Punktreduktion.">
+          <Knopf variante="sekundaer" onClick={() => setGpsOffen(true)}>
+            GPS-Datei importieren …
+          </Knopf>
+        </Gruppe>
+        {gpsOffen && (
+          <GpsImport
+            k={k}
+            onZu={() => setGpsOffen(false)}
+            onFertig={(t) => {
+              setGpsOffen(false);
+              setMeldung(t);
+            }}
+          />
+        )}
         <Geoimport k={k} />
       </Seite>
     );
