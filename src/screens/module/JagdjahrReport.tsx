@@ -115,8 +115,8 @@ export function JagdjahrReport({ k }: { k: RevierKontext }) {
       {daten && inhalt(daten, false)}
       {druck && daten && (
         <Druckrahmen querformat onZu={() => setDruck(false)}>
-          <section className="bj-druck-seite quer">
-            <h1>Jagdjahr-Report · {k.revierName}</h1>
+          <section className="bj-druck-seite quer" style={{ color: '#000', background: '#fff' }}>
+            <h1 style={{ color: '#000' }}>Jagdjahr-Report · {k.revierName}</h1>
             <p className="art">
               Jagdjahre {jjLabel(jahre[0]!)} bis {jjLabel(jahre[jahre.length - 1]!)}
               {o.wildart ? ` · ${name(o.wildart)}` : ''} · Erstellt am {new Date().toLocaleDateString('de-DE')}
@@ -126,6 +126,22 @@ export function JagdjahrReport({ k }: { k: RevierKontext }) {
         </Druckrahmen>
       )}
     </div>
+  );
+}
+
+function Leer2({ a, children }: { a: boolean; children: React.ReactNode }) {
+  return a ? <p style={{ color: '#000' }}>{children}</p> : <Leer>{children}</Leer>;
+}
+
+// Im Druck: schlichter Block auf weißem Blatt (die Bildschirm-Gruppe ist im Dunkelmodus dunkel)
+function Block({ titel, fuss, ausdruck, children }: { titel: string; fuss?: React.ReactNode; ausdruck: boolean; children: React.ReactNode }) {
+  if (!ausdruck) return <Gruppe titel={titel} fuss={fuss}>{children}</Gruppe>;
+  return (
+    <section style={{ color: '#000', background: '#fff', marginTop: 10 }}>
+      <h2 className="klein" style={{ color: '#000' }}>{titel}</h2>
+      {children}
+      {fuss && <small className="art" style={{ color: '#333' }}>{fuss}</small>}
+    </section>
   );
 }
 
@@ -180,7 +196,7 @@ function Inhalt({ d, o, jahre, strecke, zaehl, zaehlArten, diagrammArt, name, au
     );
     return (
       <Fragment key={a}>
-        <h3 style={{ margin: '10px 0 4px', fontSize: '1rem' }}>{ARTEN.find((x) => x.art === a)!.titel}</h3>
+        <h3 style={{ margin: '10px 0 4px', fontSize: '1rem', color: ausdruck ? '#000' : undefined }}>{ARTEN.find((x) => x.art === a)!.titel}</h3>
         {rahmen(
           <table className={tab}>
             <thead>
@@ -233,17 +249,17 @@ function Inhalt({ d, o, jahre, strecke, zaehl, zaehlArten, diagrammArt, name, au
 
   return (
     <>
-      <Gruppe titel="A · Strecke">
+      <Block ausdruck={ausdruck} titel="A · Strecke">
         <div style={{ padding: '4px var(--abstand) 8px' }}>
-          {hatStrecke ? ARTEN.map((a) => streckeTabelle(a.art)) : <Leer>Keine Strecke im gewählten Zeitraum.</Leer>}
+          {hatStrecke ? ARTEN.map((a) => streckeTabelle(a.art)) : <Leer2 a={ausdruck}>Keine Strecke im gewählten Zeitraum.</Leer2>}
         </div>
-      </Gruppe>
+      </Block>
 
-      <Gruppe titel="B · Wildtiererfassung" fuss="Nur abgeschlossene Zählungen. Zählwert = Summe je Zählung über alle Zonen; Wert je 100 ha = gezählte Stücke ÷ gezählte Fläche.">
+      <Block ausdruck={ausdruck} titel="B · Wildtiererfassung" fuss="Nur abgeschlossene Zählungen. Zählwert = Summe je Zählung über alle Zonen; Wert je 100 ha = gezählte Stücke ÷ gezählte Fläche.">
         <div style={{ padding: '4px var(--abstand) 8px' }}>
-          {modiAlle.size > 1 && <Hinweis art="warnung">Gemischte Flächenmodi: Die Werte je 100 ha sind nicht streng vergleichbar.</Hinweis>}
+          {modiAlle.size > 1 && (ausdruck ? <p style={{ margin: '4px 0', color: '#000' }}><strong>Hinweis:</strong> Gemischte Flächenmodi, die Werte je 100 ha sind nicht streng vergleichbar.</p> : <Hinweis art="warnung">Gemischte Flächenmodi: Die Werte je 100 ha sind nicht streng vergleichbar.</Hinweis>)}
           {zeilenB.length === 0 ? (
-            <Leer>Keine abgeschlossenen Zählungen im gewählten Zeitraum.</Leer>
+            <Leer2 a={ausdruck}>Keine abgeschlossenen Zählungen im gewählten Zeitraum.</Leer2>
           ) : (
             rahmen(
               <table className={tab}>
@@ -291,10 +307,10 @@ function Inhalt({ d, o, jahre, strecke, zaehl, zaehlArten, diagrammArt, name, au
             </div>
           )}
         </div>
-      </Gruppe>
+      </Block>
 
       {o.kennzahlen && (
-        <Gruppe titel="C · Kennzahlen" fuss={`Strecke = Abschüsse und gefangene Tiere ohne Fallwild. Revierfläche ${zahl(d.revier_ha, 0)} ha. „je 100 ha“ ist der Jahresdurchschnitt im Zeitraum; Verhältnis = Strecke ÷ Summe der Ø-Zählwerte (nur Jagdjahre mit Zählung).`}>
+        <Block ausdruck={ausdruck} titel="C · Kennzahlen" fuss={`Strecke = Abschüsse und gefangene Tiere ohne Fallwild. Revierfläche ${zahl(d.revier_ha, 0)} ha. „je 100 ha“ ist der Jahresdurchschnitt im Zeitraum; Verhältnis = Strecke ÷ Summe der Ø-Zählwerte (nur Jagdjahre mit Zählung).`}>
           <div style={{ padding: '4px var(--abstand) 8px' }}>
             {rahmen(
               <table className={tab}>
@@ -319,7 +335,7 @@ function Inhalt({ d, o, jahre, strecke, zaehl, zaehlArten, diagrammArt, name, au
               </table>,
             )}
           </div>
-        </Gruppe>
+        </Block>
       )}
     </>
   );
