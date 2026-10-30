@@ -919,8 +919,10 @@ export type Database = {
           aktualisiert_am: string
           bemerkung: string | null
           bewegungsjagd_id: string | null
+          ebene_id: string | null
           erstellt_am: string
           erstellt_von: string | null
+          farbe: string | null
           geloescht_am: string | null
           geom: unknown
           id: string
@@ -933,8 +935,10 @@ export type Database = {
           aktualisiert_am?: string
           bemerkung?: string | null
           bewegungsjagd_id?: string | null
+          ebene_id?: string | null
           erstellt_am?: string
           erstellt_von?: string | null
+          farbe?: string | null
           geloescht_am?: string | null
           geom: unknown
           id?: string
@@ -947,8 +951,10 @@ export type Database = {
           aktualisiert_am?: string
           bemerkung?: string | null
           bewegungsjagd_id?: string | null
+          ebene_id?: string | null
           erstellt_am?: string
           erstellt_von?: string | null
+          farbe?: string | null
           geloescht_am?: string | null
           geom?: unknown
           id?: string
@@ -963,6 +969,13 @@ export type Database = {
             columns: ["bewegungsjagd_id"]
             isOneToOne: false
             referencedRelation: "bewegungsjagden"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pirschwege_ebene_id_fkey"
+            columns: ["ebene_id"]
+            isOneToOne: false
+            referencedRelation: "routen_ebenen"
             referencedColumns: ["id"]
           },
           {
@@ -1101,6 +1114,53 @@ export type Database = {
             columns: ["hegering_id"]
             isOneToOne: false
             referencedRelation: "hegeringe"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      routen_ebenen: {
+        Row: {
+          aktualisiert_am: string
+          erstellt_am: string
+          farbe: string | null
+          geloescht_am: string | null
+          id: string
+          name: string
+          reihenfolge: number
+          revier_id: string
+          typ: string
+          wte_aktiv: boolean
+        }
+        Insert: {
+          aktualisiert_am?: string
+          erstellt_am?: string
+          farbe?: string | null
+          geloescht_am?: string | null
+          id?: string
+          name: string
+          reihenfolge?: number
+          revier_id: string
+          typ: string
+          wte_aktiv?: boolean
+        }
+        Update: {
+          aktualisiert_am?: string
+          erstellt_am?: string
+          farbe?: string | null
+          geloescht_am?: string | null
+          id?: string
+          name?: string
+          reihenfolge?: number
+          revier_id?: string
+          typ?: string
+          wte_aktiv?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "routen_ebenen_revier_id_fkey"
+            columns: ["revier_id"]
+            isOneToOne: false
+            referencedRelation: "reviere"
             referencedColumns: ["id"]
           },
         ]
@@ -1567,6 +1627,10 @@ export type Database = {
       revier_aufteilen_vorschau: {
         Args: { p_anzahl: number; p_revier_id: string }
         Returns: Json
+      }
+      routen_ebene_loeschen: {
+        Args: { p_ebene_id: string; p_mit_routen?: boolean }
+        Returns: number
       }
       sitzung_flaeche_berechnen: {
         Args: { p_breite_m?: number; p_modus?: string; p_sitzung_id: string }

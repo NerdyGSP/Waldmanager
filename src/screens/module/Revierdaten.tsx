@@ -3,13 +3,14 @@ import { supabase } from '../../lib/supabase';
 import { fehlertext } from '../../lib/fehler';
 import { Feld, Gruppe, Hinweis, Knopf } from '../../components/ui';
 
-type Art = 'grenze' | 'zonen' | 'ebenen' | 'einrichtungen' | 'pirschwege';
-const ARTEN: Array<{ id: Art; tabelle: 'revier_grenzen' | 'zonen' | 'zonen_ebenen' | 'einrichtungen' | 'pirschwege'; titel: string; hinweis: string }> = [
+type Art = 'grenze' | 'zonen' | 'ebenen' | 'einrichtungen' | 'pirschwege' | 'routenebenen';
+const ARTEN: Array<{ id: Art; tabelle: 'revier_grenzen' | 'zonen' | 'zonen_ebenen' | 'einrichtungen' | 'pirschwege' | 'routen_ebenen'; titel: string; hinweis: string }> = [
   { id: 'grenze', tabelle: 'revier_grenzen', titel: 'Reviergrenze', hinweis: 'Die Revierfläche in ha bleibt unverändert, bis eine neue Grenze übernommen wird.' },
   { id: 'zonen', tabelle: 'zonen', titel: 'Zonen', hinweis: 'Zählwerte, Beobachtungen, Abschüsse und Wildschäden bleiben erhalten, verlieren aber ihre Zonenzuordnung.' },
   { id: 'ebenen', tabelle: 'zonen_ebenen', titel: 'Zonenebenen', hinweis: 'Die Ebene früherer Zählungen entfällt.' },
   { id: 'einrichtungen', tabelle: 'einrichtungen', titel: 'Einrichtungen', hinweis: 'Verknüpfungen in Abschüssen und Aufgaben werden entfernt.' },
-  { id: 'pirschwege', tabelle: 'pirschwege', titel: 'Pirschwege', hinweis: '' },
+  { id: 'pirschwege', tabelle: 'pirschwege', titel: 'Routen (Pirschwege, WTE- und Treiberrouten)', hinweis: '' },
+  { id: 'routenebenen', tabelle: 'routen_ebenen', titel: 'Routenebenen', hinweis: 'Die Routen darin bleiben ohne Ebene erhalten; „Routen“ zusätzlich auswählen, um sie samt Ebene zu löschen.' },
 ];
 
 // Nur für Inhaber: Karten- und Flächendaten eines Reviers vollständig entfernen (z. B. vor einem neuen Import)
@@ -46,7 +47,7 @@ export function RevierdatenLoeschen({ revierId, onGeaendert }: { revierId: strin
     setMeldung(null);
     const geloescht: string[] = [];
     try {
-      // Zonen vor Ebenen, damit nichts mehr auf eine Ebene zeigt
+      // Zonen vor Ebenen und Routen vor Routenebenen, damit nichts mehr auf eine Ebene zeigt
       for (const a of ARTEN.filter((x) => auswahl.has(x.id))) {
         const { error, count } = await supabase.from(a.tabelle).delete({ count: 'exact' }).eq('revier_id', revierId);
         if (error) throw error;

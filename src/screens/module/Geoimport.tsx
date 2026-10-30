@@ -1,3 +1,5 @@
+import { useRoutenEbenen, ebeneBereitstellen, freierName } from '../../lib/routen';
+import { RoutenEbenenWahl, ebeneUngueltig } from '../../components/RoutenEbenenWahl';
 import { useEffect, useMemo, useState } from 'react';
 import type { Geometry } from 'geojson';
 import { supabase } from '../../lib/supabase';
@@ -51,6 +53,13 @@ export function Geoimport({ k }: { k: RevierKontext }) {
   const [schichtNr, setSchichtNr] = useState(0);
   const [namensfeld, setNamensfeld] = useState('');
   const [ebeneId, setEbeneId] = useState('');
+  const [routenEbeneId, setRoutenEbeneId] = useState('');
+  const [neueRoutenEbene, setNeueRoutenEbene] = useState('');
+  const { ebenen: routenEbenen } = useRoutenEbenen(k.revierId);
+  useEffect(() => {
+    setRoutenEbeneId('');
+    setNeueRoutenEbene('');
+  }, [ziel]);
   const [typ, setTyp] = useState<Enums<'einrichtung_typ'>>('hochsitz');
   const [hatGrenze, setHatGrenze] = useState(false);
   const [ersetzen, setErsetzen] = useState(false);
@@ -87,6 +96,8 @@ export function Geoimport({ k }: { k: RevierKontext }) {
     setFehler(null);
     setSchichtNr(0);
     setErsetzen(false);
+    setRoutenEbeneId('');
+    setNeueRoutenEbene('');
   }
 
   async function dateiWaehlen(datei: File) {
@@ -203,12 +214,17 @@ export function Geoimport({ k }: { k: RevierKontext }) {
       } else {
         const routeTyp = ziel === 'treiberrouten' ? 'treiberroute' : ziel === 'wte_routen' ? 'wte_route' : 'pirschweg';
         const routeName = ziel === 'treiberrouten' ? 'Treiberroute' : ziel === 'wte_routen' ? 'WTE-Route' : 'Pirschweg';
-        const zeilen: Array<{ revier_id: string; name: string; typ: string; geom: string }> = [];
+        const zeilen: Array<{ revier_id: string; name: string; typ: string; geom: string; ebene_id: string | null }> = [];
+        const { data: belegt } = await supabase.from('pirschwege').select('name').eq('revier_id', k.revierId).is('geloescht_am', null);
+        const namen = (belegt ?? []).map((x) => x.name);
+        const zielEbene = await ebeneBereitstellen(k.revierId, routeTyp, routenEbeneId, neueRoutenEbene, routenEbenen, new Map());
         for (const f of passend) {
           for (const g of einzelteile(f, ziel)) {
             const nr = zeilen.length + 1;
-            const name = nameVon(f, `${routeName} ${nr}`);
-            zeilen.push({ revier_id: k.revierId, name, typ: routeTyp, geom: linieEWKT((g as unknown as { coordinates: Array<[number, number]> }).coordinates) });
+            // Routennamen sind je Revier eindeutig: bei Doppelungen wird eine Nummer angehängt
+            const name = freierName(namen, nameVon(f, `${routeName} ${nr}`));
+            namen.push(name);
+            zeilen.push({ revier_id: k.revierId, name, typ: routeTyp, ebene_id: zielEbene, geom: linieEWKT((g as unknown as { coordinates: Array<[number, number]> }).coordinates) });
           }
         }
         for (const teil of stuecke(zeilen, 100)) {
@@ -347,6 +363,19 @@ export function Geoimport({ k }: { k: RevierKontext }) {
                 ))}
               </Auswahl>
             )}
+            {(ziel === 'pirschwege' || ziel === 'treiberrouten' || ziel === 'wte_routen') && (
+              <RoutenEbenenWahl
+                typ={ziel === 'treiberrouten' ? 'treiberroute' : ziel === 'wte_routen' ? 'wte_route' : 'pirschweg'}
+                ebenen={routenEbenen}
+                ebeneId={routenEbeneId}
+                neuerName={neueRoutenEbene}
+                darfAnlegen={k.istInhaber}
+                onAendern={(id, neu) => {
+                  setRoutenEbeneId(id);
+                  setNeueRoutenEbene(neu);
+                }}
+              />
+            )}
             {ziel === 'einrichtungen' && (
               <Auswahl label="Art der Einrichtungen" value={typ} onChange={(e) => setTyp(e.target.value as Enums<'einrichtung_typ'>)}>
                 <EinrichtungsOptionen />
@@ -376,7 +405,7 @@ export function Geoimport({ k }: { k: RevierKontext }) {
               )}
               <Knopf
                 variante="akzent"
-                disabled={laeuft || (ziel === 'grenze' && hatGrenze && !ersetzen)}
+                disabled={laeuft || (ziel === 'grenze' && hatGrenze && !ersetzen) || ebeneUngueltig(routenEbeneId, neueRoutenEbene)}
                 onClick={() => void importieren()}
               >
                 {laeuft

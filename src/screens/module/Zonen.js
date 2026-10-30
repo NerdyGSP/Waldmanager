@@ -4,10 +4,16 @@ import { supabase } from '../../lib/supabase';
 import { fehlertext } from '../../lib/fehler';
 import { nameVergeben, useZonen, useZonenEbenen, zufallsFarben, ZONENFARBEN } from '../../lib/stammdaten';
 import { navigieren } from '../../lib/router';
-import { Auswahl, Farbwahl, Feld, Gruppe, Hinweis, Knopf, Leer, Seite, Zeile } from '../../components/ui';
+import { Auswahl, Farbwahl, Feld, Gruppe, Hinweis, Knopf, Leer, Segmente, Seite, Zeile } from '../../components/ui';
 import { Symbol } from '../../components/symbole';
 import { AufteilenDialog } from './AufteilenDialog';
-export function Zonen({ k }) {
+import { Routen } from './Routen';
+// Modul „Zonen & Routen“: Umschalter oben, darunter Zonen (wie bisher) oder Routen
+export function Zonen({ k, unterpfad = [] }) {
+    const routen = unterpfad[0] === 'routen';
+    return (_jsxs(Seite, { titel: "Zonen & Routen", untertitel: routen ? 'Routenebenen und Routen · Farbe je Route über den Farbpunkt' : 'Erfassungszonen und individuelle Zonenebenen · Farbe je Zone über den Farbpunkt', children: [_jsx(Segmente, { label: "Ansicht", optionen: [{ wert: 'zonen', label: 'Zonen' }, { wert: 'routen', label: 'Routen' }], wert: routen ? 'routen' : 'zonen', onAendern: (w) => navigieren(w === 'routen' ? '/zonen/routen' : '/zonen') }), routen ? _jsx(Routen, { k: k }) : _jsx(ZonenListe, { k: k })] }));
+}
+function ZonenListe({ k }) {
     const { zonen, laedt, laden } = useZonen(k.revierId);
     const { ebenen, laden: ebenenLaden } = useZonenEbenen(k.revierId);
     const [fehler, setFehler] = useState(null);
@@ -103,7 +109,7 @@ export function Zonen({ k }) {
         setFehler(error ? fehlertext(error) : null);
         await laden();
     }
-    return (_jsxs(Seite, { titel: "Zonen", untertitel: "Erfassungszonen und individuelle Zonenebenen \u00B7 Farbe je Zone \u00FCber den Farbpunkt", children: [fehler && _jsx(Hinweis, { art: "fehler", children: fehler }), gruppen.length > 1 && (_jsxs("div", { className: "zonen-alle", children: [_jsx("button", { className: "link", onClick: () => setZu(new Set()), children: "Alle aufklappen" }), _jsx("button", { className: "link", onClick: () => setZu(new Set(gruppen.map((g) => g.ebene?.id ?? 'ohne'))), children: "Alle zuklappen" })] })), gruppen.map(({ ebene, zonen: liste }) => {
+    return (_jsxs(_Fragment, { children: [fehler && _jsx(Hinweis, { art: "fehler", children: fehler }), gruppen.length > 1 && (_jsxs("div", { className: "zonen-alle", children: [_jsx("button", { className: "link", onClick: () => setZu(new Set()), children: "Alle aufklappen" }), _jsx("button", { className: "link", onClick: () => setZu(new Set(gruppen.map((g) => g.ebene?.id ?? 'ohne'))), children: "Alle zuklappen" })] })), gruppen.map(({ ebene, zonen: liste }) => {
                 const gid = ebene?.id ?? 'ohne';
                 const offen = !zu.has(gid);
                 return (_jsxs("section", { className: "gruppe", children: [_jsxs("div", { className: "gruppe-kopf", children: [_jsxs("button", { className: "gruppe-toggle", "aria-expanded": offen, onClick: () => umschalten(gid), children: [_jsx("span", { "aria-hidden": "true", children: _jsx(Symbol, { name: offen ? 'runter' : 'ausklappen', className: "symbol klein" }) }), ebene && _jsx("i", { className: "farbpunkt", style: { background: ebene.farbe ?? 'var(--text-leise)' } }), _jsx("span", { className: "gruppe-titel", style: { margin: 0 }, children: `${ebene ? ebene.name : ebenen.length ? 'Ohne Ebene' : 'Zonen'} · ${liste.length}` })] }), k.istInhaber && liste.length > 0 && (_jsx("button", { className: "link", onClick: () => void zufallsfarben(liste), title: "Weist jeder Zone dieser Ebene eine andere, zuf\u00E4llige Farbe zu", children: "Zufallsfarben" }))] }), offen && _jsxs("div", { className: "gruppe-inhalt", children: [!laedt && liste.length === 0 && _jsx(Zeile, { label: "Noch keine Zonen in dieser Ebene" }), liste.map((z, i) => (_jsx(Zeile, { label: _jsxs("span", { className: "zone-name", children: [k.istInhaber ? (_jsx(Farbwahl, { wert: z.farbe ?? ebene?.farbe ?? '#1e5c3a', label: `Farbe der Zone ${z.name}`, onAendern: (f) => void farbeSetzen(z, f) })) : (_jsx("i", { className: "farbpunkt", style: { background: z.farbe ?? ebene?.farbe ?? 'var(--akzent)' } })), z.name, _jsx("small", { children: z.hatGeometrie ? 'Fläche gezeichnet' : 'ohne Fläche' })] }), children: k.istInhaber && (_jsxs("span", { className: "zeile-aktionen", children: [ebenen.length > 0 && (_jsxs("select", { className: "zeile-auswahl", "aria-label": `Ebene von ${z.name}`, value: z.ebeneId ?? '', onChange: (e) => ebeneZuweisen(z, e.target.value), children: [_jsx("option", { value: "", children: "Ohne Ebene" }), ebenen.map((e) => (_jsx("option", { value: e.id, children: e.name }, e.id)))] })), _jsx("button", { className: "link", onClick: () => verschieben(liste, i, -1), disabled: i === 0, "aria-label": "Nach oben", children: "\u2191" }), _jsx("button", { className: "link", onClick: () => verschieben(liste, i, 1), disabled: i === liste.length - 1, "aria-label": "Nach unten", children: "\u2193" }), _jsx("button", { className: "link", onClick: () => umbenennen(z), children: "Umbenennen" }), _jsx("button", { className: "link gefahr", onClick: () => entfernen(z), children: "Entfernen" })] })) }, z.id)))] })] }, gid));

@@ -8,7 +8,8 @@ const ARTEN = [
     { id: 'zonen', tabelle: 'zonen', titel: 'Zonen', hinweis: 'Zählwerte, Beobachtungen, Abschüsse und Wildschäden bleiben erhalten, verlieren aber ihre Zonenzuordnung.' },
     { id: 'ebenen', tabelle: 'zonen_ebenen', titel: 'Zonenebenen', hinweis: 'Die Ebene früherer Zählungen entfällt.' },
     { id: 'einrichtungen', tabelle: 'einrichtungen', titel: 'Einrichtungen', hinweis: 'Verknüpfungen in Abschüssen und Aufgaben werden entfernt.' },
-    { id: 'pirschwege', tabelle: 'pirschwege', titel: 'Pirschwege', hinweis: '' },
+    { id: 'pirschwege', tabelle: 'pirschwege', titel: 'Routen (Pirschwege, WTE- und Treiberrouten)', hinweis: '' },
+    { id: 'routenebenen', tabelle: 'routen_ebenen', titel: 'Routenebenen', hinweis: 'Die Routen darin bleiben ohne Ebene erhalten; „Routen“ zusätzlich auswählen, um sie samt Ebene zu löschen.' },
 ];
 // Nur für Inhaber: Karten- und Flächendaten eines Reviers vollständig entfernen (z. B. vor einem neuen Import)
 export function RevierdatenLoeschen({ revierId, onGeaendert }) {
@@ -40,7 +41,7 @@ export function RevierdatenLoeschen({ revierId, onGeaendert }) {
         setMeldung(null);
         const geloescht = [];
         try {
-            // Zonen vor Ebenen, damit nichts mehr auf eine Ebene zeigt
+            // Zonen vor Ebenen und Routen vor Routenebenen, damit nichts mehr auf eine Ebene zeigt
             for (const a of ARTEN.filter((x) => auswahl.has(x.id))) {
                 const { error, count } = await supabase.from(a.tabelle).delete({ count: 'exact' }).eq('revier_id', revierId);
                 if (error)

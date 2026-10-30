@@ -1,4 +1,6 @@
 import { jsxs as _jsxs, jsx as _jsx, Fragment as _Fragment } from "react/jsx-runtime";
+import { useRoutenEbenen, ebeneBereitstellen } from '../../lib/routen';
+import { RoutenEbenenWahl, ebeneUngueltig } from '../../components/RoutenEbenenWahl';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { LngLatBounds, Map as KarteMap, setWorkerUrl } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -40,6 +42,7 @@ export function GpsImport({ k, onZu, onFertig, standardSitzungId }) {
     const [jagdId, setJagdId] = useState('');
     const [sitzungId, setSitzungId] = useState(standardSitzungId ?? '');
     const [speichert, setSpeichert] = useState(false);
+    const { ebenen: routenEbenen } = useRoutenEbenen(k.revierId);
     useEffect(() => {
         void supabase.rpc('karte_daten', { p_revier_id: k.revierId, p_tage: 1 }).then(({ data }) => {
             setGrenze(data?.grenze ?? null);
@@ -72,6 +75,8 @@ export function GpsImport({ k, onZu, onFertig, standardSitzungId }) {
                 ziel,
                 bemerkung: '',
                 mitDatum: false,
+                ebene: '',
+                neueEbene: '',
             })));
             setSchritt(2);
         }
@@ -157,6 +162,7 @@ export function GpsImport({ k, onZu, onFertig, standardSitzungId }) {
         setSpeichert(true);
         try {
             let n = 0;
+            const ebenenCache = new Map();
             for (const [i, z] of zeilen.entries()) {
                 const r = reduziert[i];
                 const b = berichte[i];
@@ -164,8 +170,10 @@ export function GpsImport({ k, onZu, onFertig, standardSitzungId }) {
                     continue;
                 const datum = z.mitDatum && b.von ? `Aufgezeichnet am ${datumDE(new Date(b.von).toLocaleDateString('sv-SE'))}` : '';
                 const bem = [z.bemerkung.trim(), datum].filter(Boolean).join(' · ');
+                const ebeneId = await ebeneBereitstellen(k.revierId, z.ziel, z.ebene, z.neueEbene, routenEbenen, ebenenCache);
                 const { error } = await supabase.from('pirschwege').insert({
                     revier_id: k.revierId,
+                    ebene_id: ebeneId,
                     name: z.name.trim(),
                     bemerkung: bem || null,
                     typ: z.ziel,
@@ -202,6 +210,6 @@ export function GpsImport({ k, onZu, onFertig, standardSitzungId }) {
                                 return null;
                             const f = fehlerzeile(z, i);
                             const b = berichte[i];
-                            return (_jsxs("div", { className: "gruppe", style: { padding: 10 }, children: [_jsx(Feld, { label: "Name", value: z.name, onChange: (e) => setZeilen(zeilen.map((x, j) => (j === i ? { ...x, name: e.target.value } : x))) }), f && _jsx(Hinweis, { art: "fehler", children: f }), _jsx(Auswahl, { label: "Als", value: z.ziel, onChange: (e) => setZeilen(zeilen.map((x, j) => (j === i ? { ...x, ziel: e.target.value } : x))), children: ziele.map((x) => (_jsx("option", { value: x.z, children: x.name }, x.z))) }), _jsx(Feld, { label: "Bemerkung (optional)", value: z.bemerkung, onChange: (e) => setZeilen(zeilen.map((x, j) => (j === i ? { ...x, bemerkung: e.target.value } : x))) }), b.von !== null && (_jsxs("label", { style: { display: 'flex', gap: 8, alignItems: 'center' }, children: [_jsx("input", { type: "checkbox", checked: z.mitDatum, onChange: (e) => setZeilen(zeilen.map((x, j) => (j === i ? { ...x, mitDatum: e.target.checked } : x))) }), "Aufzeichnungsdatum (", datumDE(new Date(b.von).toLocaleDateString('sv-SE')), ") in der Bemerkung vermerken"] }))] }, i));
-                        }), zeilen.some((z) => z.an && z.ziel === 'treiberroute') && (_jsxs(Auswahl, { label: "Bewegungsjagd (optional)", value: jagdId, onChange: (e) => setJagdId(e.target.value), children: [_jsx("option", { value: "", children: "\u2013 keine, revierweit \u2013" }), jagden.map((j) => (_jsxs("option", { value: j.id, children: [j.titel, j.datum ? ` (${datumDE(j.datum)})` : ''] }, j.id)))] })), zeilen.some((z) => z.an && z.ziel === 'wte_route') && (_jsxs(Auswahl, { label: "Z\u00E4hlung (optional)", value: sitzungId, onChange: (e) => setSitzungId(e.target.value), children: [_jsx("option", { value: "", children: "\u2013 keine \u2013" }), sitzungen.map((s) => (_jsxs("option", { value: s.id, children: ["Z\u00E4hlung vom ", datumDE(s.datum)] }, s.id)))] })), _jsxs("div", { style: { display: 'flex', gap: 8, flexWrap: 'wrap' }, children: [_jsx(Knopf, { variante: "ghost", onClick: () => setSchritt(2), children: "Zur\u00FCck" }), _jsx(Knopf, { variante: "akzent", disabled: speichert || zeilen.some((z, i) => fehlerzeile(z, i)), onClick: () => void speichern(), children: speichert ? 'Speichern …' : 'Speichern' })] })] })), _jsx(Knopf, { variante: "ghost", onClick: onZu, disabled: speichert, children: "Abbrechen" })] }) }));
+                            return (_jsxs("div", { className: "gruppe", style: { padding: 10 }, children: [_jsx(Feld, { label: "Name", value: z.name, onChange: (e) => setZeilen(zeilen.map((x, j) => (j === i ? { ...x, name: e.target.value } : x))) }), f && _jsx(Hinweis, { art: "fehler", children: f }), _jsx(Auswahl, { label: "Als", value: z.ziel, onChange: (e) => setZeilen(zeilen.map((x, j) => (j === i ? { ...x, ziel: e.target.value, ebene: '', neueEbene: '' } : x))), children: ziele.map((x) => (_jsx("option", { value: x.z, children: x.name }, x.z))) }), _jsx(RoutenEbenenWahl, { typ: z.ziel, ebenen: routenEbenen, ebeneId: z.ebene, neuerName: z.neueEbene, darfAnlegen: k.istInhaber, onAendern: (ebene, neueEbene) => setZeilen(zeilen.map((x, j) => (j === i ? { ...x, ebene, neueEbene } : x))) }), _jsx(Feld, { label: "Bemerkung (optional)", value: z.bemerkung, onChange: (e) => setZeilen(zeilen.map((x, j) => (j === i ? { ...x, bemerkung: e.target.value } : x))) }), b.von !== null && (_jsxs("label", { style: { display: 'flex', gap: 8, alignItems: 'center' }, children: [_jsx("input", { type: "checkbox", checked: z.mitDatum, onChange: (e) => setZeilen(zeilen.map((x, j) => (j === i ? { ...x, mitDatum: e.target.checked } : x))) }), "Aufzeichnungsdatum (", datumDE(new Date(b.von).toLocaleDateString('sv-SE')), ") in der Bemerkung vermerken"] }))] }, i));
+                        }), zeilen.some((z) => z.an && z.ziel === 'treiberroute') && (_jsxs(Auswahl, { label: "Bewegungsjagd (optional)", value: jagdId, onChange: (e) => setJagdId(e.target.value), children: [_jsx("option", { value: "", children: "\u2013 keine, revierweit \u2013" }), jagden.map((j) => (_jsxs("option", { value: j.id, children: [j.titel, j.datum ? ` (${datumDE(j.datum)})` : ''] }, j.id)))] })), zeilen.some((z) => z.an && z.ziel === 'wte_route') && (_jsxs(Auswahl, { label: "Z\u00E4hlung (optional)", value: sitzungId, onChange: (e) => setSitzungId(e.target.value), children: [_jsx("option", { value: "", children: "\u2013 keine \u2013" }), sitzungen.map((s) => (_jsxs("option", { value: s.id, children: ["Z\u00E4hlung vom ", datumDE(s.datum)] }, s.id)))] })), _jsxs("div", { style: { display: 'flex', gap: 8, flexWrap: 'wrap' }, children: [_jsx(Knopf, { variante: "ghost", onClick: () => setSchritt(2), children: "Zur\u00FCck" }), _jsx(Knopf, { variante: "akzent", disabled: speichert || zeilen.some((z, i) => fehlerzeile(z, i) || (z.an && ebeneUngueltig(z.ebene, z.neueEbene))), onClick: () => void speichern(), children: speichert ? 'Speichern …' : 'Speichern' })] })] })), _jsx(Knopf, { variante: "ghost", onClick: onZu, disabled: speichert, children: "Abbrechen" })] }) }));
 }

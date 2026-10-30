@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { datumDE } from '../../lib/zeit';
 import { nameVergeben, ZONENFARBEN, type Zone } from '../../lib/stammdaten';
+import { freierName, routenTypLabel, type RoutenEbene } from '../../lib/routen';
 import { Auswahl, Farbwahl, Feld, Hinweis, Knopf } from '../../components/ui';
 
 export type SheetArt = 'grenze' | 'zone' | 'pirschweg' | 'treiberroute' | 'wte_route';
@@ -14,6 +15,9 @@ export type SheetWerte = {
   wteAktiv: boolean;
   bewegungsjagdId: string;
   sitzungId: string;
+  /** Routen: Zielebene (leer = ohne Ebene) oder Name einer neu anzulegenden Ebene */
+  routenEbeneId: string;
+  neueEbeneName: string;
 };
 type Ebene = { id: string; name: string; farbe: string | null; wte_aktiv?: boolean };
 
@@ -39,6 +43,9 @@ export function ZeichnenSheet({
   onSpeichern,
   onAbbrechen,
   standardSitzungId,
+  routenEbenen = [],
+  routenNamen = [],
+  darfEbenenAnlegen = false,
 }: {
   art: SheetArt;
   revierId: string;
@@ -51,8 +58,13 @@ export function ZeichnenSheet({
   onSpeichern: (w: SheetWerte) => void;
   onAbbrechen: () => void;
   standardSitzungId?: string | null; // laufende WTE: WTE-Routen werden ihr automatisch zugeordnet
+  routenEbenen?: RoutenEbene[];
+  routenNamen?: string[];
+  darfEbenenAnlegen?: boolean;
 }) {
-  const [name, setName] = useState(art === 'zone' ? `Zone ${zonen.length + 1}` : art === 'grenze' ? '' : STANDARDNAME[art]);
+  const [name, setName] = useState(art === 'zone' ? `Zone ${zonen.length + 1}` : art === 'grenze' ? '' : freierName(routenNamen, STANDARDNAME[art]));
+  const [routenEbeneId, setRoutenEbeneId] = useState('');
+  const [neueEbeneName, setNeueEbeneName] = useState('');
   const [bemerkung, setBemerkung] = useState('');
   const [zoneId, setZoneId] = useState<string>('');
   const [ebeneId, setEbeneId] = useState('');
@@ -81,7 +93,17 @@ export function ZeichnenSheet({
   const ebene = ebenen.find((e) => e.id === ebeneId);
   const neueZone = art === 'zone' && !zoneId;
   const doppelt = neueZone && nameVergeben(zonen.map((z) => z.name), name);
-  const gueltig = art === 'grenze' ? !hatGrenze || bestaetigt : art === 'zone' ? (!!zoneId || (!!name.trim() && !doppelt)) : !!name.trim();
+  const istRoute = art === 'pirschweg' || art === 'treiberroute' || art === 'wte_route';
+  const passendeEbenen = istRoute ? routenEbenen.filter((e) => e.typ === art) : [];
+  const routeDoppelt = istRoute && nameVergeben(routenNamen, name);
+  const ebeneNeu = routenEbeneId === '__neu';
+  const neueEbeneDoppelt = ebeneNeu && !!neueEbeneName.trim() && nameVergeben(routenEbenen.map((e) => e.name), neueEbeneName);
+  const gueltig =
+    art === 'grenze'
+      ? !hatGrenze || bestaetigt
+      : art === 'zone'
+        ? !!zoneId || (!!name.trim() && !doppelt)
+        : !!name.trim() && !routeDoppelt && (!ebeneNeu || (!!neueEbeneName.trim() && !neueEbeneDoppelt));
 
   return (
     <div className="wte-sheet zeichnen-sheet" role="dialog" aria-modal="false" aria-label={TITEL[art]}>
@@ -175,6 +197,24 @@ export function ZeichnenSheet({
               ))}
             </Auswahl>
           )}
+          {routeDoppelt && <Hinweis art="fehler">Eine Route „{name.trim()}“ gibt es in diesem Revier bereits.</Hinweis>}
+          {(passendeEbenen.length > 0 || darfEbenenAnlegen) && (
+            <Auswahl label={`Ebene (${routenTypLabel(art)})`} value={routenEbeneId} onChange={(e) => setRoutenEbeneId(e.target.value)}>
+              <option value="">Ohne Ebene</option>
+              {passendeEbenen.map((x) => (
+                <option key={x.id} value={x.id}>
+                  {x.name}
+                </option>
+              ))}
+              {darfEbenenAnlegen && <option value="__neu">+ Neue Ebene anlegen …</option>}
+            </Auswahl>
+          )}
+          {ebeneNeu && (
+            <>
+              <Feld label="Name der neuen Ebene" value={neueEbeneName} onChange={(e) => setNeueEbeneName(e.target.value)} />
+              {neueEbeneDoppelt && <Hinweis art="fehler">Eine Ebene „{neueEbeneName.trim()}“ gibt es bereits.</Hinweis>}
+            </>
+          )}
           <Feld label="Bemerkung (optional)" value={bemerkung} onChange={(e) => setBemerkung(e.target.value)} />
         </>
       )}
@@ -187,7 +227,7 @@ export function ZeichnenSheet({
         <Knopf
           variante="akzent"
           disabled={speichert || !gueltig}
-          onClick={() => onSpeichern({ name: name.trim(), bemerkung: bemerkung.trim(), zoneId: zoneId || null, ebeneId, farbe, wteAktiv, bewegungsjagdId, sitzungId })}
+          onClick={() => onSpeichern({ name: name.trim(), bemerkung: bemerkung.trim(), zoneId: zoneId || null, ebeneId, farbe, wteAktiv, bewegungsjagdId, sitzungId, routenEbeneId: ebeneNeu ? '' : routenEbeneId, neueEbeneName: ebeneNeu ? neueEbeneName.trim() : '' })}
         >
           {speichert ? 'Speichere …' : 'Speichern'}
         </Knopf>

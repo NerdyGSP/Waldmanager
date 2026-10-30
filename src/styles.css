@@ -1001,3 +1001,5 @@ button.kachel:active { transform: none; }
 .einr-tab th button { border: 0; background: none; font: inherit; font-weight: 600; cursor: pointer; padding: 0; color: inherit; }
 .einr-tab td.aktion { white-space: nowrap; }
 .einr-tab td.aktion button { margin-right: 4px; }
+.routen-unterebene { display: grid; gap: 2px; }
+.routen-unterebene input[type=range] { width: 100%; }

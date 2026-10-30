@@ -43,7 +43,7 @@ const MODULE = [
   { pfad: 'bewegungsjagd', titel: 'Bewegungsjagd', text: 'Einladen, Zu- und Absagen, Stände zuweisen', symbol: '🦌' },
   { pfad: 'begehungsscheine', titel: 'Begehungsscheine', text: 'Gastjäger-Scheine ausstellen und prüfen', symbol: '📄' },
   { pfad: 'monitoring', titel: 'Monitoring', text: 'Statistik und Quervergleich im Hegering', symbol: '📈' },
-  { pfad: 'zonen', titel: 'Zonen', text: 'Erfassungszonen anlegen und ordnen', symbol: '▦' },
+  { pfad: 'zonen', titel: 'Zonen & Routen', text: 'Erfassungszonen, Routen und Ebenen anlegen und ordnen', symbol: '▦' },
   { pfad: 'jagdzeiten', titel: 'Jagdzeiten', text: 'Was ist heute jagdbar? Zeiten und Sonderregeln je Wildart', symbol: '' },
   { pfad: 'freigaben', titel: 'Freigaben', text: 'Wildarten für den Quervergleich freigeben', symbol: '🤝' },
   { pfad: 'import', titel: 'Datenimport', text: 'Historische Zählungen und Abschüsse aus CSV', symbol: '⬆️' },
@@ -205,7 +205,7 @@ const NAVIGATION = [
   { pfad: 'bewegungsjagd', titel: 'Bewegungsjagd' },
   { pfad: 'begehungsscheine', titel: 'Begehungsscheine' },
   { pfad: 'monitoring', titel: 'Monitoring' },
-  { pfad: 'zonen', titel: 'Zonen' },
+  { pfad: 'zonen', titel: 'Zonen & Routen' },
   { pfad: 'jagdzeiten', titel: 'Jagdzeiten' },
   { pfad: 'freigaben', titel: 'Freigaben' },
   { pfad: 'import', titel: 'Datenimport' },
@@ -392,7 +392,7 @@ function ModulInhalt({ modul, unterpfad, k, breit = false }: { modul: string; un
     case 'freigaben':
       return <Freigaben k={k} />;
     case 'zonen':
-      return <Zonen k={k} />;
+      return <Zonen k={k} unterpfad={unterpfad} />;
     case 'abschuesse':
       return <Abschuesse k={k} unterpfad={unterpfad} />;
     case 'erfassung':

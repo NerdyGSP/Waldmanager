@@ -1,3 +1,5 @@
+import { useRoutenEbenen, ebeneBereitstellen } from '../../lib/routen';
+import { RoutenEbenenWahl, ebeneUngueltig } from '../../components/RoutenEbenenWahl';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { LngLatBounds, Map as KarteMap, setWorkerUrl, type GeoJSONSource, type StyleSpecification } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -28,7 +30,7 @@ const km = (m: number) => `${(m / 1000).toLocaleString('de-DE', { minimumFractio
 const uhr = (t: number) => new Date(t).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' });
 const zahl = (n: number) => n.toLocaleString('de-DE');
 
-type Auswahlzeile = { an: boolean; name: string; ziel: GpsZiel; bemerkung: string; mitDatum: boolean };
+type Auswahlzeile = { an: boolean; name: string; ziel: GpsZiel; bemerkung: string; mitDatum: boolean; ebene: string; neueEbene: string };
 
 // GPS-Datei einer Smartwatch (GPX, KML, KMZ, FIT) übernehmen: 1. Datei und Ziel, 2. Prüfbericht und Punktreduktion, 3. Benennung
 export function GpsImport({ k, onZu, onFertig, standardSitzungId }: { k: RevierKontext; onZu: () => void; onFertig: (text: string) => void; standardSitzungId?: string | null }) {
@@ -50,6 +52,7 @@ export function GpsImport({ k, onZu, onFertig, standardSitzungId }: { k: RevierK
   const [jagdId, setJagdId] = useState('');
   const [sitzungId, setSitzungId] = useState(standardSitzungId ?? '');
   const [speichert, setSpeichert] = useState(false);
+  const { ebenen: routenEbenen } = useRoutenEbenen(k.revierId);
 
   useEffect(() => {
     void supabase.rpc('karte_daten', { p_revier_id: k.revierId, p_tage: 1 }).then(({ data }) => {
@@ -83,6 +86,8 @@ export function GpsImport({ k, onZu, onFertig, standardSitzungId }: { k: RevierK
           ziel,
           bemerkung: '',
           mitDatum: false,
+          ebene: '',
+          neueEbene: '',
         })),
       );
       setSchritt(2);
@@ -165,14 +170,17 @@ export function GpsImport({ k, onZu, onFertig, standardSitzungId }: { k: RevierK
     setSpeichert(true);
     try {
       let n = 0;
+      const ebenenCache = new Map<string, string>();
       for (const [i, z] of zeilen.entries()) {
         const r = reduziert[i];
         const b = berichte[i];
         if (!z.an || !r || !b) continue;
         const datum = z.mitDatum && b.von ? `Aufgezeichnet am ${datumDE(new Date(b.von).toLocaleDateString('sv-SE'))}` : '';
         const bem = [z.bemerkung.trim(), datum].filter(Boolean).join(' · ');
+        const ebeneId = await ebeneBereitstellen(k.revierId, z.ziel, z.ebene, z.neueEbene, routenEbenen, ebenenCache);
         const { error } = await supabase.from('pirschwege').insert({
           revier_id: k.revierId,
+          ebene_id: ebeneId,
           name: z.name.trim(),
           bemerkung: bem || null,
           typ: z.ziel,
@@ -305,13 +313,14 @@ export function GpsImport({ k, onZu, onFertig, standardSitzungId }: { k: RevierK
                 <div key={i} className="gruppe" style={{ padding: 10 }}>
                   <Feld label="Name" value={z.name} onChange={(e) => setZeilen(zeilen.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} />
                   {f && <Hinweis art="fehler">{f}</Hinweis>}
-                  <Auswahl label="Als" value={z.ziel} onChange={(e) => setZeilen(zeilen.map((x, j) => (j === i ? { ...x, ziel: e.target.value as GpsZiel } : x)))}>
+                  <Auswahl label="Als" value={z.ziel} onChange={(e) => setZeilen(zeilen.map((x, j) => (j === i ? { ...x, ziel: e.target.value as GpsZiel, ebene: '', neueEbene: '' } : x)))}>
                     {ziele.map((x) => (
                       <option key={x.z} value={x.z}>
                         {x.name}
                       </option>
                     ))}
                   </Auswahl>
+                  <RoutenEbenenWahl typ={z.ziel} ebenen={routenEbenen} ebeneId={z.ebene} neuerName={z.neueEbene} darfAnlegen={k.istInhaber} onAendern={(ebene, neueEbene) => setZeilen(zeilen.map((x, j) => (j === i ? { ...x, ebene, neueEbene } : x)))} />
                   <Feld label="Bemerkung (optional)" value={z.bemerkung} onChange={(e) => setZeilen(zeilen.map((x, j) => (j === i ? { ...x, bemerkung: e.target.value } : x)))} />
                   {b.von !== null && (
                     <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -347,7 +356,7 @@ export function GpsImport({ k, onZu, onFertig, standardSitzungId }: { k: RevierK
               <Knopf variante="ghost" onClick={() => setSchritt(2)}>
                 Zurück
               </Knopf>
-              <Knopf variante="akzent" disabled={speichert || zeilen.some((z, i) => fehlerzeile(z, i))} onClick={() => void speichern()}>
+              <Knopf variante="akzent" disabled={speichert || zeilen.some((z, i) => fehlerzeile(z, i) || (z.an && ebeneUngueltig(z.ebene, z.neueEbene)))} onClick={() => void speichern()}>
                 {speichert ? 'Speichern …' : 'Speichern'}
               </Knopf>
             </div>

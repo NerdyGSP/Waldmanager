@@ -3,12 +3,29 @@ import { supabase } from '../../lib/supabase';
 import { fehlertext } from '../../lib/fehler';
 import { nameVergeben, useZonen, useZonenEbenen, zufallsFarben, ZONENFARBEN, type Zone, type ZonenEbene } from '../../lib/stammdaten';
 import { navigieren } from '../../lib/router';
-import { Auswahl, Farbwahl, Feld, Gruppe, Hinweis, Knopf, Leer, Seite, Zeile } from '../../components/ui';
+import { Auswahl, Farbwahl, Feld, Gruppe, Hinweis, Knopf, Leer, Segmente, Seite, Zeile } from '../../components/ui';
 import type { RevierKontext } from './kontext';
 import { Symbol } from '../../components/symbole';
 import { AufteilenDialog } from './AufteilenDialog';
+import { Routen } from './Routen';
 
-export function Zonen({ k }: { k: RevierKontext }) {
+// Modul „Zonen & Routen“: Umschalter oben, darunter Zonen (wie bisher) oder Routen
+export function Zonen({ k, unterpfad = [] }: { k: RevierKontext; unterpfad?: string[] }) {
+  const routen = unterpfad[0] === 'routen';
+  return (
+    <Seite titel="Zonen & Routen" untertitel={routen ? 'Routenebenen und Routen · Farbe je Route über den Farbpunkt' : 'Erfassungszonen und individuelle Zonenebenen · Farbe je Zone über den Farbpunkt'}>
+      <Segmente<'zonen' | 'routen'>
+        label="Ansicht"
+        optionen={[{ wert: 'zonen', label: 'Zonen' }, { wert: 'routen', label: 'Routen' }]}
+        wert={routen ? 'routen' : 'zonen'}
+        onAendern={(w) => navigieren(w === 'routen' ? '/zonen/routen' : '/zonen')}
+      />
+      {routen ? <Routen k={k} /> : <ZonenListe k={k} />}
+    </Seite>
+  );
+}
+
+function ZonenListe({ k }: { k: RevierKontext }) {
   const { zonen, laedt, laden } = useZonen(k.revierId);
   const { ebenen, laden: ebenenLaden } = useZonenEbenen(k.revierId);
   const [fehler, setFehler] = useState<string | null>(null);
@@ -107,7 +124,7 @@ export function Zonen({ k }: { k: RevierKontext }) {
   }
 
   return (
-    <Seite titel="Zonen" untertitel="Erfassungszonen und individuelle Zonenebenen · Farbe je Zone über den Farbpunkt">
+    <>
       {fehler && <Hinweis art="fehler">{fehler}</Hinweis>}
 
       {gruppen.length > 1 && (
@@ -216,7 +233,7 @@ export function Zonen({ k }: { k: RevierKontext }) {
         </Knopf>
       )}
       {aufteilen && <AufteilenDialog revierId={k.revierId} onZu={() => setAufteilen(false)} onAngelegt={alleNeuLaden} />}
-    </Seite>
+    </>
   );
 }
 

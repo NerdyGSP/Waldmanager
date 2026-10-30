@@ -1,4 +1,6 @@
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
+import { useRoutenEbenen, ebeneBereitstellen, freierName } from '../../lib/routen';
+import { RoutenEbenenWahl, ebeneUngueltig } from '../../components/RoutenEbenenWahl';
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { fehlertext } from '../../lib/fehler';
@@ -37,6 +39,13 @@ export function Geoimport({ k }) {
     const [schichtNr, setSchichtNr] = useState(0);
     const [namensfeld, setNamensfeld] = useState('');
     const [ebeneId, setEbeneId] = useState('');
+    const [routenEbeneId, setRoutenEbeneId] = useState('');
+    const [neueRoutenEbene, setNeueRoutenEbene] = useState('');
+    const { ebenen: routenEbenen } = useRoutenEbenen(k.revierId);
+    useEffect(() => {
+        setRoutenEbeneId('');
+        setNeueRoutenEbene('');
+    }, [ziel]);
     const [typ, setTyp] = useState('hochsitz');
     const [hatGrenze, setHatGrenze] = useState(false);
     const [ersetzen, setErsetzen] = useState(false);
@@ -73,6 +82,8 @@ export function Geoimport({ k }) {
         setFehler(null);
         setSchichtNr(0);
         setErsetzen(false);
+        setRoutenEbeneId('');
+        setNeueRoutenEbene('');
     }
     async function dateiWaehlen(datei) {
         zuruecksetzen(true);
@@ -198,11 +209,16 @@ export function Geoimport({ k }) {
                 const routeTyp = ziel === 'treiberrouten' ? 'treiberroute' : ziel === 'wte_routen' ? 'wte_route' : 'pirschweg';
                 const routeName = ziel === 'treiberrouten' ? 'Treiberroute' : ziel === 'wte_routen' ? 'WTE-Route' : 'Pirschweg';
                 const zeilen = [];
+                const { data: belegt } = await supabase.from('pirschwege').select('name').eq('revier_id', k.revierId).is('geloescht_am', null);
+                const namen = (belegt ?? []).map((x) => x.name);
+                const zielEbene = await ebeneBereitstellen(k.revierId, routeTyp, routenEbeneId, neueRoutenEbene, routenEbenen, new Map());
                 for (const f of passend) {
                     for (const g of einzelteile(f, ziel)) {
                         const nr = zeilen.length + 1;
-                        const name = nameVon(f, `${routeName} ${nr}`);
-                        zeilen.push({ revier_id: k.revierId, name, typ: routeTyp, geom: linieEWKT(g.coordinates) });
+                        // Routennamen sind je Revier eindeutig: bei Doppelungen wird eine Nummer angehängt
+                        const name = freierName(namen, nameVon(f, `${routeName} ${nr}`));
+                        namen.push(name);
+                        zeilen.push({ revier_id: k.revierId, name, typ: routeTyp, ebene_id: zielEbene, geom: linieEWKT(g.coordinates) });
                     }
                 }
                 for (const teil of stuecke(zeilen, 100)) {
@@ -233,7 +249,10 @@ export function Geoimport({ k }) {
                                 e.target.value = '';
                             } })] }) })), pruefung && (_jsx(Gruppe, { titel: fehler || hatFehler ? 'Prüfbericht – Import nicht möglich' : 'Prüfbericht', children: _jsx("ul", { className: "pruefbericht", children: pruefung.map((p, i) => (_jsxs("li", { className: `pruef-${p.status}`, children: [_jsx("span", { "aria-hidden": "true", children: SYMBOL[p.status] }), _jsx("span", { children: p.text })] }, i))) }) })), fehler && pruefung && (_jsxs(_Fragment, { children: [_jsxs(Hinweis, { art: "fehler", children: [fehler, " Bitte exportiere die Daten erneut aus dem GIS oder w\u00E4hle eine andere Datei."] }), _jsx(Knopf, { variante: "sekundaer", onClick: () => zuruecksetzen(true), children: "Andere Datei w\u00E4hlen" })] })), einlesung && schicht && ziel && (_jsxs(_Fragment, { children: [_jsxs(Gruppe, { titel: `3 · ${zielInfo?.titel} aus „${einlesung.dateiname}“`, children: [einlesung.schichten.length > 1 && (_jsx(Auswahl, { label: "Ebene in der Datei", value: schichtNr, onChange: (e) => schichtWechseln(Number(e.target.value)), children: einlesung.schichten.map((s, i) => (_jsxs("option", { value: i, children: [s.name, " (", s.features.length, ")"] }, s.name))) })), _jsx("div", { className: "zeile", children: _jsxs("span", { className: "zeile-label", children: ["Enthaltene Geometrien", _jsx("small", { children: Object.entries(schicht.geometrietypen)
                                                 .map(([t, n]) => `${n.toLocaleString('de-DE')} × ${ARTEN[t] ?? t}`)
-                                                .join(' · ') })] }) }), (ziel === 'zonen' || ziel === 'einrichtungen' || ziel === 'pirschwege' || ziel === 'treiberrouten' || ziel === 'wte_routen') && schicht.felder.length > 0 && (_jsxs(Auswahl, { label: ziel === 'zonen' ? 'Zonenname aus Feld' : ziel === 'einrichtungen' ? 'Name aus Feld' : 'Name der Linie aus Feld', value: namensfeld, onChange: (e) => setNamensfeld(e.target.value), children: [_jsx("option", { value: "", children: ziel === 'einrichtungen' ? 'ohne Namen' : 'automatisch nummerieren' }), schicht.felder.map((f) => (_jsxs("option", { value: f, children: [f, beispiele(f, 1)[0] ? ` – z. B. „${beispiele(f, 1)[0]}“` : ''] }, f)))] })), (ziel === 'zonen' || ziel === 'einrichtungen' || ziel === 'pirschwege' || ziel === 'treiberrouten' || ziel === 'wte_routen') && namensfeld && beispiele(namensfeld, 3).length > 0 && (_jsxs("small", { style: { color: "var(--text-leise)" }, children: ["Beispielwerte: ", beispiele(namensfeld, 3).map((b) => `„${b}“`).join(', ')] })), ziel === 'zonen' && ebenen.length > 0 && (_jsxs(Auswahl, { label: "Zonenebene", value: ebeneId, onChange: (e) => setEbeneId(e.target.value), children: [_jsx("option", { value: "", children: "Ohne Ebene" }), ebenen.map((e) => (_jsx("option", { value: e.id, children: e.name }, e.id)))] })), ziel === 'einrichtungen' && (_jsx(Auswahl, { label: "Art der Einrichtungen", value: typ, onChange: (e) => setTyp(e.target.value), children: _jsx(EinrichtungsOptionen, {}) }))] }), passend.length === 0 ? (_jsxs(Hinweis, { art: "fehler", children: ["Diese Ebene enth\u00E4lt keine ", zielInfo?.geometrie, ", die zu \u201E", zielInfo?.titel, "\u201C passen. W\u00E4hle eine andere Ebene oder ein anderes Importziel."] })) : (_jsxs(_Fragment, { children: [_jsx(Vorschau, { objekte: passend }), ziel === 'grenze' && hatGrenze && (_jsxs(Hinweis, { art: "fehler", children: ["Das Revier hat bereits eine Grenze. Sie wird durch den Import ersetzt; vorhandene Zonen bleiben unver\u00E4ndert.", _jsxs("label", { className: "zeile", style: { border: 0, padding: '8px 0 0' }, children: [_jsx("input", { type: "checkbox", checked: ersetzen, onChange: (e) => setErsetzen(e.target.checked) }), _jsx("span", { className: "zeile-label", children: "Vorhandene Reviergrenze ersetzen" })] })] })), ziel === 'grenze' && passend.length > 1 && _jsxs(Leer, { children: [passend.length, " Fl\u00E4chen werden zu einer Reviergrenze zusammengefasst."] }), passend.length < schicht.features.length && (_jsxs(Leer, { children: [schicht.features.length - passend.length, " weitere Objekte anderer Geometrieart werden nicht importiert."] })), _jsx(Knopf, { variante: "akzent", disabled: laeuft || (ziel === 'grenze' && hatGrenze && !ersetzen), onClick: () => void importieren(), children: laeuft
+                                                .join(' · ') })] }) }), (ziel === 'zonen' || ziel === 'einrichtungen' || ziel === 'pirschwege' || ziel === 'treiberrouten' || ziel === 'wte_routen') && schicht.felder.length > 0 && (_jsxs(Auswahl, { label: ziel === 'zonen' ? 'Zonenname aus Feld' : ziel === 'einrichtungen' ? 'Name aus Feld' : 'Name der Linie aus Feld', value: namensfeld, onChange: (e) => setNamensfeld(e.target.value), children: [_jsx("option", { value: "", children: ziel === 'einrichtungen' ? 'ohne Namen' : 'automatisch nummerieren' }), schicht.felder.map((f) => (_jsxs("option", { value: f, children: [f, beispiele(f, 1)[0] ? ` – z. B. „${beispiele(f, 1)[0]}“` : ''] }, f)))] })), (ziel === 'zonen' || ziel === 'einrichtungen' || ziel === 'pirschwege' || ziel === 'treiberrouten' || ziel === 'wte_routen') && namensfeld && beispiele(namensfeld, 3).length > 0 && (_jsxs("small", { style: { color: "var(--text-leise)" }, children: ["Beispielwerte: ", beispiele(namensfeld, 3).map((b) => `„${b}“`).join(', ')] })), ziel === 'zonen' && ebenen.length > 0 && (_jsxs(Auswahl, { label: "Zonenebene", value: ebeneId, onChange: (e) => setEbeneId(e.target.value), children: [_jsx("option", { value: "", children: "Ohne Ebene" }), ebenen.map((e) => (_jsx("option", { value: e.id, children: e.name }, e.id)))] })), (ziel === 'pirschwege' || ziel === 'treiberrouten' || ziel === 'wte_routen') && (_jsx(RoutenEbenenWahl, { typ: ziel === 'treiberrouten' ? 'treiberroute' : ziel === 'wte_routen' ? 'wte_route' : 'pirschweg', ebenen: routenEbenen, ebeneId: routenEbeneId, neuerName: neueRoutenEbene, darfAnlegen: k.istInhaber, onAendern: (id, neu) => {
+                                    setRoutenEbeneId(id);
+                                    setNeueRoutenEbene(neu);
+                                } })), ziel === 'einrichtungen' && (_jsx(Auswahl, { label: "Art der Einrichtungen", value: typ, onChange: (e) => setTyp(e.target.value), children: _jsx(EinrichtungsOptionen, {}) }))] }), passend.length === 0 ? (_jsxs(Hinweis, { art: "fehler", children: ["Diese Ebene enth\u00E4lt keine ", zielInfo?.geometrie, ", die zu \u201E", zielInfo?.titel, "\u201C passen. W\u00E4hle eine andere Ebene oder ein anderes Importziel."] })) : (_jsxs(_Fragment, { children: [_jsx(Vorschau, { objekte: passend }), ziel === 'grenze' && hatGrenze && (_jsxs(Hinweis, { art: "fehler", children: ["Das Revier hat bereits eine Grenze. Sie wird durch den Import ersetzt; vorhandene Zonen bleiben unver\u00E4ndert.", _jsxs("label", { className: "zeile", style: { border: 0, padding: '8px 0 0' }, children: [_jsx("input", { type: "checkbox", checked: ersetzen, onChange: (e) => setErsetzen(e.target.checked) }), _jsx("span", { className: "zeile-label", children: "Vorhandene Reviergrenze ersetzen" })] })] })), ziel === 'grenze' && passend.length > 1 && _jsxs(Leer, { children: [passend.length, " Fl\u00E4chen werden zu einer Reviergrenze zusammengefasst."] }), passend.length < schicht.features.length && (_jsxs(Leer, { children: [schicht.features.length - passend.length, " weitere Objekte anderer Geometrieart werden nicht importiert."] })), _jsx(Knopf, { variante: "akzent", disabled: laeuft || (ziel === 'grenze' && hatGrenze && !ersetzen) || ebeneUngueltig(routenEbeneId, neueRoutenEbene), onClick: () => void importieren(), children: laeuft
                                     ? 'Import läuft …'
                                     : ziel === 'grenze'
                                         ? 'Als Reviergrenze übernehmen'

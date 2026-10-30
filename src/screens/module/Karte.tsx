@@ -34,6 +34,7 @@ import { EinrichtungsOptionen } from '../../components/EinrichtungsOptionen';
 import { EinrichtungSheet, VerschiebeLeiste, type EinrichtungInfo } from './EinrichtungSheet';
 import { speichernOderMerken } from '../../lib/offline';
 import { GpsImport } from './GpsImport';
+import { useRoutenEbenen, ROUTENFOKUS, routenTypFarbe } from '../../lib/routen';
 import { ZeichnenSheet, type SheetArt, type SheetWerte } from './ZeichnenSheet';
 
 // ---------- Kartengrundlagen ----------
@@ -248,6 +249,23 @@ export default function Karte({
   const [meldung, setMeldung] = useState<{ art: 'fehler' | 'erfolg' | 'info'; text: string } | null>(null);
   const aufzeichnung = useRef<number | null>(null);
   const [ausgeblendet, setAusgeblendet] = useState<Set<string>>(new Set());
+  // Routenebenen: einzeln ausblenden und mit eigener Transparenz (je Gerät gemerkt)
+  const { ebenen: routenEbenen, laden: routenEbenenLaden } = useRoutenEbenen(k.revierId);
+  const [routenEinst, setRoutenEinst] = useState<{ aus: string[]; transparenz: Record<string, number> }>(() => {
+    try {
+      const r = JSON.parse(localStorage.getItem('hegewerk.karte.routen') ?? 'null') as { aus?: string[]; transparenz?: Record<string, number> } | null;
+      return { aus: r?.aus ?? [], transparenz: r?.transparenz ?? {} };
+    } catch {
+      return { aus: [], transparenz: {} };
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem('hegewerk.karte.routen', JSON.stringify(routenEinst));
+    } catch {
+      /* nur für diese Sitzung */
+    }
+  }, [routenEinst]);
   const grenzeRef = useRef<MultiPolygon | null>(null);
   const luftbildSchluessel = useRef('');
   const [einst, setEinst] = useState(ebenenEinstellungenLesen);
@@ -297,6 +315,7 @@ export default function Karte({
   useEffect(() => {
     if (wte && navigator.onLine) void sitzungLaden();
   }, [wte, sitzungLaden]);
+  const wteRoutenEbenenIds = useMemo(() => routenEbenen.filter((e) => e.typ === 'wte_route' && e.wte_aktiv).map((e) => e.id), [routenEbenen]);
   const wteEbenenIds = useMemo(() => (daten?.ebenen ?? []).filter((e) => e.wte_aktiv).map((e) => e.id), [daten]);
 
   // Filter für Heatmap und Abschüsse (gelten für alle drei Quellen)
@@ -327,6 +346,7 @@ export default function Karte({
       setMeldung({ art: 'fehler', text: fehlertext(error) });
       return;
     }
+    void routenEbenenLaden();
     const d = (data ?? {}) as unknown as Partial<KartenDaten>;
     setDaten({
       grenze: d.grenze ?? null,
@@ -339,7 +359,7 @@ export default function Karte({
       zaehlungen: d.zaehlungen ?? [],
       mitte: ((d as { mitte?: { coordinates?: number[] } | null }).mitte?.coordinates as [number, number] | undefined) ?? null,
     });
-  }, [k.revierId]);
+  }, [k.revierId, routenEbenenLaden]);
 
   // Karte initialisieren
   useEffect(() => {
@@ -383,6 +403,22 @@ export default function Karte({
       if (!m.hasImage(e.id)) m.addImage(e.id, einrichtungsBild('sonstiges', '#5d6d7e'), { pixelRatio: 2 });
     });
     m.on('load', () => {
+      // „Auf Karte zeigen“ für eine Route (aus „Zonen & Routen“)
+      try {
+        const r = sessionStorage.getItem(ROUTENFOKUS);
+        if (r) {
+          sessionStorage.removeItem(ROUTENFOKUS);
+          const x = JSON.parse(r) as { geometry: { coordinates: number[][] } };
+          const pts = x.geometry.coordinates;
+          if (pts.length) {
+            const b = new LngLatBounds(pts[0] as [number, number], pts[0] as [number, number]);
+            for (const c of pts) b.extend(c as [number, number]);
+            m.fitBounds(b, { padding: 60, duration: 0, maxZoom: 18 });
+          }
+        }
+      } catch {
+        /* ohne Fokus weiter */
+      }
       // „Auf Karte zeigen“ aus der Einrichtungstabelle
       try {
         const f = sessionStorage.getItem('hegewerk:kartenfokus');
@@ -440,7 +476,7 @@ export default function Karte({
         source: 'pirschwege',
         layout: { 'line-cap': 'round', 'line-join': 'round' },
         filter: ['==', ['get', 'typ'], 'pirschweg'],
-        paint: { 'line-color': '#7b4a12', 'line-width': 3, 'line-dasharray': [2, 1.5] },
+        paint: { 'line-color': ['coalesce', ['get', 'farbe'], '#7b4a12'], 'line-width': 3, 'line-dasharray': [2, 1.5] },
       });
       // Treiberrouten und WTE-Routen: eigene Farben, Richtungspfeile entlang der Linie
       m.addImage('route-pfeil', pfeilBild(), { pixelRatio: 2 });
@@ -451,7 +487,7 @@ export default function Karte({
           source: 'pirschwege',
           layout: { 'line-cap': 'round', 'line-join': 'round' },
           filter: ['==', ['get', 'typ'], typ],
-          paint: { 'line-color': farbe, 'line-width': 3.5 },
+          paint: { 'line-color': ['coalesce', ['get', 'farbe'], farbe], 'line-width': 3.5 },
         });
         m.addLayer({
           id: `${id}-pfeile`,
@@ -635,6 +671,17 @@ export default function Karte({
     // WTE-Routen sind im WTE-Modus immer sichtbar
     sichtbar('wte-routen-linie', wte || ebenen.wteRouten);
     sichtbar('wte-routen-pfeile', wte || ebenen.wteRouten);
+    // Routenebenen einzeln ausblenden; im WTE-Modus nur WTE-Routen aus WTE-aktiven Ebenen, Treiberrouten nur offener Jagden
+    const ebeneAus = ['!', ['in', ['coalesce', ['get', 'ebene_id'], 'ohne'], ['literal', routenEinst.aus]]];
+    const routenFilter = (typ: string, extra?: unknown) =>
+      ['all', ['==', ['get', 'typ'], typ], ebeneAus, ...(extra ? [extra] : [])] as unknown as Parameters<typeof m.setFilter>[1];
+    m.setFilter('pirschwege-linie', routenFilter('pirschweg'));
+    const treiberOffen = ['!=', ['get', 'jagd_offen'], false];
+    m.setFilter('treiberrouten-linie', routenFilter('treiberroute', treiberOffen));
+    m.setFilter('treiberrouten-pfeile', routenFilter('treiberroute', treiberOffen));
+    const wteRoute = wte ? ['in', ['coalesce', ['get', 'ebene_id'], 'ohne'], ['literal', wteRoutenEbenenIds]] : undefined;
+    m.setFilter('wte-routen-linie', routenFilter('wte_route', wteRoute));
+    m.setFilter('wte-routen-pfeile', routenFilter('wte_route', wteRoute));
     sichtbar('heatmap', !wte && ebenen.heatmap);
     sichtbar('abschuesse-punkt', !wte && ebenen.abschuesse);
     // Einzelne Zonenebenen ein-/ausblenden
@@ -645,7 +692,7 @@ export default function Karte({
     m.setFilter('zonen-linie', filter);
     zonenBeschriftungenAnzeigen();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ebenen, bereit, ausgeblendet, wte, wteEbenenIds]);
+  }, [ebenen, bereit, ausgeblendet, wte, wteEbenenIds, routenEinst.aus, wteRoutenEbenenIds]);
 
   // Reihenfolge und Transparenz der Ebenen
   useEffect(() => {
@@ -660,11 +707,16 @@ export default function Karte({
     setze('zonen-linie', 'line-opacity', Math.min(1, d.zonen * 1.8));
     setze('grenze-linie', 'line-opacity', d.grenze);
     setze('heatmap', 'heatmap-opacity', d.heatmap);
-    setze('pirschwege-linie', 'line-opacity', d.pirschwege);
-    setze('treiberrouten-linie', 'line-opacity', d.treiberrouten);
-    setze('treiberrouten-pfeile', 'icon-opacity', d.treiberrouten);
-    setze('wte-routen-linie', 'line-opacity', d.wteRouten);
-    setze('wte-routen-pfeile', 'icon-opacity', d.wteRouten);
+    // Routen: Gruppen-Deckkraft mal Deckkraft der jeweiligen Ebene
+    const routenDeckkraft = (gruppe: number) => {
+      const paare = Object.entries(routenEinst.transparenz).flatMap(([id, t]) => [id, 1 - t / 100]);
+      return (paare.length ? ['*', gruppe, ['match', ['coalesce', ['get', 'ebene_id'], 'ohne'], ...paare, 1]] : gruppe) as unknown as number;
+    };
+    setze('pirschwege-linie', 'line-opacity', routenDeckkraft(d.pirschwege));
+    setze('treiberrouten-linie', 'line-opacity', routenDeckkraft(d.treiberrouten));
+    setze('treiberrouten-pfeile', 'icon-opacity', routenDeckkraft(d.treiberrouten));
+    setze('wte-routen-linie', 'line-opacity', routenDeckkraft(d.wteRouten));
+    setze('wte-routen-pfeile', 'icon-opacity', routenDeckkraft(d.wteRouten));
     setze('abschuesse-punkt', 'circle-opacity', d.abschuesse);
     setze('abschuesse-punkt', 'circle-stroke-opacity', d.abschuesse);
     setze('einrichtungen-punkt', 'icon-opacity', d.einrichtungen);
@@ -674,7 +726,7 @@ export default function Karte({
       for (const schicht of EBENEN_SCHICHTEN[id]) if (m.getLayer(schicht)) m.moveLayer(schicht);
     }
     for (const schicht of ['zeichnung-flaeche', 'zeichnung-linie', 'zeichnung-punkte']) if (m.getLayer(schicht)) m.moveLayer(schicht);
-  }, [einst, bereit, daten]);
+  }, [einst, bereit, daten, routenEinst.transparenz]);
 
   // Ausgewählte Zone hervorheben
   useEffect(() => {
@@ -1079,8 +1131,19 @@ export default function Karte({
         }
       } else {
         if (!w) return;
+        let ebeneId = w.routenEbeneId || null;
+        if (w.neueEbeneName) {
+          const { data: neueEbene, error: ebeneFehler } = await supabase
+            .from('routen_ebenen')
+            .insert({ revier_id: k.revierId, name: w.neueEbeneName, typ: modus.typ, reihenfolge: routenEbenen.length, wte_aktiv: modus.typ === 'wte_route', farbe: ZONENFARBEN[(routenEbenen.length + 3) % ZONENFARBEN.length] })
+            .select('id')
+            .single();
+          if (ebeneFehler) throw ebeneFehler;
+          ebeneId = neueEbene.id;
+        }
         const { error } = await supabase.from('pirschwege').insert({
           revier_id: k.revierId,
+          ebene_id: ebeneId,
           name: w.name,
           bemerkung: w.bemerkung || null,
           typ: modus.typ,
@@ -1349,6 +1412,42 @@ export default function Karte({
                       ))}
                     </div>
                   )}
+                  {(id === 'pirschwege' || id === 'treiberrouten' || id === 'wteRouten') && ebenen[id] && (() => {
+                    const typ = id === 'pirschwege' ? 'pirschweg' : id === 'treiberrouten' ? 'treiberroute' : 'wte_route';
+                    const liste: Array<{ id: string; name: string; farbe: string | null }> = routenEbenen.filter((e) => e.typ === typ);
+                    if ((daten?.pirschwege ?? []).some((f) => f.properties?.typ === typ && !f.properties?.ebene_id)) liste.push({ id: 'ohne', name: 'Ohne Ebene', farbe: null });
+                    if (!liste.length) return null;
+                    return (
+                      <div className="unterebenen">
+                        {liste.map((e) => (
+                          <div key={e.id} className="routen-unterebene">
+                            <label className="ebene">
+                              <input
+                                type="checkbox"
+                                checked={!routenEinst.aus.includes(e.id)}
+                                onChange={(ev) => setRoutenEinst((alt) => ({ ...alt, aus: ev.target.checked ? alt.aus.filter((x) => x !== e.id) : [...alt.aus, e.id] }))}
+                              />
+                              <i className="farbpunkt" style={{ background: e.farbe ?? routenTypFarbe(typ) }} />
+                              {e.name}
+                            </label>
+                            <label className="transparenz">
+                              <span>Transparenz</span>
+                              <input
+                                type="range"
+                                min={0}
+                                max={100}
+                                step={5}
+                                value={routenEinst.transparenz[e.id] ?? 0}
+                                aria-label={`Transparenz ${e.name}`}
+                                onChange={(ev) => setRoutenEinst((alt) => ({ ...alt, transparenz: { ...alt.transparenz, [e.id]: Number(ev.target.value) } }))}
+                              />
+                              <output>{routenEinst.transparenz[e.id] ?? 0} %</output>
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
                   {id === 'einrichtungen' && ebenen.einrichtungen && (
                     <div className="legende">
                       {EINRICHTUNGSTYPEN.filter((t) => daten?.einrichtungen.some((e) => e.properties?.typ === t.wert)).map((t) => (
@@ -1536,6 +1635,9 @@ export default function Karte({
         <ZeichnenSheet
           art={sheetArt}
           standardSitzungId={wteSitzung?.id ?? null}
+          routenEbenen={routenEbenen}
+          routenNamen={(daten?.pirschwege ?? []).map((f) => String(f.properties?.name ?? ''))}
+          darfEbenenAnlegen={k.istInhaber}
           revierId={k.revierId}
           zonen={zonen}
           ebenen={kartenEbenen}
