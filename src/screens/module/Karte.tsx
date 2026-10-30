@@ -262,6 +262,21 @@ export default function Karte({
   const [meldung, setMeldung] = useState<{ art: 'fehler' | 'erfolg' | 'info'; text: string } | null>(null);
   const aufzeichnung = useRef<number | null>(null);
   const [ausgeblendet, setAusgeblendet] = useState<Set<string>>(new Set());
+  // Transparenzregler je Ebene erst nach Klick auf den Einstellungsbutton zeigen
+  const [reglerOffen, setReglerOffen] = useState<string[]>([]);
+  const reglerUmschalten = (id: string) => setReglerOffen((a) => (a.includes(id) ? a.filter((x) => x !== id) : [...a, id]));
+  const reglerKnopf = (id: string, name: string) => (
+    <button
+      type="button"
+      className="regler-knopf"
+      aria-label={`Transparenz-Einstellung ${name}`}
+      aria-expanded={reglerOffen.includes(id)}
+      title="Transparenz einstellen"
+      onClick={() => reglerUmschalten(id)}
+    >
+      <Symbol name="einstellungen" className="symbol klein" />
+    </button>
+  );
   // Routenebenen: einzeln ausblenden und mit eigener Transparenz (je Gerät gemerkt)
   const { ebenen: routenEbenen, laden: routenEbenenLaden } = useRoutenEbenen(k.revierId);
   const [routenEinst, setRoutenEinst] = useState<{ aus: string[]; transparenz: Record<string, number> }>(() => {
@@ -1380,7 +1395,10 @@ export default function Karte({
           <Abschnitt titel="Heatmap & Abschüsse">
             {(['heatmap', 'abschuesse'] as const).map((id) => (
               <div key={id} className="ebenen-block">
-                <EbenenSchalter label={ebenenInfo[id].label} an={ebenenInfo[id].an} onAendern={ebenenInfo[id].setAn} />
+                <div className="ebenen-kopf">
+                  <EbenenSchalter label={ebenenInfo[id].label} an={ebenenInfo[id].an} onAendern={ebenenInfo[id].setAn} />
+                  <span className="ebenen-schieber">{reglerKnopf(id, ebenenInfo[id].name)}</span>
+                </div>
                 {id === 'heatmap' && (
                   <div className="segmente" role="radiogroup" aria-label="Quelle der Heatmap">
                     {(Object.keys(HEATNAMEN) as HeatQuelle[]).map((q) => (
@@ -1390,6 +1408,7 @@ export default function Karte({
                     ))}
                   </div>
                 )}
+                {reglerOffen.includes(id) && (
                 <label className="transparenz">
                   <span>Transparenz</span>
                   <input
@@ -1403,6 +1422,7 @@ export default function Karte({
                   />
                   <output>{Math.round((1 - einst.deckkraft[id]) * 100)} %</output>
                 </label>
+                )}
               </div>
             ))}
             <label className="transparenz">
@@ -1439,6 +1459,7 @@ export default function Karte({
                   <div className="ebenen-kopf">
                     <EbenenSchalter label={info.label} an={info.an} gesperrt={info.gesperrt} onAendern={info.setAn} />
                     <span className="ebenen-schieber">
+                      {reglerKnopf(id, info.name)}
                       <button type="button" aria-label={`${info.name} nach oben`} disabled={id === sichtbareIds[0]} onClick={() => verschieben(i, -1)}>
                         <Symbol name="nachOben" className="symbol klein" />
                       </button>
@@ -1447,6 +1468,7 @@ export default function Karte({
                       </button>
                     </span>
                   </div>
+                  {reglerOffen.includes(id) && (
                   <label className="transparenz">
                     <span>Transparenz</span>
                     <input
@@ -1460,6 +1482,7 @@ export default function Karte({
                     />
                     <output>{Math.round((1 - einst.deckkraft[id]) * 100)} %</output>
                   </label>
+                  )}
                   {id === 'zonen' && ebenen.zonen && kartenEbenen.length > 0 && (
                     <div className="unterebenen">
                       {[...kartenEbenen, ...(hatOhneEbene ? [{ id: 'ohne', name: 'Ohne Ebene', farbe: null }] : [])].map((e) => (
@@ -1500,6 +1523,8 @@ export default function Karte({
                               <i className="farbpunkt" style={{ background: e.farbe ?? routenTypFarbe(typ) }} />
                               {e.name}
                             </label>
+                            <span className="ebenen-schieber">{reglerKnopf(`route-${e.id}`, e.name)}</span>
+                            {reglerOffen.includes(`route-${e.id}`) && (
                             <label className="transparenz">
                               <span>Transparenz</span>
                               <input
@@ -1513,6 +1538,7 @@ export default function Karte({
                               />
                               <output>{routenEinst.transparenz[e.id] ?? 0} %</output>
                             </label>
+                            )}
                           </div>
                         ))}
                       </div>

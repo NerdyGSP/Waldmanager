@@ -727,6 +727,9 @@ button.kachel:active { transform: none; }
   width: 28px; height: 28px; padding: 0; border: 1px solid var(--color-border); border-radius: var(--radius-sm);
   background: var(--color-surface); color: var(--color-text-muted); font-size: var(--fs-xs); cursor: pointer;
 }
+.ebenen-schieber button[aria-expanded='true'] { background: var(--color-primary-soft); color: var(--color-primary); border-color: var(--color-primary); }
+.routen-unterebene { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 8px; }
+.routen-unterebene .transparenz { grid-column: 1 / -1; }
 .ebenen-schieber button:disabled { opacity: 0.35; cursor: default; }
 .ebenen-schieber button:hover:not(:disabled) { background: var(--color-neutral-soft); }
 .transparenz { display: grid; grid-template-columns: auto 1fr 3.2em; align-items: center; gap: 8px; padding-left: 28px; font-size: var(--fs-xs); color: var(--color-text-muted); }
