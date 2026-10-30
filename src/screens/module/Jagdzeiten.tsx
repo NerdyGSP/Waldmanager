@@ -1,34 +1,44 @@
-import { useMemo, useState } from 'react';
-import { useWildarten, wildartName } from '../../lib/stammdaten';
+import { useCallback, useMemo, useState } from 'react';
+import { useWildarten } from '../../lib/stammdaten';
 import { navigieren } from '../../lib/router';
 import {
   RECHTSHINWEIS,
   STATUS_TEXT,
   klassen,
-  monatsbalken,
   statusAm,
+  tagesverlauf,
   useJagdzeiten,
-  zeitraumText,
   type Status,
+  type Zeitraum,
 } from '../../lib/jagdzeiten';
 import { datumDE } from '../../lib/zeit';
-import { Auswahl, Gruppe, Hinweis, Leer, Seite, Zeile } from '../../components/ui';
+import { Auswahl, Einklappbar, Hinweis, Leer, Seite } from '../../components/ui';
+import { Jahresbalken, JagdzeitenSheet } from './JagdzeitenSheet';
 import type { RevierKontext } from './kontext';
 
-const MONATE = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
-const MONATSNAMEN = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-function Balken({ zeilen, heute }: { zeilen: ReturnType<typeof useJagdzeiten>['zeilen'] & object; heute: Date }) {
-  const b = useMemo(() => monatsbalken(zeilen), [zeilen]);
-  return (
-    <div className="jz-balken" role="img" aria-label={b.map((s, i) => `${MONATSNAMEN[i]}: ${s === 'voll' ? 'jagdbar' : s === 'teil' ? 'teilweise jagdbar' : 'Schonzeit'}`).join(', ')}>
-      {b.map((s, i) => (
-        <span key={i} className={`jz-monat jz-${s} ${i === heute.getMonth() ? 'jz-heute' : ''}`}>
-          {MONATE[i]}
-        </span>
-      ))}
-    </div>
-  );
+function stichtagAusUrl(): Date {
+  const p = new URLSearchParams(window.location.search).get('stichtag');
+  if (p && /^\d{4}-\d{2}-\d{2}$/.test(p)) {
+    const d = new Date(`${p}T12:00:00`);
+    if (!Number.isNaN(d.getTime())) return d;
+  }
+  return new Date();
+}
+
+/** Aggregierte Tagesfolge → zusammenhängende Zeiträume (2 = grün, 1 = orange) */
+function laeufe(v: number[]): Zeitraum[] {
+  const out: Zeitraum[] = [];
+  let i = 0;
+  while (i < v.length) {
+    if (v[i] === 0) { i++; continue; }
+    let j = i;
+    while (j + 1 < v.length && v[j + 1] === v[i]) j++;
+    out.push({ von: i, bis: j, eingeschraenkt: v[i] === 1 });
+    i = j + 1;
+  }
+  return out;
 }
 
 export function Jagdzeiten({ k, unterpfad }: { k: RevierKontext; unterpfad: string[] }) {
@@ -37,7 +47,16 @@ export function Jagdzeiten({ k, unterpfad }: { k: RevierKontext; unterpfad: stri
   const [wildartFilter, setWildartFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState<'' | Status>('');
   const [nurJagdbar, setNurJagdbar] = useState(false);
-  const heute = useMemo(() => new Date(), []);
+  const [stichtag, setStichtagState] = useState<Date>(stichtagAusUrl);
+  const heuteIso = iso(new Date());
+  const stichtagHeute = iso(stichtag) === heuteIso;
+  const suche = stichtagHeute ? '' : `?stichtag=${iso(stichtag)}`;
+
+  const setStichtag = useCallback((d: Date) => {
+    setStichtagState(d);
+    const t = iso(d) === iso(new Date()) ? '' : `?stichtag=${iso(d)}`;
+    window.history.replaceState(null, '', window.location.pathname + t);
+  }, []);
 
   const proArt = useMemo(() => {
     const m = new Map<string, NonNullable<typeof zeilen>>();
@@ -49,78 +68,28 @@ export function Jagdzeiten({ k, unterpfad }: { k: RevierKontext; unterpfad: stri
     () =>
       wildarten
         .filter((w) => proArt.has(w.id))
-        .map((w) => ({ w, zeilen: proArt.get(w.id)!, s: statusAm(proArt.get(w.id)!, heute) }))
+        .map((w) => ({ w, zeilen: proArt.get(w.id)!, s: statusAm(proArt.get(w.id)!, stichtag) }))
         .filter((x) => (!wildartFilter || x.w.id === wildartFilter) && (!statusFilter || x.s.status === statusFilter) && (!nurJagdbar || x.s.status !== 'schonzeit')),
-    [wildarten, proArt, heute, wildartFilter, statusFilter, nurJagdbar],
+    [wildarten, proArt, stichtag, wildartFilter, statusFilter, nurJagdbar],
   );
 
-  const kopf = (
-    <>
+  const detailId = unterpfad[0];
+  const detailW = detailId ? wildarten.find((w) => w.id === detailId) : undefined;
+  const detailZ = detailId ? proArt.get(detailId) ?? [] : [];
+  const schliessen = useCallback(() => navigieren('/jagdzeiten' + suche), [suche]);
+
+  return (
+    <Seite titel="Jagd- & Schonzeiten" untertitel={`${k.bundesland} · Stichtag ${stichtagHeute ? 'heute ' : ''}${datumDE(iso(stichtag))}`}>
       <Hinweis>
         {RECHTSHINWEIS} Bundesland: <strong>{k.bundesland}</strong>
         {k.istInhaber ? ' (änderbar unter Reviermanagement → Revier).' : '.'}
       </Hinweis>
       {fehler && !geladen && <Hinweis art="fehler">Jagdzeiten konnten nicht geladen werden: {fehler}</Hinweis>}
-    </>
-  );
-
-  // ----- Detail einer Wildart -----
-  const detailId = unterpfad[0];
-  if (detailId) {
-    const z = proArt.get(detailId) ?? [];
-    const s = z.length ? statusAm(z, heute) : null;
-    const ks = klassen(z);
-    const stand = z[0]?.gueltig_ab;
-    return (
-      <Seite titel={wildartName(wildarten, detailId)} untertitel={s ? `Heute: ${STATUS_TEXT[s.status]}` : undefined} zurueck={() => navigieren('/jagdzeiten')}>
-        {kopf}
-        {!z.length ? (
-          <Leer>Für diese Wildart sind für {k.bundesland} keine Zeiten hinterlegt.</Leer>
-        ) : (
-          <>
-            <Gruppe titel="Jahresübersicht" fuss="Grün: ganzer Monat jagdbar · hell: zeitweise bzw. nur einzelne Klassen · grau: Schonzeit. Heutiger Monat umrandet.">
-              <Balken zeilen={z} heute={heute} />
-            </Gruppe>
-            {ks.map((c) => {
-              const jetzt = statusAm(c.zeilen, heute).status === 'jagdbar';
-              return (
-                <Gruppe key={c.name ?? 'alle'} titel={c.name ?? 'Alle Klassen'}>
-                  <Zeile label="Jagdzeit" wert={c.zeilen.map(zeitraumText).join(' und ')} />
-                  <Zeile label="Schonzeit" wert={c.schonzeit ?? '–'} />
-                  <Zeile label="Heute" wert={jetzt ? 'jagdbar' : 'Schonzeit'} />
-                  {c.sonderregel && <Zeile label="Sonderregel" wert={c.sonderregel} />}
-                </Gruppe>
-              );
-            })}
-            <Gruppe titel="Quelle" fuss="Verbindlich bleibt die Landesverordnung.">
-              <Zeile label="Verordnung" wert={z[0]!.quelle} />
-              <Zeile label="Stand" wert={stand ? datumDE(stand) : '–'} />
-              {z[0]!.quelle_url && (
-                <Zeile
-                  label="Link"
-                  wert={
-                    <a href={z[0]!.quelle_url} target="_blank" rel="noreferrer">
-                      Verordnung / Übersicht öffnen
-                    </a>
-                  }
-                />
-              )}
-            </Gruppe>
-          </>
-        )}
-      </Seite>
-    );
-  }
-
-  // ----- Übersicht -----
-  return (
-    <Seite titel="Jagd- & Schonzeiten" untertitel={`${k.bundesland} · heute ${datumDE(heute.toISOString().slice(0, 10))}`}>
-      {kopf}
       {geladen && zeilen!.length === 0 ? (
         <Hinweis>Daten für dieses Bundesland noch nicht hinterlegt.</Hinweis>
       ) : (
         <>
-          <Gruppe titel="Filter">
+          <Einklappbar variante="karte" titel="Filter" speicher="jagdzeiten.filter">
             <Auswahl label="Wildart" value={wildartFilter} onChange={(e) => setWildartFilter(e.target.value)}>
               <option value="">Alle</option>
               {wildarten.filter((w) => proArt.has(w.id)).map((w) => (
@@ -129,32 +98,50 @@ export function Jagdzeiten({ k, unterpfad }: { k: RevierKontext; unterpfad: stri
                 </option>
               ))}
             </Auswahl>
-            <Auswahl label="Status heute" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as '' | Status)}>
+            <label className="zeile">
+              <span className="zeile-label">Stichtag</span>
+              <input type="date" value={iso(stichtag)} onChange={(e) => e.target.value && setStichtag(new Date(`${e.target.value}T12:00:00`))} />
+            </label>
+            <Auswahl label="Status am Stichtag" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as '' | Status)}>
               <option value="">Alle</option>
               <option value="jagdbar">jagdbar</option>
-              <option value="teilweise">Sonderregel</option>
+              <option value="eingeschraenkt">eingeschränkt</option>
               <option value="schonzeit">Schonzeit</option>
             </Auswahl>
             <label className="zeile">
-              <span className="zeile-label">Nur jagdbare Arten (auch teilweise)</span>
+              <span className="zeile-label">Nur jagdbare Arten (auch eingeschränkt)</span>
               <input type="checkbox" checked={nurJagdbar} onChange={(e) => setNurJagdbar(e.target.checked)} />
             </label>
-          </Gruppe>
+          </Einklappbar>
           {!geladen && <Leer>Jagdzeiten werden geladen …</Leer>}
           {geladen && liste.length === 0 && <Leer>Keine Wildart entspricht dem Filter.</Leer>}
           <div className="jz-liste">
-            {liste.map(({ w, zeilen: z, s }) => (
-              <button key={w.id} type="button" className="jz-karte" onClick={() => navigieren(`/jagdzeiten/${w.id}`)}>
-                <span className="jz-kopf">
-                  <strong>{w.name}</strong>
-                  <span className={`jz-status jz-s-${s.status}`}>{STATUS_TEXT[s.status]}</span>
-                </span>
-                <Balken zeilen={z} heute={heute} />
-                {s.status === 'teilweise' && <small>Jagdbar: {s.jagdbar.join(', ')}</small>}
-              </button>
-            ))}
+            {liste.map(({ w, zeilen: z, s }) => {
+              const seg = laeufe(tagesverlauf(klassen(z)));
+              return (
+                <button key={w.id} type="button" className="jz-karte" onClick={() => navigieren(`/jagdzeiten/${w.id}${suche}`)}>
+                  <span className="jz-kopf">
+                    <strong>{w.name}</strong>
+                    <span className={`jz-status jz-s-${s.status}`}>{STATUS_TEXT[s.status]}</span>
+                  </span>
+                  <Jahresbalken segmente={seg} stichtag={stichtag} kompakt label={`${w.name}: ${STATUS_TEXT[s.status]} am ${datumDE(iso(stichtag))}`} />
+                  {s.status === 'eingeschraenkt' && s.jagdbar.length > 0 && <small>Jagdbar: {s.jagdbar.join(', ')}</small>}
+                </button>
+              );
+            })}
           </div>
         </>
+      )}
+      {detailId && geladen && (
+        <JagdzeitenSheet
+          titel={detailW?.name ?? 'Wildart'}
+          gruppe={detailW?.gruppe}
+          zeilen={detailZ}
+          stichtag={stichtag}
+          stichtagHeute={stichtagHeute}
+          onStichtag={setStichtag}
+          onSchliessen={schliessen}
+        />
       )}
     </Seite>
   );

@@ -163,7 +163,7 @@ function SchonzeitHinweis({ bundesland, datum }: { bundesland: string; datum: st
     if (!z.length) return null;
     const s = statusAm(z, tag);
     const name = wildarten.find((w) => w.id === id)?.name ?? id;
-    return s.status === 'schonzeit' ? `${name}: Schonzeit` : s.status === 'teilweise' ? `${name}: Schonzeit für ${s.geschont.join(', ')}` : null;
+    return s.status === 'schonzeit' ? `${name}: Schonzeit` : s.status === 'eingeschraenkt' ? `${name}: Schonzeit für ${s.geschont.join(', ')}` : null;
   }).filter(Boolean);
   if (!zeilen_.length) return null;
   return (

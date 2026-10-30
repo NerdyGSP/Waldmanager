@@ -1098,6 +1098,7 @@ export type Database = {
       jagdzeiten: {
         Row: {
           bundesland: string
+          eingeschraenkt: boolean
           ganzjaehrig: boolean
           gueltig_ab: string
           id: string
@@ -1113,6 +1114,7 @@ export type Database = {
         }
         Insert: {
           bundesland: string
+          eingeschraenkt?: boolean
           ganzjaehrig?: boolean
           gueltig_ab: string
           id?: string
@@ -1128,6 +1130,7 @@ export type Database = {
         }
         Update: {
           bundesland?: string
+          eingeschraenkt?: boolean
           ganzjaehrig?: boolean
           gueltig_ab?: string
           id?: string
