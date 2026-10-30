@@ -197,8 +197,12 @@ function SitzungBearbeiten({ k, sitzung, onFertig }: { k: RevierKontext; sitzung
   async function speichern() {
     setLaeuft(true);
     setFehler(null);
-    const { datum: _datum, ...z } = alsSitzungsZeile(wert);
-    const { error } = await supabase.from('zaehlsitzungen').update(z).eq('id', sitzung.id);
+    if (!wert.datum) {
+      setLaeuft(false);
+      setFehler('Bitte ein Datum angeben.');
+      return;
+    }
+    const { error } = await supabase.from('zaehlsitzungen').update(alsSitzungsZeile(wert)).eq('id', sitzung.id);
     setLaeuft(false);
     if (error) setFehler(fehlertext(error));
     else onFertig(true);
@@ -207,7 +211,7 @@ function SitzungBearbeiten({ k, sitzung, onFertig }: { k: RevierKontext; sitzung
   return (
     <Seite titel={`Zählung ${datumDE(sitzung.datum)}`} untertitel="Sitzungsdaten bearbeiten" zurueck={() => onFertig(false)}>
       {fehler && <Hinweis art="fehler">{fehler}</Hinweis>}
-      <SitzungsdatenFormular wert={wert} onAendern={setWert} mitte={mitte} datumAenderbar={false} autoVorbelegen={false} />
+      <SitzungsdatenFormular wert={wert} onAendern={setWert} mitte={mitte} datumAenderbar autoVorbelegen={false} />
       <Knopf variante="akzent" disabled={laeuft} onClick={() => void speichern()}>
         {laeuft ? 'Speichern …' : 'Speichern'}
       </Knopf>
@@ -349,7 +353,7 @@ function SitzungAnsicht({ k, sitzungId }: { k: RevierKontext; sitzungId: string 
             </Knopf>
             {darfLoeschen && (
               <Knopf variante="sekundaer" onClick={() => setBearbeiten(true)}>
-                Sitzungsdaten bearbeiten (Wetter, Zeiten)
+                Sitzungsdaten bearbeiten (Datum, Wetter, Zeiten)
               </Knopf>
             )}
             <Knopf variante="sekundaer" onClick={wiederOeffnen}>
