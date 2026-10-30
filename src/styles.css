@@ -1041,3 +1041,7 @@ button.kachel:active { transform: none; }
   .glocke-panel { left: 8px !important; right: 8px; top: 56px !important; width: auto; max-height: 75vh; }
 }
 .desk-marke .glocke + .desk-einklappen { margin-left: 8px; }
+
+.legende-typ { display: inline-flex; align-items: center; gap: 5px; border: 0; background: none; padding: 3px 6px; margin: -3px -6px; border-radius: var(--radius-sm); font: inherit; color: inherit; cursor: pointer; }
+.legende-typ:hover { background: color-mix(in srgb, var(--akzent) 10%, transparent); }
+.legende-typ.aus { opacity: 0.45; text-decoration: line-through; }

@@ -12,6 +12,7 @@ import {
   Popup,
   ScaleControl,
   setWorkerUrl,
+  type FilterSpecification,
   type GeoJSONSource,
   type MapMouseEvent,
   type MapTouchEvent,
@@ -276,6 +277,28 @@ export default function Karte({
       /* nur für diese Sitzung */
     }
   }, [routenEinst]);
+  // Einrichtungsarten einzeln ausblenden (je Gerät gemerkt)
+  const [typenAus, setTypenAus] = useState<string[]>(() => {
+    try {
+      const r = JSON.parse(localStorage.getItem('hegewerk.karte.einrichtungsTypenAus') ?? '[]') as unknown;
+      return Array.isArray(r) ? r.map(String) : [];
+    } catch {
+      return [];
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem('hegewerk.karte.einrichtungsTypenAus', JSON.stringify(typenAus));
+    } catch {
+      /* nur für diese Sitzung */
+    }
+  }, [typenAus]);
+  const einrFilter = (verschiebeId?: string): FilterSpecification | null => {
+    const teile: unknown[] = [];
+    if (typenAus.length) teile.push(['!', ['in', ['get', 'typ'], ['literal', typenAus]]]);
+    if (verschiebeId) teile.push(['!=', ['get', 'id'], verschiebeId]);
+    return teile.length === 0 ? null : (teile.length === 1 ? teile[0] : ['all', ...teile]) as FilterSpecification;
+  };
   const grenzeRef = useRef<MultiPolygon | null>(null);
   const luftbildSchluessel = useRef('');
   const [einst, setEinst] = useState(ebenenEinstellungenLesen);
@@ -1239,13 +1262,20 @@ export default function Karte({
       const p = marker.getLngLat();
       setVerschiebe((v) => v && { ...v, lng: p.lng, lat: p.lat });
     });
-    if (m.getLayer('einrichtungen-punkt')) m.setFilter('einrichtungen-punkt', ['!=', ['get', 'id'], id]);
+    if (m.getLayer('einrichtungen-punkt')) m.setFilter('einrichtungen-punkt', einrFilter(id));
     return () => {
       marker.remove();
-      if (m.getLayer('einrichtungen-punkt')) m.setFilter('einrichtungen-punkt', null);
+      if (m.getLayer('einrichtungen-punkt')) m.setFilter('einrichtungen-punkt', einrFilter());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [verschiebe?.einr.id, bereit]);
+
+  useEffect(() => {
+    const m = karte.current;
+    if (!m || !bereit || !m.getLayer('einrichtungen-punkt')) return;
+    m.setFilter('einrichtungen-punkt', einrFilter(verschiebe?.einr.id));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [typenAus, bereit]);
 
   async function einrichtungSpeichern(typ: Enums<'einrichtung_typ'>, name: string, bemerkung: string) {
     if (!neueEinrichtung) return;
@@ -1459,11 +1489,18 @@ export default function Karte({
                     );
                   })()}
                   {id === 'einrichtungen' && ebenen.einrichtungen && (
-                    <div className="legende">
+                    <div className="legende legende-schalter">
                       {EINRICHTUNGSTYPEN.filter((t) => daten?.einrichtungen.some((e) => e.properties?.typ === t.wert)).map((t) => (
-                        <span key={t.wert}>
+                        <button
+                          key={t.wert}
+                          type="button"
+                          className={`legende-typ ${typenAus.includes(t.wert) ? 'aus' : ''}`}
+                          aria-pressed={!typenAus.includes(t.wert)}
+                          title={typenAus.includes(t.wert) ? `${t.label} einblenden` : `${t.label} ausblenden`}
+                          onClick={() => setTypenAus((a) => (a.includes(t.wert) ? a.filter((x) => x !== t.wert) : [...a, t.wert]))}
+                        >
                           <EinrichtungsIcon typ={t.wert} farbe={t.farbe} groesse={18} /> {t.label}
-                        </span>
+                        </button>
                       ))}
                     </div>
                   )}

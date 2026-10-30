@@ -200,6 +200,32 @@ export default function Karte({ k, eingebettet = false, panelZiel = null, aktual
             /* nur für diese Sitzung */
         }
     }, [routenEinst]);
+    // Einrichtungsarten einzeln ausblenden (je Gerät gemerkt)
+    const [typenAus, setTypenAus] = useState(() => {
+        try {
+            const r = JSON.parse(localStorage.getItem('hegewerk.karte.einrichtungsTypenAus') ?? '[]');
+            return Array.isArray(r) ? r.map(String) : [];
+        }
+        catch {
+            return [];
+        }
+    });
+    useEffect(() => {
+        try {
+            localStorage.setItem('hegewerk.karte.einrichtungsTypenAus', JSON.stringify(typenAus));
+        }
+        catch {
+            /* nur für diese Sitzung */
+        }
+    }, [typenAus]);
+    const einrFilter = (verschiebeId) => {
+        const teile = [];
+        if (typenAus.length)
+            teile.push(['!', ['in', ['get', 'typ'], ['literal', typenAus]]]);
+        if (verschiebeId)
+            teile.push(['!=', ['get', 'id'], verschiebeId]);
+        return teile.length === 0 ? null : (teile.length === 1 ? teile[0] : ['all', ...teile]);
+    };
     const grenzeRef = useRef(null);
     const luftbildSchluessel = useRef('');
     const [einst, setEinst] = useState(ebenenEinstellungenLesen);
@@ -1184,14 +1210,21 @@ export default function Karte({ k, eingebettet = false, panelZiel = null, aktual
             setVerschiebe((v) => v && { ...v, lng: p.lng, lat: p.lat });
         });
         if (m.getLayer('einrichtungen-punkt'))
-            m.setFilter('einrichtungen-punkt', ['!=', ['get', 'id'], id]);
+            m.setFilter('einrichtungen-punkt', einrFilter(id));
         return () => {
             marker.remove();
             if (m.getLayer('einrichtungen-punkt'))
-                m.setFilter('einrichtungen-punkt', null);
+                m.setFilter('einrichtungen-punkt', einrFilter());
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [verschiebe?.einr.id, bereit]);
+    useEffect(() => {
+        const m = karte.current;
+        if (!m || !bereit || !m.getLayer('einrichtungen-punkt'))
+            return;
+        m.setFilter('einrichtungen-punkt', einrFilter(verschiebe?.einr.id));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [typenAus, bereit]);
     async function einrichtungSpeichern(typ, name, bemerkung) {
         if (!neueEinrichtung)
             return;
@@ -1276,7 +1309,7 @@ export default function Karte({ k, eingebettet = false, panelZiel = null, aktual
                                         if (!liste.length)
                                             return null;
                                         return (_jsx("div", { className: "unterebenen", children: liste.map((e) => (_jsxs("div", { className: "routen-unterebene", children: [_jsxs("label", { className: "ebene", children: [_jsx("input", { type: "checkbox", checked: !routenEinst.aus.includes(e.id), onChange: (ev) => setRoutenEinst((alt) => ({ ...alt, aus: ev.target.checked ? alt.aus.filter((x) => x !== e.id) : [...alt.aus, e.id] })) }), _jsx("i", { className: "farbpunkt", style: { background: e.farbe ?? routenTypFarbe(typ) } }), e.name] }), _jsxs("label", { className: "transparenz", children: [_jsx("span", { children: "Transparenz" }), _jsx("input", { type: "range", min: 0, max: 100, step: 5, value: routenEinst.transparenz[e.id] ?? 0, "aria-label": `Transparenz ${e.name}`, onChange: (ev) => setRoutenEinst((alt) => ({ ...alt, transparenz: { ...alt.transparenz, [e.id]: Number(ev.target.value) } })) }), _jsxs("output", { children: [routenEinst.transparenz[e.id] ?? 0, " %"] })] })] }, e.id))) }));
-                                    })(), id === 'einrichtungen' && ebenen.einrichtungen && (_jsx("div", { className: "legende", children: EINRICHTUNGSTYPEN.filter((t) => daten?.einrichtungen.some((e) => e.properties?.typ === t.wert)).map((t) => (_jsxs("span", { children: [_jsx(EinrichtungsIcon, { typ: t.wert, farbe: t.farbe, groesse: 18 }), " ", t.label] }, t.wert))) }))] }, id));
+                                    })(), id === 'einrichtungen' && ebenen.einrichtungen && (_jsx("div", { className: "legende legende-schalter", children: EINRICHTUNGSTYPEN.filter((t) => daten?.einrichtungen.some((e) => e.properties?.typ === t.wert)).map((t) => (_jsxs("button", { type: "button", className: `legende-typ ${typenAus.includes(t.wert) ? 'aus' : ''}`, "aria-pressed": !typenAus.includes(t.wert), title: typenAus.includes(t.wert) ? `${t.label} einblenden` : `${t.label} ausblenden`, onClick: () => setTypenAus((a) => (a.includes(t.wert) ? a.filter((x) => x !== t.wert) : [...a, t.wert])), children: [_jsx(EinrichtungsIcon, { typ: t.wert, farbe: t.farbe, groesse: 18 }), " ", t.label] }, t.wert))) }))] }, id));
                         }) }), !ISTHANDY && _jsx("p", { className: "leer", style: { margin: 0 }, children: "Das Luftbild wird f\u00FCr den gesamten Kartenausschnitt geladen und auf dem Ger\u00E4t zwischengespeichert." }), ISTHANDY && _jsx("p", { className: "leer", style: { margin: 0 }, children: "Mobil wird das Luftbild nur f\u00FCr den Revierbereich geladen und auf dem Ger\u00E4t zwischengespeichert, um Daten zu sparen." })] }), k.istInhaber && (_jsx(Abschnitt, { titel: "Import", children: _jsx("button", { className: "knopf knopf-sekundaer", onClick: () => navigieren('/import'), children: "Geodaten importieren (SHP, GeoPackage)" }) })), _jsx("p", { className: "leer", children: "Zeichnen, Aufzeichnen und GPS-Import findest du im Men\u00FC \u201E+ NEU\u201C auf der Karte." }), _jsx("p", { className: "leer", children: "Heatmap und Absch\u00FCsse zeigen nur Erfassungen mit Position (Z\u00E4hlungen: Zone). Wind: Open-Meteo." }), wildarten.length > 0 && anzahlBeob > 0 && (_jsxs("p", { className: "leer", children: ["H\u00E4ufigste Wildart: ", wildartName(wildarten, haeufigste(daten?.beobachtungen ?? []))] }))] }));
     return (_jsxs("div", { className: "karte-seite", children: [_jsx("div", { ref: container, className: "karte" }), !zeichnet && (_jsxs("div", { className: "karte-chips", children: [_jsxs("div", { className: "karte-chip-reihe", children: [wind && (_jsxs("div", { className: "karte-chip wind", title: "Wetter, Sonne, Mond und B\u00FCchsenlicht", children: [_jsxs("button", { type: "button", className: "wind-haupt", "aria-expanded": wetterOffen, "aria-haspopup": "dialog", onClick: () => setWetterOffen((o) => !o), children: [_jsx("span", { className: "wind-pfeil", style: { transform: `rotate(${wind.windRichtung + 180}deg)` }, "aria-hidden": "true", children: "\u2191" }), _jsxs("span", { children: [_jsxs("strong", { children: [Math.round(wind.windKmh), " km/h"] }), " aus ", himmelsrichtung(wind.windRichtung), _jsxs("small", { children: [Math.round(wind.temperatur), " \u00B0C \u00B7 Wetter"] })] })] }), _jsx("button", { className: "link", onClick: windLaden, "aria-label": "Wind aktualisieren", children: _jsx(Symbol, { name: "aktualisieren", className: "symbol klein" }) })] })), _jsxs("button", { type: "button", className: `karte-chip chip-knopf ${windpfeile ? 'an' : ''}`, "aria-pressed": windpfeile, "aria-label": "Windpfeile auf der Karte ein- oder ausblenden", title: "Windpfeile von deinem Standort", onClick: () => setWindpfeile(!windpfeile), children: [_jsx(Symbol, { name: "wind", className: "symbol klein" }), " Windpfeile"] }), _jsxs("button", { type: "button", className: `karte-chip chip-knopf ${wte ? 'an' : ''}`, "aria-pressed": wte, "aria-label": "Neu: Einrichtung, Fang, Wildtiererfassung", "aria-haspopup": "menu", "aria-expanded": wteMenue, onClick: () => setWteMenue((o) => !o), children: [_jsx(Symbol, { name: "neu", className: "symbol klein" }), " NEU"] })] }), wind && wetterOffen && _jsx(WetterPanel, { lat: wetterOrt[0], lon: wetterOrt[1], mitte: daten?.mitte ?? null, onSchliessen: () => setWetterOffen(false) })] })), zeichnet && (_jsxs("div", { className: "zeichen-leiste", children: [_jsxs("span", { children: [modus.art === 'grenze' && 'Reviergrenze: Eckpunkte antippen', modus.art === 'zone' && modus.bearbeiten && `Zone „${modus.name}“ bearbeiten: Punkte ziehen, Linie antippen = Punkt einfügen`, modus.art === 'zone' && !modus.bearbeiten && (modus.zoneId ? `Zone „${modus.name}“: Eckpunkte antippen` : 'Neue Zone: Eckpunkte antippen'), modus.art === 'route' && `${ROUTENNAME[modus.typ]}: Wegpunkte antippen`, modus.art === 'aufzeichnung' && `${ROUTENNAME[modus.typ]} per GPS: ${punkte.length} Punkte`] }), modus.art === 'zone' && modus.bearbeiten ? (_jsx("button", { className: "knopf knopf-sekundaer klein", onClick: () => {
                             setPunkte((p) => p.filter((_, i) => i !== gewaehlterPunkt));
