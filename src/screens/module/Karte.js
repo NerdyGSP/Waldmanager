@@ -129,6 +129,16 @@ export default function Karte({ k, eingebettet = false, panelZiel = null, aktual
     const [modus, setModusState] = useState(null);
     const [gpsImport, setGpsImport] = useState(false);
     const [einrSheet, setEinrSheet] = useState(null);
+    // Deep Link aus der Glocke, während die Karte schon offen ist
+    useEffect(() => {
+        const fokus = (ev) => {
+            const x = ev.detail;
+            karte.current?.jumpTo({ center: [x.lng, x.lat], zoom: 18 });
+            setEinrSheet(x);
+        };
+        window.addEventListener('hegewerk:kartenfokus', fokus);
+        return () => window.removeEventListener('hegewerk:kartenfokus', fokus);
+    }, []);
     const [verschiebe, setVerschiebe] = useState(null);
     const [verschiebeLaeuft, setVerschiebeLaeuft] = useState(false);
     const verschiebeAktiv = useRef(false);

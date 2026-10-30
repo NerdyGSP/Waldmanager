@@ -209,6 +209,16 @@ export default function Karte({
   const [modus, setModusState] = useState<Modus>(null);
   const [gpsImport, setGpsImport] = useState(false);
   const [einrSheet, setEinrSheet] = useState<EinrichtungInfo | null>(null);
+  // Deep Link aus der Glocke, während die Karte schon offen ist
+  useEffect(() => {
+    const fokus = (ev: Event) => {
+      const x = (ev as CustomEvent<EinrichtungInfo>).detail;
+      karte.current?.jumpTo({ center: [x.lng, x.lat], zoom: 18 });
+      setEinrSheet(x);
+    };
+    window.addEventListener('hegewerk:kartenfokus', fokus);
+    return () => window.removeEventListener('hegewerk:kartenfokus', fokus);
+  }, []);
   const [verschiebe, setVerschiebe] = useState<{ einr: EinrichtungInfo; lng: number; lat: number } | null>(null);
   const [verschiebeLaeuft, setVerschiebeLaeuft] = useState(false);
   const verschiebeAktiv = useRef(false);

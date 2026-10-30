@@ -1003,3 +1003,41 @@ button.kachel:active { transform: none; }
 .einr-tab td.aktion button { margin-right: 4px; }
 .routen-unterebene { display: grid; gap: 2px; }
 .routen-unterebene input[type=range] { width: 100%; }
+
+/* Glocke / Benachrichtigungen */
+.glocke {
+  position: relative; width: 40px; height: 40px; border: 0; border-radius: var(--radius-sm); background: var(--flaeche); color: var(--text-leise);
+  display: grid; place-items: center; cursor: pointer; flex: none;
+}
+.glocke:hover, .glocke.aktiv { color: var(--akzent); }
+.glocke svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.glocke-badge {
+  position: absolute; top: 2px; right: 1px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: #c0392b; color: #fff;
+  font-size: 0.7rem; font-weight: 700; line-height: 18px; text-align: center;
+}
+.desk-marke .glocke { width: 34px; height: 34px; margin-left: auto; }
+.desk-marke .glocke + .warteschlange, .desk-marke .warteschlange + .glocke { margin-left: 8px; }
+.glocke-schleier { position: fixed; inset: 0; z-index: 1200; background: transparent; }
+.glocke-panel {
+  position: fixed; z-index: 1201; width: 360px; max-width: calc(100vw - 16px); max-height: min(70vh, 560px); display: flex; flex-direction: column;
+  background: var(--flaeche); color: var(--text); border: 1px solid var(--linie); border-radius: var(--radius); box-shadow: 0 8px 28px rgba(0,0,0,0.28); overflow: hidden;
+}
+.glocke-panel header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--linie); }
+.glocke-alle { border: 0; background: none; color: var(--akzent); font: inherit; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
+.glocke-alle:disabled { color: var(--text-leise); cursor: default; opacity: 0.6; }
+.glocke-liste { overflow-y: auto; overscroll-behavior: contain; }
+.glocke-liste h3 { margin: 0; padding: 10px 14px 4px; font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-leise); }
+.glocke-leer { margin: 0; padding: 22px 14px; color: var(--text-leise); text-align: center; }
+.glocke-zeile { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 14px; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.glocke-zeile:hover { background: color-mix(in srgb, var(--akzent) 8%, transparent); }
+.glocke-zeile.neu { background: color-mix(in srgb, var(--akzent) 6%, transparent); }
+.glocke-zeile.hervor .glocke-text strong { color: #c0392b; }
+.glocke-symbol { flex: none; width: 28px; text-align: center; font-size: 1.15rem; }
+.glocke-text { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.glocke-text strong { font-size: 0.9rem; font-weight: 600; overflow-wrap: anywhere; }
+.glocke-text small { color: var(--text-leise); font-size: 0.78rem; }
+.glocke-punkt { flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--akzent); }
+@media (max-width: 600px) {
+  .glocke-panel { left: 8px !important; right: 8px; top: 56px !important; width: auto; max-height: 75vh; }
+}
+.desk-marke .glocke + .desk-einklappen { margin-left: 8px; }

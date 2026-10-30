@@ -3,6 +3,7 @@ import type { Session } from '@supabase/supabase-js';
 import { fehlertext } from '../lib/fehler';
 import { gemerktesRevier, revierMerken, useNutzerKontext, type Mitgliedschaft } from '../lib/useNutzerKontext';
 import { navigieren, usePfad } from '../lib/router';
+import { Glocke } from '../components/Glocke';
 import { useWarteschlange } from '../lib/offline';
 import { EingebettetKontext, Hinweis, Knopf } from '../components/ui';
 import { Symbol } from '../components/symbole';
@@ -155,6 +156,7 @@ export function Home({ session }: { session: Session }) {
         )}
 
         <div className="leiste-nutzer">
+          <Glocke revierId={revierId} userId={session.user.id} />
           {offen > 0 && (
             <span className="warteschlange" title="Noch nicht übertragene Erfassungen">
               {offen} offline
@@ -275,6 +277,7 @@ function DesktopLayout({
                 {offen} offline
               </span>
             )}
+            <Glocke revierId={revierId} userId={userId} />
             {!voll && (
               <button
                 className="desk-einklappen"
@@ -382,7 +385,7 @@ function Sonderseite({
 }) {
   if (modul === 'reviermanagement') return <Reviermanagement userId={userId} aktuell={aktuell} nachAenderung={nachAenderung} />;
   if (modul === 'masteradmin') return kontext.istMasteradmin ? <Masteradmin userId={userId} nachAenderung={nachAenderung} /> : <Hinweis>Diese Seite gibt es nicht.</Hinweis>;
-  return <Einstellungen kontext={kontext} nachAenderung={nachAenderung} />;
+  return <Einstellungen kontext={kontext} userId={userId} istInhaber={aktuell?.rolle === 'inhaber'} nachAenderung={nachAenderung} />;
 }
 
 function ModulInhalt({ modul, unterpfad, k, breit = false }: { modul: string; unterpfad: string[]; k: RevierKontext; breit?: boolean }) {

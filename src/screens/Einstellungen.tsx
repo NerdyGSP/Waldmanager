@@ -6,6 +6,7 @@ import type { Mitgliedschaft, NutzerKontext } from '../lib/useNutzerKontext';
 import { Auswahl, Feld, Gruppe, Hinweis, Knopf, PasswortFeld, Seite, Segmente, Zeile } from '../components/ui';
 import { BUNDESLAENDER } from '../lib/jagdzeiten';
 import { useDarstellung, type Darstellung } from '../lib/darstellung';
+import { EREIGNIS_GRUPPEN } from '../lib/ereignisse';
 import { MitgliederPanel } from './MitgliederPanel';
 import { RevierdatenLoeschen } from './module/Revierdaten';
 
@@ -13,9 +14,13 @@ const ROLLEN = { inhaber: 'Revierinhaber/-pächter', mitjaeger: 'Mitjäger' } as
 
 export function Einstellungen({
   kontext,
+  userId,
+  istInhaber,
   nachAenderung,
 }: {
   kontext: NutzerKontext;
+  userId: string;
+  istInhaber: boolean;
   nachAenderung: (neueRevierId?: string | null) => Promise<void>;
 }) {
   return (
@@ -25,6 +30,7 @@ export function Einstellungen({
         <Konto name={kontext.name} email={kontext.email} onGeaendert={() => nachAenderung()} />
       </details>
       <DarstellungWahl />
+      <BenachrichtigungenWahl userId={userId} istInhaber={istInhaber} />
       <KartenSpeicher />
       <Gruppe titel="Lizenzen" fuss="Navigationsicons: Material Symbols (Google, Apache 2.0). Einrichtungssymbole: game-icons.net (Lorc, Delapouite u. a., CC BY 3.0).">
         <Zeile label="Kartendaten © OpenStreetMap-Mitwirkende, Luftbild © LGLN" />
@@ -317,6 +323,51 @@ export function CodeEinloesen({ onEingeloest }: { onEingeloest: (revierId: strin
         Einlösen
       </Knopf>
     </form>
+  );
+}
+
+// Benachrichtigungen: Ein/Aus je Ereignisgruppe, je Nutzer gespeichert
+function BenachrichtigungenWahl({ userId, istInhaber }: { userId: string; istInhaber: boolean }) {
+  const [werte, setWerte] = useState<Record<string, boolean> | null>(null);
+  const [fehler, setFehler] = useState<string | null>(null);
+  useEffect(() => {
+    void supabase
+      .from('profiles')
+      .select('benachrichtigungen')
+      .eq('id', userId)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (error) setFehler(fehlertext(error));
+        else setWerte((data?.benachrichtigungen ?? {}) as Record<string, boolean>);
+      });
+  }, [userId]);
+  async function umschalten(id: string, an: boolean) {
+    if (!werte) return;
+    const neu = { ...werte, [id]: an };
+    setWerte(neu);
+    const { error } = await supabase.from('profiles').update({ benachrichtigungen: neu }).eq('id', userId);
+    if (error) {
+      setWerte(werte);
+      setFehler(fehlertext(error));
+    } else setFehler(null);
+  }
+  const gruppen = EREIGNIS_GRUPPEN.filter((g) => istInhaber || !g.nurInhaber);
+  return (
+    <Gruppe titel="Benachrichtigungen" fuss="Steuert, welche Meldungen in der Glocke erscheinen. Eigene Aktionen werden nie gemeldet. Es gibt keinen E-Mail- oder Push-Versand.">
+      {fehler && <Hinweis art="fehler">{fehler}</Hinweis>}
+      {gruppen.map((g) => (
+        <Zeile key={g.id} label={<><strong>{g.label}</strong><br /><small style={{ color: 'var(--text-leise)' }}>{g.text}</small></>}>
+          <input
+            type="checkbox"
+            role="switch"
+            aria-label={g.label}
+            checked={werte ? werte[g.id] !== false : true}
+            disabled={!werte}
+            onChange={(e) => void umschalten(g.id, e.target.checked)}
+          />
+        </Zeile>
+      ))}
+    </Gruppe>
   );
 }
 

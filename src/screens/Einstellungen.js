@@ -6,11 +6,12 @@ import { navigieren } from '../lib/router';
 import { Auswahl, Feld, Gruppe, Hinweis, Knopf, PasswortFeld, Seite, Segmente, Zeile } from '../components/ui';
 import { BUNDESLAENDER } from '../lib/jagdzeiten';
 import { useDarstellung } from '../lib/darstellung';
+import { EREIGNIS_GRUPPEN } from '../lib/ereignisse';
 import { MitgliederPanel } from './MitgliederPanel';
 import { RevierdatenLoeschen } from './module/Revierdaten';
 const ROLLEN = { inhaber: 'Revierinhaber/-pächter', mitjaeger: 'Mitjäger' };
-export function Einstellungen({ kontext, nachAenderung, }) {
-    return (_jsxs(Seite, { titel: "Einstellungen", children: [_jsxs("details", { className: "einklappbar", children: [_jsx("summary", { children: "Konto" }), _jsx(Konto, { name: kontext.name, email: kontext.email, onGeaendert: () => nachAenderung() })] }), _jsx(DarstellungWahl, {}), _jsx(KartenSpeicher, {}), _jsx(Gruppe, { titel: "Lizenzen", fuss: "Navigationsicons: Material Symbols (Google, Apache 2.0). Einrichtungssymbole: game-icons.net (Lorc, Delapouite u. a., CC BY 3.0).", children: _jsx(Zeile, { label: "Kartendaten \u00A9 OpenStreetMap-Mitwirkende, Luftbild \u00A9 LGLN" }) }), _jsx(Knopf, { variante: "gefahr", onClick: () => supabase.auth.signOut(), children: "Abmelden" })] }));
+export function Einstellungen({ kontext, userId, istInhaber, nachAenderung, }) {
+    return (_jsxs(Seite, { titel: "Einstellungen", children: [_jsxs("details", { className: "einklappbar", children: [_jsx("summary", { children: "Konto" }), _jsx(Konto, { name: kontext.name, email: kontext.email, onGeaendert: () => nachAenderung() })] }), _jsx(DarstellungWahl, {}), _jsx(BenachrichtigungenWahl, { userId: userId, istInhaber: istInhaber }), _jsx(KartenSpeicher, {}), _jsx(Gruppe, { titel: "Lizenzen", fuss: "Navigationsicons: Material Symbols (Google, Apache 2.0). Einrichtungssymbole: game-icons.net (Lorc, Delapouite u. a., CC BY 3.0).", children: _jsx(Zeile, { label: "Kartendaten \u00A9 OpenStreetMap-Mitwirkende, Luftbild \u00A9 LGLN" }) }), _jsx(Knopf, { variante: "gefahr", onClick: () => supabase.auth.signOut(), children: "Abmelden" })] }));
 }
 // Revierverwaltung: Revier, Mitglieder & Einladungen, Kartendaten löschen, Revier verlassen, Code einlösen
 export function Reviermanagement({ userId, aktuell, nachAenderung, }) {
@@ -138,6 +139,39 @@ export function CodeEinloesen({ onEingeloest }) {
         await onEingeloest(data ?? null);
     }
     return (_jsxs("form", { onSubmit: absenden, children: [_jsx(Gruppe, { titel: "Einladungscode einl\u00F6sen", fuss: "Damit trittst du mit deinem bestehenden Account einem weiteren Revier bei.", children: _jsx(Feld, { label: "Code", placeholder: "XXXX-XXXX", autoCapitalize: "characters", autoComplete: "off", spellCheck: false, required: true, value: code, onChange: (e) => setCode(codeFormatieren(e.target.value)) }) }), fehler && _jsx(Hinweis, { art: "fehler", children: fehler }), erfolg && _jsx(Hinweis, { art: "erfolg", children: "Code eingel\u00F6st." }), _jsx(Knopf, { type: "submit", variante: "sekundaer", disabled: laedt || code.length < 9, children: "Einl\u00F6sen" })] }));
+}
+// Benachrichtigungen: Ein/Aus je Ereignisgruppe, je Nutzer gespeichert
+function BenachrichtigungenWahl({ userId, istInhaber }) {
+    const [werte, setWerte] = useState(null);
+    const [fehler, setFehler] = useState(null);
+    useEffect(() => {
+        void supabase
+            .from('profiles')
+            .select('benachrichtigungen')
+            .eq('id', userId)
+            .maybeSingle()
+            .then(({ data, error }) => {
+            if (error)
+                setFehler(fehlertext(error));
+            else
+                setWerte((data?.benachrichtigungen ?? {}));
+        });
+    }, [userId]);
+    async function umschalten(id, an) {
+        if (!werte)
+            return;
+        const neu = { ...werte, [id]: an };
+        setWerte(neu);
+        const { error } = await supabase.from('profiles').update({ benachrichtigungen: neu }).eq('id', userId);
+        if (error) {
+            setWerte(werte);
+            setFehler(fehlertext(error));
+        }
+        else
+            setFehler(null);
+    }
+    const gruppen = EREIGNIS_GRUPPEN.filter((g) => istInhaber || !g.nurInhaber);
+    return (_jsxs(Gruppe, { titel: "Benachrichtigungen", fuss: "Steuert, welche Meldungen in der Glocke erscheinen. Eigene Aktionen werden nie gemeldet. Es gibt keinen E-Mail- oder Push-Versand.", children: [fehler && _jsx(Hinweis, { art: "fehler", children: fehler }), gruppen.map((g) => (_jsx(Zeile, { label: _jsxs(_Fragment, { children: [_jsx("strong", { children: g.label }), _jsx("br", {}), _jsx("small", { style: { color: 'var(--text-leise)' }, children: g.text })] }), children: _jsx("input", { type: "checkbox", role: "switch", "aria-label": g.label, checked: werte ? werte[g.id] !== false : true, disabled: !werte, onChange: (e) => void umschalten(g.id, e.target.checked) }) }, g.id)))] }));
 }
 function DarstellungWahl() {
     const [wert, setWert] = useDarstellung();
