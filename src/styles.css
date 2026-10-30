@@ -354,7 +354,7 @@ button.kachel:active { transform: scale(0.98); }
 }
 .zeichen-leiste span { font-weight: 600; }
 .karte-dialog {
-  position: absolute; z-index: 5; left: 50%; bottom: 36px; transform: translateX(-50%); width: min(340px, calc(100% - 24px));
+  position: absolute; z-index: 5; left: 50%; bottom: calc(36px + env(safe-area-inset-bottom)); transform: translateX(-50%); width: min(340px, calc(100% - 24px));
   background: var(--flaeche); border-radius: var(--radius); border: 1px solid var(--color-border); padding: 14px;
   display: grid; gap: 8px;
 }
@@ -964,3 +964,14 @@ button.kachel:active { transform: none; }
 .einr-aktionen { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 4px; }
 .einr-aktionen .knopf { flex: 1 1 220px; text-align: center; text-decoration: none; }
 .verschiebe-marker { width: 26px; height: 26px; border-radius: 50%; background: #e8863c; border: 3px solid #fff; box-shadow: 0 0 0 2px #b3261e, 0 2px 8px rgba(0,0,0,.4); cursor: grab; }
+/* Statusleiste bei offenem Sheet: kleiner Chip oben links unter den Karten-Chips (das +NEU-Menü ist nur auf dem Handy ein Sheet) */
+.wte-leiste.kompakt { top: 64px; bottom: auto; left: 12px; transform: none; padding: 4px 10px; max-width: none; z-index: 9; }
+.wte-leiste.kompakt span, .wte-leiste.kompakt .link { display: none; }
+.wte-leiste.kompakt strong::before { content: '● '; }
+.wte-leiste.kompakt strong::after { content: ' aktiv'; font-weight: 500; }
+@media (max-width: 899px) {
+  .wte-leiste.kompakt-mobil { top: 64px; bottom: auto; left: 12px; transform: none; padding: 4px 10px; max-width: none; z-index: 9; }
+  .wte-leiste.kompakt-mobil span, .wte-leiste.kompakt-mobil .link { display: none; }
+  .wte-leiste.kompakt-mobil strong::before { content: '● '; }
+  .wte-leiste.kompakt-mobil strong::after { content: ' aktiv'; font-weight: 500; }
+}

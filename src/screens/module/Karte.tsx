@@ -1186,6 +1186,8 @@ export default function Karte({
 
   // ---------- Darstellung ----------
 
+  // Offenes Sheet oder Dialog am unteren Rand: die Statusleiste schrumpft zum kleinen Chip oben und bleibt so immer sichtbar
+  const sheetOffen = !!sheetArt || !!neueEinrichtung || !!einrSheet || !!gewaehlteZone || (wte && !!wteZone) || gpsImport;
   const zeichnet = modus && modus.art !== 'einrichtung';
   const einrichtungsNamen = (daten?.einrichtungen ?? []).map((e) => (e.properties?.name as string | null) ?? null);
   const kartenEbenen = daten?.ebenen ?? [];
@@ -1534,7 +1536,7 @@ export default function Karte({
         />
       )}
       {modus?.art === 'einrichtung' && (
-        <div className="wte-leiste" role="status">
+        <div className={`wte-leiste${sheetOffen ? ' kompakt' : ''}${wteMenue ? ' kompakt-mobil' : ''}`} role="status">
           <strong>Einrichtung</strong>
           <span>Karte antippen, um die Position zu setzen</span>
           <button type="button" className="link" onClick={() => setModus(null)}>
@@ -1543,7 +1545,7 @@ export default function Karte({
         </div>
       )}
       {wte && (
-        <div className="wte-leiste" role="status">
+        <div className={`wte-leiste${sheetOffen ? ' kompakt' : ''}${wteMenue ? ' kompakt-mobil' : ''}`} role="status">
           <strong>WTE</strong>
           <span>
             {wteEbenenIds.length === 0
