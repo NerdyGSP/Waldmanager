@@ -8,6 +8,7 @@ import { PositionWaehlen } from '../../components/PositionWaehlen';
 import type { Enums } from '../../lib/database.types';
 import { Auswahl, Feld, Gruppe, Hinweis, Knopf, Leer, Seite, Segmente, Zeile, WildartOptionen } from '../../components/ui';
 import type { RevierKontext } from './kontext';
+import { Symbol } from '../../components/symbole';
 
 // Fangfähige Arten (Fang melden)
 const FANG_WILDARTEN = ['fuchs', 'waschbaer', 'dachs', 'marderhund', 'steinmarder', 'baummarder', 'iltis', 'hermelin', 'mink', 'nutria'];
@@ -119,7 +120,7 @@ export function Abschuesse({ k, unterpfad = [] }: { k: RevierKontext; unterpfad?
         {liste.map((a) => (
           <button key={a.id} className="zeile zeile-knopf" onClick={() => setBearbeiten(a)}>
             <span className="zeile-label">
-              {a.art === 'fang' ? `🪤 Fang · ${a.fang_ergebnis === 'leer' ? 'leer' : `${a.wildart_id ? wildartName(wildarten, a.wildart_id) : ''}${a.fang_ergebnis === 'fehlfang' ? ' (Fehlfang)' : a.fang_zustand ? ` (${a.fang_zustand})` : ''}`}` : `${wildartName(wildarten, a.wildart_id ?? '')} ${GESCHLECHTER.find((g) => g.wert === a.geschlecht)?.kurz}`}
+              {a.art === 'fang' ? `Fang · ${a.fang_ergebnis === 'leer' ? 'leer' : `${a.wildart_id ? wildartName(wildarten, a.wildart_id) : ''}${a.fang_ergebnis === 'fehlfang' ? ' (Fehlfang)' : a.fang_zustand ? ` (${a.fang_zustand})` : ''}`}` : `${wildartName(wildarten, a.wildart_id ?? '')} ${GESCHLECHTER.find((g) => g.wert === a.geschlecht)?.kurz}`}
               {a.altersklasse ? ` · ${a.altersklasse}` : ''}
               <small>
                 {datumZeitDE(a.erlegt_am)} · {name(a.erleger_id)}
@@ -328,7 +329,7 @@ function AbschussFormular({ k, vorlage, startArt, onFertig }: { k: RevierKontext
         </Gruppe>
 
         <Knopf type="button" variante="sekundaer" onClick={ortUebernehmen}>
-          📍 Aktuelle Position als {art === 'fang' ? 'Fangort' : 'Erlegeort'}
+          <Symbol name="position" className="symbol klein" /> Aktuelle Position als {art === 'fang' ? 'Fangort' : 'Erlegeort'}
         </Knopf>
         <PositionWaehlen
           revierId={k.revierId}

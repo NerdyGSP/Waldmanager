@@ -9,6 +9,7 @@ import { datumZeitDE } from '../../lib/zeit';
 import type { Enums } from '../../lib/database.types';
 import { Auswahl, Feld, Gruppe, Hinweis, Knopf, Leer, Seite, Segmente, Zaehler, Zeile } from '../../components/ui';
 import type { RevierKontext } from './kontext';
+import { Symbol } from '../../components/symbole';
 
 const SCHNELLWAHL = ['rehwild', 'schwarzwild', 'rotwild', 'damwild', 'fuchs', 'feldhase'];
 
@@ -188,7 +189,7 @@ export function Erfassung({ k }: { k: RevierKontext }) {
         {anzahl} × {wildartName(wildarten, wildartId)} erfassen
       </Knopf>
       <Knopf variante="sekundaer" onClick={ortBestimmen}>
-        📍 Aktuelle Position verwenden
+        <Symbol name="position" className="symbol klein" /> Aktuelle Position verwenden
       </Knopf>
       <PositionWaehlen
         revierId={k.revierId}

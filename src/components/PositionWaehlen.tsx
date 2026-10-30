@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import type { Geometry } from 'geojson';
 import { supabase } from '../lib/supabase';
 import { Knopf } from './ui';
+import { Symbol } from './symbole';
 
 const BjKarte = lazy(() => import('../screens/bewegungsjagd/BjKarte'));
 
@@ -26,7 +27,7 @@ export function PositionWaehlen({ revierId, wert, onWaehlen }: { revierId: strin
   return (
     <>
       <Knopf type="button" variante="sekundaer" onClick={() => setOffen(true)}>
-        🗺️ Auf Karte wählen
+        <Symbol name="kartePunkt" className="symbol klein" /> Auf Karte wählen
       </Knopf>
       {offen &&
         createPortal(
