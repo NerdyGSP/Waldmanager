@@ -311,13 +311,13 @@ function DesktopLayout({
           </h1>
         </div>
 
-        {!voll && !eingeklappt && (
+        {(voll || !eingeklappt) && (
           <button className="desk-nav-schalter" onClick={navUmschalten} aria-expanded={!navZu} aria-controls="desk-nav">
             <span>{navZu ? 'Alle Module zeigen' : 'Nur aktives Modul'}</span>
             <span aria-hidden="true">{navZu ? '▾' : '▴'}</span>
           </button>
         )}
-        <nav id="desk-nav" className={`desk-nav ${navZu && !voll && !eingeklappt ? 'desk-nav-zu' : ''}`} aria-label="Module">
+        <nav id="desk-nav" className={`desk-nav ${navZu && (voll || !eingeklappt) ? 'desk-nav-zu' : ''}`} aria-label="Module">
           {NAVIGATION.filter((n) => n.pfad !== 'masteradmin' || kontext.istMasteradmin).map((n) => (
             <button
               key={n.pfad}
