@@ -29,6 +29,8 @@ type Abschuss = {
   einrichtung_id: string | null;
   fang_ergebnis: string | null;
   fang_zustand: string | null;
+  erleger_name: string | null;
+  bewegungsjagd_id: string | null;
 };
 
 export function Abschuesse({ k, unterpfad = [] }: { k: RevierKontext; unterpfad?: string[] }) {
@@ -45,7 +47,7 @@ export function Abschuesse({ k, unterpfad = [] }: { k: RevierKontext; unterpfad?
   const laden = useCallback(async () => {
     const { data, error } = await supabase
       .from('abschuesse')
-      .select('id, erlegt_am, wildart_id, geschlecht, altersklasse, gewicht_kg, zone_id, erleger_id, erfasst_von, bemerkung, art, einrichtung_id, fang_ergebnis, fang_zustand')
+      .select('id, erlegt_am, wildart_id, geschlecht, altersklasse, gewicht_kg, zone_id, erleger_id, erfasst_von, bemerkung, art, einrichtung_id, fang_ergebnis, fang_zustand, erleger_name, bewegungsjagd_id')
       .eq('revier_id', k.revierId)
       .is('geloescht_am', null)
       .gte('erlegt_am', `${jahr.von}T00:00:00`)
@@ -94,7 +96,7 @@ export function Abschuesse({ k, unterpfad = [] }: { k: RevierKontext; unterpfad?
   return (
     <Seite
       titel="Abschüsse & Fänge"
-      untertitel={`Jagdjahr ${jahr.label} · ${liste.filter(zaehltZurStrecke).length} Stück Strecke${liste.some((x) => x.art === 'fang') ? ` · ${liste.filter((x) => x.art === 'fang').length} Fangmeldungen` : ''}`}
+      untertitel={`Jagdjahr ${jahr.label} · ${liste.filter(zaehltZurStrecke).length} Stück Strecke${liste.some((x) => x.art === 'fang') ? ` · ${liste.filter((x) => x.art === 'fang').length} Fangmeldungen` : ''}${liste.some((x) => x.art === 'fallwild') ? ` · ${liste.filter((x) => x.art === 'fallwild').length} Fallwild` : ''}`}
       aktion={<Knopf onClick={() => setBearbeiten('neu')}>+ Erfassen</Knopf>}
     >
       <label className="filter">
@@ -123,10 +125,10 @@ export function Abschuesse({ k, unterpfad = [] }: { k: RevierKontext; unterpfad?
         {liste.map((a) => (
           <button key={a.id} className="zeile zeile-knopf" onClick={() => setBearbeiten(a)}>
             <span className="zeile-label">
-              {a.art === 'fang' ? `Fang · ${a.fang_ergebnis === 'leer' ? 'leer' : `${a.wildart_id ? wildartName(wildarten, a.wildart_id) : ''}${a.fang_ergebnis === 'fehlfang' ? ' (Fehlfang)' : a.fang_zustand ? ` (${a.fang_zustand})` : ''}`}` : `${wildartName(wildarten, a.wildart_id ?? '')} ${GESCHLECHTER.find((g) => g.wert === a.geschlecht)?.kurz}`}
+              {a.art === 'fang' ? `Fang · ${a.fang_ergebnis === 'leer' ? 'leer' : `${a.wildart_id ? wildartName(wildarten, a.wildart_id) : ''}${a.fang_ergebnis === 'fehlfang' ? ' (Fehlfang)' : a.fang_zustand ? ` (${a.fang_zustand})` : ''}`}` : `${a.art === 'fallwild' ? 'Fallwild · ' : ''}${wildartName(wildarten, a.wildart_id ?? '')} ${GESCHLECHTER.find((g) => g.wert === a.geschlecht)?.kurz}`}
               {a.altersklasse ? ` · ${a.altersklasse}` : ''}
               <small>
-                {datumZeitDE(a.erlegt_am)} · {name(a.erleger_id)}
+                {datumZeitDE(a.erlegt_am)} · {a.erleger_id ? name(a.erleger_id) : (a.erleger_name ?? name(a.erleger_id))}{a.bewegungsjagd_id ? ' · Bewegungsjagd' : ''}
                 {zone(a.zone_id) ? ` · ${zone(a.zone_id)}` : ''}
                 {a.gewicht_kg ? ` · ${a.gewicht_kg.toLocaleString('de-DE')} kg` : ''}
               </small>
@@ -235,9 +237,9 @@ function AbschussFormular({ k, vorlage, startArt, falleVor = '', onFertig }: { k
   }
 
   return (
-    <Seite titel={`${art === 'fang' ? 'Fang' : 'Abschuss'} ${vorlage ? 'bearbeiten' : 'erfassen'}`} zurueck={() => void onFertig()}>
+    <Seite titel={`${art === 'fang' ? 'Fang' : art === 'fallwild' ? 'Fallwild' : 'Abschuss'} ${vorlage ? 'bearbeiten' : 'erfassen'}`} zurueck={() => void onFertig()}>
       <form onSubmit={speichern}>
-        <Segmente label="Art" wert={art} onAendern={setArt} optionen={[{ wert: 'abschuss', label: 'Abschuss' }, { wert: 'fang', label: 'Fang' }]} />
+        <Segmente label="Art" wert={art} onAendern={setArt} optionen={[{ wert: 'abschuss', label: 'Abschuss' }, { wert: 'fallwild', label: 'Fallwild' }, { wert: 'fang', label: 'Fang' }]} />
         {art === 'fang' ? (
           <Gruppe>
             <Auswahl label="Falle" required value={falleId} onChange={(e) => setFalleId(e.target.value)}>

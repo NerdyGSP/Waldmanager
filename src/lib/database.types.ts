@@ -20,9 +20,12 @@ export type Database = {
           altersklasse: string | null
           art: string
           bemerkung: string | null
+          bewegungsjagd_id: string | null
           einrichtung_id: string | null
           erfasst_von: string | null
           erleger_id: string | null
+          erleger_name: string | null
+          erleger_teilnehmer_id: string | null
           erlegt_am: string
           erstellt_am: string
           fang_ergebnis: string | null
@@ -42,9 +45,12 @@ export type Database = {
           altersklasse?: string | null
           art?: string
           bemerkung?: string | null
+          bewegungsjagd_id?: string | null
           einrichtung_id?: string | null
           erfasst_von?: string | null
           erleger_id?: string | null
+          erleger_name?: string | null
+          erleger_teilnehmer_id?: string | null
           erlegt_am: string
           erstellt_am?: string
           fang_ergebnis?: string | null
@@ -64,9 +70,12 @@ export type Database = {
           altersklasse?: string | null
           art?: string
           bemerkung?: string | null
+          bewegungsjagd_id?: string | null
           einrichtung_id?: string | null
           erfasst_von?: string | null
           erleger_id?: string | null
+          erleger_name?: string | null
+          erleger_teilnehmer_id?: string | null
           erlegt_am?: string
           erstellt_am?: string
           fang_ergebnis?: string | null
@@ -82,6 +91,13 @@ export type Database = {
           zone_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "abschuesse_bewegungsjagd_id_fkey"
+            columns: ["bewegungsjagd_id"]
+            isOneToOne: false
+            referencedRelation: "bewegungsjagden"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "abschuesse_einrichtung_id_fkey"
             columns: ["einrichtung_id"]
@@ -101,6 +117,13 @@ export type Database = {
             columns: ["erleger_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "abschuesse_erleger_teilnehmer_id_fkey"
+            columns: ["erleger_teilnehmer_id"]
+            isOneToOne: false
+            referencedRelation: "bewegungsjagd_teilnehmer"
             referencedColumns: ["id"]
           },
           {

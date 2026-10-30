@@ -417,9 +417,12 @@ export function TeilnehmerListeDruck({ jagd, tn, standName, onZu }: { jagd: Jagd
 
 const Haken = ({ an }: { an: boolean }) => <span className={`bj-druck-haken ${an ? 'an' : ''}`} aria-label={an ? 'ja' : 'offen'} />;
 
-export function JagdtagMappeDruck({ jagd, tn, leitung, rettung, staende, standName, onZu }: { jagd: Jagd; tn: Teilnehmer[]; leitung: Jagdleiter[]; rettung: Rettung[]; staende: Stand[]; standName: (id: string | null) => string; onZu: () => void }) {
+export type StreckeDruckZeile = { wildart: string; geschlecht: string; altersklasse: string | null; stand: string; erleger: string; uhr: string; gewicht: number | null };
+
+export function JagdtagMappeDruck({ jagd, tn, leitung, rettung, staende, standName, strecke = [], onZu }: { strecke?: StreckeDruckZeile[]; jagd: Jagd; tn: Teilnehmer[]; leitung: Jagdleiter[]; rettung: Rettung[]; staende: Stand[]; standName: (id: string | null) => string; onZu: () => void }) {
   const [detail, setDetail] = useState(true);
   const [anhang, setAnhang] = useState(true);
+  const [mitStrecke, setMitStrecke] = useState(true);
   const adresse = useAdresse(jagd.treffpunkt_lat, jagd.treffpunkt_lng);
   const zu = useMemo(() => tn.filter((t) => t.status === 'zugesagt' && t.aktiv), [tn]);
   const gruppiert = zu.some((t) => t.ist_ansteller);
@@ -478,6 +481,7 @@ export function JagdtagMappeDruck({ jagd, tn, leitung, rettung, staende, standNa
         <>
           <label><input type="checkbox" checked={detail} onChange={(e) => setDetail(e.target.checked)} /> Detailkarten</label>
           <label><input type="checkbox" checked={anhang} onChange={(e) => setAnhang(e.target.checked)} /> Anstellerlisten als Anhang</label>
+          {strecke.length > 0 && <label><input type="checkbox" checked={mitStrecke} onChange={(e) => setMitStrecke(e.target.checked)} /> Streckenliste</label>}
         </>
       }
     >
@@ -575,6 +579,30 @@ export function JagdtagMappeDruck({ jagd, tn, leitung, rettung, staende, standNa
             </section>
           );
         })}
+      {mitStrecke && strecke.length > 0 && (
+        <section className="bj-druck-seite quer">
+          <h1 style={{ fontSize: '1.3rem' }}>Strecke · {jagd.titel}</h1>
+          <p className="art">{jagd.art} · {zeitText(jagd)} · {strecke.length} Stück</p>
+          <table className="bj-druck-liste">
+            <thead><tr><th>Wildart</th><th>Geschlecht</th><th>Alter</th><th>Stand</th><th>Erleger</th><th>Uhr</th><th>Gewicht</th></tr></thead>
+            <tbody>
+              {[...new Set(strecke.map((r) => r.wildart))].sort((a, b) => a.localeCompare(b, 'de')).flatMap((w) => {
+                const rows = strecke.filter((r) => r.wildart === w);
+                return [
+                  <tr className="gruppe" key={`g${w}`}><td colSpan={7}>{w}: {rows.length} Stück</td></tr>,
+                  ...rows.map((r, i) => (
+                    <tr key={`${w}${i}`}>
+                      <td>{r.wildart}</td><td>{r.geschlecht}</td><td>{r.altersklasse ?? ''}</td><td>{r.stand}</td><td>{r.erleger}</td><td>{r.uhr}</td>
+                      <td>{r.gewicht ? `${r.gewicht.toLocaleString('de-DE')} kg` : ''}</td>
+                    </tr>
+                  )),
+                ];
+              })}
+            </tbody>
+            <tfoot><tr><td colSpan={7}><strong>Summe: {strecke.length} Stück</strong></td></tr></tfoot>
+          </table>
+        </section>
+      )}
     </Druckrahmen>
   );
 }

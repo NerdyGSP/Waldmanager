@@ -9,12 +9,13 @@ import { datumDE, heuteISO } from '../../lib/zeit';
 import { EinrichtungsOptionen } from '../../components/EinrichtungsOptionen';
 import { EINRICHTUNGSTYPEN, useMitglieder } from '../../lib/stammdaten';
 import { TeilnehmerInfoDruck, TeilnehmerListeDruck, JagdtagMappeDruck } from './BjDruck';
+import { BjStrecke, streckeText, useBjStrecke } from './BjStrecke';
 import { JagdleitungBlock, RettungspunkteBlock, StandKartenDialog, useBjVorbereitung } from './BjVorbereitung';
 import { BjTeilnehmerUebersicht } from './BjTeilnehmerUebersicht';
 import { emailGueltig, JAGDARTEN, neuerEntwurf, teilnehmerCsv, type TeilnehmerEntwurf } from '../../lib/bewegungsjagd';
 import type { Tables } from '../../lib/database.types';
 import { statusAm, useJagdzeiten } from '../../lib/jagdzeiten';
-import { useWildarten } from '../../lib/stammdaten';
+import { GESCHLECHTER, useWildarten, wildartName } from '../../lib/stammdaten';
 import { Auswahl, Feld, Gruppe, Hinweis, Knopf, Leer, Segmente, Seite } from '../../components/ui';
 import type { RevierKontext } from '../module/kontext';
 import type { BjMarker } from './BjKarte';
@@ -584,6 +585,9 @@ function Auswertung({ k, id }: { k: RevierKontext; id: string }) {
   const [aufgaben, setAufgaben] = useState<Aufgabe[]>([]);
   const [fehler, setFehler] = useState<string | null>(null);
   const [abschluss, setAbschluss] = useState(false);
+  const [streckePruefung, setStreckePruefung] = useState(false);
+  const wildarten = useWildarten();
+  const { liste: strecke, laden: streckeLaden } = useBjStrecke(id);
   const [kommentar, setKommentar] = useState('');
   const [aufgabeTitel, setAufgabeTitel] = useState('');
   const [aufgabeFaellig, setAufgabeFaellig] = useState('');
@@ -780,6 +784,7 @@ function Auswertung({ k, id }: { k: RevierKontext; id: string }) {
         <div><strong>{z.hunde}</strong><span>Hunde</span></div>
         <div><strong>{z.hornblaeser}</strong><span>Hornbläser</span></div>
         <div><strong>{z.plaetze}</strong><span>Mitfahrplätze</span></div>
+        <div><strong>{strecke.length}</strong><span>Strecke (Stück)</span></div>
         {jagd.schuesseltreiben && <div><strong>{z.schuessel}</strong><span>Schüsseltreiben</span></div>}
         {jagd.hegebeitrag_aktiv && <div><strong>{z.hege.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}</strong><span>Hegebeitrag (Zusagen)</span></div>}
       </div>
@@ -865,6 +870,17 @@ function Auswertung({ k, id }: { k: RevierKontext; id: string }) {
         <div className="bj-ja-nein"><span /><Knopf variante="sekundaer" disabled={!aufgabeTitel.trim()} onClick={() => void aufgabeAnlegen()}>Aufgabe hinzufügen</Knopf></div>
       </Gruppe>
 
+      <BjStrecke
+        revierId={k.revierId}
+        bundesland={k.bundesland}
+        jagd={jagd}
+        staende={einrichtungen.filter((e) => e.typ === 'drueckjagdbock').map((e) => ({ id: e.id, label: einrLabel(e), lng: e.lng, lat: e.lat }))}
+        teilnehmer={tn.map((t) => ({ id: t.id, name: t.name, status: t.status }))}
+        liste={strecke}
+        offen={offen && k.istInhaber}
+        onGeaendert={streckeLaden}
+      />
+
       <Gruppe titel="Anmeldeseite" fuss="Teilnehmer öffnen die Seite über den Link in ihrer E-Mail.">
         <div className="bj-text"><span>{link}</span></div>
       </Gruppe>
@@ -876,14 +892,31 @@ function Auswertung({ k, id }: { k: RevierKontext; id: string }) {
       )}
       {offen && (
         <div className="bj-dialog-knoepfe">
-          <Knopf variante="akzent" onClick={() => setAbschluss(true)}>Jagd abschließen</Knopf>
+          <Knopf variante="akzent" onClick={() => setStreckePruefung(true)}>Jagd abschließen</Knopf>
         </div>
       )}
 
       {standFuer && <StandKartenDialog teilnehmer={tn.find((x) => x.id === standFuer.id) ?? standFuer} alle={tn} staende={einrichtungen.filter((e) => e.typ === 'drueckjagdbock')} grenze={grenze} onWaehlen={(sid, partner, modus) => void standWaehlen(sid, partner, modus)} onZu={() => setStandFuer(null)} />}
-      {druck === 'mappe' && <JagdtagMappeDruck jagd={jagd} tn={tn} leitung={leitung} rettung={rettung} staende={einrichtungen} standName={(eid: string | null) => (stand(eid) ? einrLabel(stand(eid)!) : '')} onZu={() => setDruck(null)} />}
+      {druck === 'mappe' && <JagdtagMappeDruck jagd={jagd} tn={tn} leitung={leitung} rettung={rettung} staende={einrichtungen} standName={(eid: string | null) => (stand(eid) ? einrLabel(stand(eid)!) : '')} strecke={strecke.map((e) => ({ wildart: wildartName(wildarten, e.wildart_id ?? ''), geschlecht: GESCHLECHTER.find((g) => g.wert === e.geschlecht)?.kurz ?? '', altersklasse: e.altersklasse, stand: standLabel(e.einrichtung_id), erleger: e.erleger_name ?? '', uhr: new Date(e.erlegt_am).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }), gewicht: e.gewicht_kg }))} onZu={() => setDruck(null)} />}
       {druck === 'info' && <TeilnehmerInfoDruck jagd={jagd} leitung={leitung} rettung={rettung} staende={einrichtungen} tn={tn} boecke={einrichtungen.filter((e) => e.typ === 'drueckjagdbock').map((e) => ({ id: e.id, lng: e.lng, lat: e.lat, name: e.name }))} onZu={() => setDruck(null)} />}
       {druck === 'liste' && <TeilnehmerListeDruck jagd={jagd} tn={tn} standName={(eid) => (stand(eid) ? einrLabel(stand(eid)!) : '')} onZu={() => setDruck(null)} />}
+
+      {streckePruefung && (
+        <div className="bj-dialog-hintergrund" role="dialog" aria-modal="true" aria-label="Strecke prüfen">
+          <div className="bj-dialog">
+            <strong>{strecke.length ? 'Strecke so übernehmen?' : 'Keine Strecke erfasst, trotzdem abschließen?'}</strong>
+            <p style={{ margin: 0, color: 'var(--color-text-muted)', fontSize: '.9rem' }}>
+              {strecke.length
+                ? `${streckeText(strecke, (w) => wildartName(wildarten, w))}. Die Einträge sind danach normale Abschüsse unter „Abschüsse & Fänge“.`
+                : 'Die Strecke lässt sich auch später unter „Abschüsse & Fänge“ eintragen.'}
+            </p>
+            <div className="bj-dialog-knoepfe">
+              <Knopf variante="ghost" onClick={() => setStreckePruefung(false)}>Zurück</Knopf>
+              <Knopf variante="akzent" onClick={() => { setStreckePruefung(false); setAbschluss(true); }}>{strecke.length ? 'Bestätigen' : 'Trotzdem abschließen'}</Knopf>
+            </div>
+          </div>
+        </div>
+      )}
 
       {abschluss && (
         <div className="bj-dialog-hintergrund" role="dialog" aria-modal="true" aria-label="Jagd abschließen">
