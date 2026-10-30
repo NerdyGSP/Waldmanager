@@ -915,6 +915,105 @@ export type Database = {
           },
         ]
       }
+      ereignis_gelesen: {
+        Row: {
+          revier_id: string
+          user_id: string
+          zuletzt_gelesen_am: string
+        }
+        Insert: {
+          revier_id: string
+          user_id: string
+          zuletzt_gelesen_am?: string
+        }
+        Update: {
+          revier_id?: string
+          user_id?: string
+          zuletzt_gelesen_am?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ereignis_gelesen_revier_id_fkey"
+            columns: ["revier_id"]
+            isOneToOne: false
+            referencedRelation: "reviere"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ereignis_gelesen_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ereignisse: {
+        Row: {
+          akteur_id: string | null
+          akteur_name: string | null
+          anzahl: number
+          erstellt_am: string
+          gruppe: string
+          hervorgehoben: boolean
+          id: string
+          ref: string | null
+          revier_id: string
+          sichtbar_fuer: string
+          titel: string
+          typ: string
+          ziel_id: string | null
+          ziel_typ: string | null
+        }
+        Insert: {
+          akteur_id?: string | null
+          akteur_name?: string | null
+          anzahl?: number
+          erstellt_am?: string
+          gruppe: string
+          hervorgehoben?: boolean
+          id?: string
+          ref?: string | null
+          revier_id: string
+          sichtbar_fuer?: string
+          titel: string
+          typ: string
+          ziel_id?: string | null
+          ziel_typ?: string | null
+        }
+        Update: {
+          akteur_id?: string | null
+          akteur_name?: string | null
+          anzahl?: number
+          erstellt_am?: string
+          gruppe?: string
+          hervorgehoben?: boolean
+          id?: string
+          ref?: string | null
+          revier_id?: string
+          sichtbar_fuer?: string
+          titel?: string
+          typ?: string
+          ziel_id?: string | null
+          ziel_typ?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ereignisse_akteur_id_fkey"
+            columns: ["akteur_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ereignisse_revier_id_fkey"
+            columns: ["revier_id"]
+            isOneToOne: false
+            referencedRelation: "reviere"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       freigaben: {
         Row: {
           freigegeben_am: string
@@ -1158,6 +1257,7 @@ export type Database = {
       profiles: {
         Row: {
           aktualisiert_am: string
+          benachrichtigungen: Json
           email: string
           erstellt_am: string
           id: string
@@ -1165,6 +1265,7 @@ export type Database = {
         }
         Insert: {
           aktualisiert_am?: string
+          benachrichtigungen?: Json
           email: string
           erstellt_am?: string
           id: string
@@ -1172,6 +1273,7 @@ export type Database = {
         }
         Update: {
           aktualisiert_am?: string
+          benachrichtigungen?: Json
           email?: string
           erstellt_am?: string
           id?: string
@@ -1843,6 +1945,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      aufgaben_faellig_pruefen: {
+        Args: { p_revier_id: string }
+        Returns: undefined
+      }
       bj_absagen_loeschen: {
         Args: { p_code: string; p_jagd: string }
         Returns: boolean
