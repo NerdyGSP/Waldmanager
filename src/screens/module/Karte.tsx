@@ -28,6 +28,7 @@ import { navigieren } from '../../lib/router';
 import { EinrichtungsIcon, einrichtungsBild } from '../../lib/einrichtungsIcons';
 import type { Enums, Json } from '../../lib/database.types';
 import type { RevierKontext } from './kontext';
+import { Symbol } from '../../components/symbole';
 
 // ---------- Kartengrundlagen ----------
 
@@ -983,7 +984,7 @@ export default function Karte({
           </Abschnitt>
 
           <Abschnitt titel="Ebenen" offen>
-          <p className="leer" style={{ margin: 0 }}>Oberste Ebene liegt über den anderen. Mit ▲ ▼ verschieben, mit dem Regler die Transparenz einstellen.</p>
+          <p className="leer" style={{ margin: 0 }}>Oberste Ebene liegt über den anderen. Mit den Pfeilen verschieben, mit dem Regler die Transparenz einstellen.</p>
           <ul className="ebenen-liste">
             {einst.reihenfolge.map((id, i) => {
               if (imBlock(id)) return null;
@@ -995,10 +996,10 @@ export default function Karte({
                     <EbenenSchalter label={info.label} an={info.an} gesperrt={info.gesperrt} onAendern={info.setAn} />
                     <span className="ebenen-schieber">
                       <button type="button" aria-label={`${info.name} nach oben`} disabled={id === sichtbareIds[0]} onClick={() => verschieben(i, -1)}>
-                        ▲
+                        <Symbol name="nachOben" className="symbol klein" />
                       </button>
                       <button type="button" aria-label={`${info.name} nach unten`} disabled={id === sichtbareIds[sichtbareIds.length - 1]} onClick={() => verschieben(i, 1)}>
-                        ▼
+                        <Symbol name="nachUnten" className="symbol klein" />
                       </button>
                     </span>
                   </div>
@@ -1146,16 +1147,16 @@ export default function Karte({
                   </span>
                   <span>
                     <strong>{Math.round(wind.windKmh)} km/h</strong> aus {himmelsrichtung(wind.windRichtung)}
-                    <small>{Math.round(wind.temperatur)} °C · Wetter ▾</small>
+                    <small>{Math.round(wind.temperatur)} °C · Wetter</small>
                   </span>
                 </button>
                 <button className="link" onClick={windLaden} aria-label="Wind aktualisieren">
-                  ↻
+                  <Symbol name="aktualisieren" className="symbol klein" />
                 </button>
               </div>
             )}
-            <button type="button" className={`karte-chip chip-knopf ${wte ? 'an' : ''}`} aria-pressed={wte} aria-haspopup="menu" aria-expanded={wteMenue} onClick={() => setWteMenue((o) => !o)}>
-              <span aria-hidden="true">👁</span> WTE
+            <button type="button" className={`karte-chip chip-knopf ${wte ? 'an' : ''}`} aria-pressed={wte} aria-label="Neu: Einrichtung, Fang, Wildtiererfassung" aria-haspopup="menu" aria-expanded={wteMenue} onClick={() => setWteMenue((o) => !o)}>
+              <Symbol name="neu" className="symbol klein" /> NEU
             </button>
             <button
               type="button"
@@ -1165,7 +1166,7 @@ export default function Karte({
               title="Windpfeile von deinem Standort"
               onClick={() => setWindpfeile(!windpfeile)}
             >
-              <span aria-hidden="true">💨</span> Windpfeile
+              <Symbol name="wind" className="symbol klein" /> Windpfeile
             </button>
           </div>
           {wind && wetterOffen && <WetterPanel lat={wetterOrt[0]} lon={wetterOrt[1]} mitte={daten?.mitte ?? null} onSchliessen={() => setWetterOffen(false)} />}
@@ -1229,7 +1230,7 @@ export default function Karte({
             </button>
           ) : (
             <button type="button" role="menuitem" onClick={() => setWte(true)}>
-              👁 Wildtiererfassung starten
+              Wildtiererfassung starten
             </button>
           )}
         </div>
@@ -1285,7 +1286,7 @@ export default function Karte({
 
       {!eingebettet && (
         <button className="panel-schalter" onClick={() => setPanelOffen((o) => !o)} aria-expanded={panelOffen}>
-          {panelOffen ? '✕ Schließen' : '☰ Ebenen & Werkzeuge'}
+          {panelOffen ? 'Schließen' : 'Ebenen & Werkzeuge'}
         </button>
       )}
 

@@ -496,7 +496,7 @@ function Start({
           {MODULE.filter((m) => m.pfad !== 'masteradmin' || istMasteradmin).map((m) => (
             <button key={m.pfad} className="kachel" onClick={() => navigieren(`/${m.pfad}`)}>
               <span className="kachel-symbol" aria-hidden="true">
-                {m.symbol}
+                <Symbol name={m.pfad} className="symbol gross" />
               </span>
               <strong>{m.titel}</strong>
               <span>{m.text}</span>

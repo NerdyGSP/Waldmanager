@@ -5,6 +5,7 @@ import { nameVergeben, useZonen, useZonenEbenen, zufallsFarben, ZONENFARBEN, typ
 import { navigieren } from '../../lib/router';
 import { Auswahl, Farbwahl, Feld, Gruppe, Hinweis, Knopf, Leer, Seite, Zeile } from '../../components/ui';
 import type { RevierKontext } from './kontext';
+import { Symbol } from '../../components/symbole';
 
 export function Zonen({ k }: { k: RevierKontext }) {
   const { zonen, laedt, laden } = useZonen(k.revierId);
@@ -124,7 +125,7 @@ export function Zonen({ k }: { k: RevierKontext }) {
         <section className="gruppe" key={gid}>
           <div className="gruppe-kopf">
             <button className="gruppe-toggle" aria-expanded={offen} onClick={() => umschalten(gid)}>
-              <span aria-hidden="true">{offen ? '▾' : '▸'}</span>
+              <span aria-hidden="true"><Symbol name={offen ? 'runter' : 'ausklappen'} className="symbol klein" /></span>
               {ebene && <i className="farbpunkt" style={{ background: ebene.farbe ?? 'var(--text-leise)' }} />}
               <span className="gruppe-titel" style={{ margin: 0 }}>
                 {`${ebene ? ebene.name : ebenen.length ? 'Ohne Ebene' : 'Zonen'} · ${liste.length}`}

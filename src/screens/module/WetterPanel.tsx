@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { himmelsrichtung } from '../../lib/geo';
 import { sonneMond, wetterDetail, type WetterDetail } from '../../lib/wetterPanel';
 import { Segmente } from '../../components/ui';
+import { Symbol } from '../../components/symbole';
 
 const zeitFmt = (d: Date | null) => (d ? d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : '–');
 
@@ -51,7 +52,7 @@ export function WetterPanel({
       <div className="wetter-kopf">
         <Segmente label="Ansicht" wert={reiter} onAendern={setReiter} optionen={[{ wert: 'wetter', label: 'Wetter' }, { wert: 'sonne', label: 'Sonne & Mond' }]} />
         <button type="button" className="link" onClick={onSchliessen} aria-label="Schließen">
-          ✕
+          <Symbol name="schliessen" className="symbol klein" />
         </button>
       </div>
 
@@ -81,7 +82,7 @@ export function WetterPanel({
                 ))}
               </div>
               <small className="leer">Open-Meteo · Stand {new Date(w.stand).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}</small>
-              <button type="button" className="link" onClick={() => void laden(true)}>↻ Aktualisieren</button>
+              <button type="button" className="link" onClick={() => void laden(true)}>Aktualisieren</button>
             </>
           )}
         </>
@@ -98,7 +99,7 @@ export function WetterPanel({
             <dl className="wetter-werte">
               <div><dt>Sonnenaufgang</dt><dd>{zeitFmt(sm.aufgang)}</dd></div>
               <div><dt>Sonnenuntergang</dt><dd>{zeitFmt(sm.untergang)}</dd></div>
-              <div><dt>Büchsenlicht</dt><dd>{zeitFmt(sm.buechsenlichtVon)} – {zeitFmt(sm.buechsenlichtBis)} <small>Richtwert: 30 min vor Aufgang bis 30 min nach Untergang</small></dd></div>
+              <div><dt>Büchsenlicht</dt><dd>{zeitFmt(sm.buechsenlichtVon)} – {zeitFmt(sm.buechsenlichtBis)} <small>Richtwert: 1,5 Std. vor Aufgang bis 1,5 Std. nach Untergang</small></dd></div>
               <div><dt>Mondaufgang</dt><dd>{zeitFmt(sm.mondAufgang)}</dd></div>
               <div><dt>Monduntergang</dt><dd>{zeitFmt(sm.mondUntergang)}</dd></div>
               <div><dt>Mondphase</dt><dd>{sm.mondphase} <small>{sm.beleuchtung} % beleuchtet</small></dd></div>

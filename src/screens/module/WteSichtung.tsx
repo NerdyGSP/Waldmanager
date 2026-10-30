@@ -7,6 +7,7 @@ import { heuteISO, mondphase } from '../../lib/zeit';
 import type { Enums } from '../../lib/database.types';
 import { Auswahl, Hinweis, Knopf, Segmente, WildartOptionen, Zaehler } from '../../components/ui';
 import type { RevierKontext } from './kontext';
+import { Symbol } from '../../components/symbole';
 
 export type WteSitzung = { id: string; datum: string; ebene_id: string | null };
 export type WteZone = { id: string; name: string; ebeneId: string | null };
@@ -96,7 +97,7 @@ export function WteSichtung({
       <div className="wte-sheet-kopf">
         <strong>Sichtung · {zone.name}</strong>
         <button type="button" className="link" onClick={onSchliessen} aria-label="Schließen">
-          ✕
+          <Symbol name="schliessen" className="symbol klein" />
         </button>
       </div>
       <Auswahl label="Wildart" value={wildartId} onChange={(e) => { setWildartId(e.target.value); setAltersklasse(''); }}>

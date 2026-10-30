@@ -4,6 +4,7 @@ import { fehlertext } from '../lib/fehler';
 import { datumDE } from '../lib/zeit';
 import { CodeAnzeige, Gruppe, Hinweis, Knopf, Seite } from '../components/ui';
 import { AdminPanel } from './AdminPanel';
+import { Symbol } from '../components/symbole';
 
 type Zeile = {
   key: string;
@@ -95,7 +96,7 @@ export function Masteradmin({ userId, nachAenderung }: { userId: string; nachAen
   const kopf = (spalte: Spalte, titel: string) => (
     <th aria-sort={sort.spalte === spalte ? (sort.auf ? 'ascending' : 'descending') : 'none'}>
       <button onClick={() => setSort((s) => ({ spalte, auf: s.spalte === spalte ? !s.auf : true }))}>
-        {titel} {sort.spalte === spalte ? (sort.auf ? '▲' : '▼') : ''}
+        {titel} {sort.spalte === spalte ? <Symbol name={sort.auf ? 'nachOben' : 'nachUnten'} className="symbol klein" /> : ''}
       </button>
     </th>
   );

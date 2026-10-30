@@ -5,6 +5,7 @@ import { useWildarten } from '../../lib/stammdaten';
 import { navigieren } from '../../lib/router';
 import { datumDE } from '../../lib/zeit';
 import { Verlauf } from '../../components/diagramme';
+import { Symbol } from '../../components/symbole';
 
 export type GewaehlteZone = { id: string; name: string; farbe: string | null; flaecheHa: number | null };
 
@@ -107,7 +108,7 @@ export function ZonenInfo({ zone, onSchliessen }: { zone: GewaehlteZone; onSchli
           Zur Wildzählung
         </button>
         <button className="zonen-info-zu" onClick={onSchliessen} aria-label="Informationsfenster schließen">
-          ✕
+          <Symbol name="schliessen" className="symbol klein" />
         </button>
       </header>
 
