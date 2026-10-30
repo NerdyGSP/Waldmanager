@@ -23,6 +23,7 @@ import { Wildschaeden } from './module/Wildschaeden';
 import { Aufgaben } from './module/Aufgaben';
 import { Begehungsscheine } from './module/Begehungsscheine';
 import { Datenimport } from './module/Datenimport';
+import { EinrichtungenVollbild } from './module/Einrichtungstabelle';
 import { BewegungsjagdListe, BewegungsjagdVollbild } from './bewegungsjagd/Bewegungsjagd';
 // Die Karte ist groß (MapLibre) und wird erst bei Bedarf geladen
 const Karte = lazy(() => import('./module/Karte'));
@@ -93,6 +94,10 @@ export function Home({ session }) {
     // Bewegungsjagd (Assistent/Auswertung): Vollbild ohne Seitenleiste und Navigation
     if (revierKontext && modul === 'bewegungsjagd' && pfad[1]) {
         return _jsx(BewegungsjagdVollbild, { k: revierKontext, id: pfad[1] }, `${revierKontext.revierId}-${pfad[1]}`);
+    }
+    // Einrichtungstabelle: Vollbild ohne Seitenleiste
+    if (revierKontext && modul === 'reviermanagement' && pfad[1] === 'einrichtungen') {
+        return _jsx(EinrichtungenVollbild, { k: revierKontext }, revierKontext.revierId);
     }
     // Browseransicht: Seitenleiste mit Navigation und Modulinhalt, rechts dauerhaft die Karte
     if (breit && revierKontext) {

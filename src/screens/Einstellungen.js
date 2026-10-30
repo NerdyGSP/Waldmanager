@@ -14,7 +14,7 @@ export function Einstellungen({ kontext, nachAenderung, }) {
 }
 // Revierverwaltung: Revier, Mitglieder & Einladungen, Kartendaten löschen, Revier verlassen, Code einlösen
 export function Reviermanagement({ userId, aktuell, nachAenderung, }) {
-    return (_jsxs(Seite, { titel: "Reviermanagement", children: [aktuell && (_jsxs(_Fragment, { children: [_jsx(Revier, { aktuell: aktuell, onGeaendert: () => nachAenderung() }), aktuell.rolle === 'inhaber' ? (_jsxs(_Fragment, { children: [_jsx(MitgliederPanel, { revierId: aktuell.revier.id, eigeneId: userId }), _jsx(RevierdatenLoeschen, { revierId: aktuell.revier.id, onGeaendert: () => nachAenderung() })] })) : (_jsx(RevierVerlassen, { aktuell: aktuell, userId: userId, onVerlassen: () => nachAenderung() }))] })), _jsx(CodeEinloesen, { onEingeloest: nachAenderung })] }));
+    return (_jsxs(Seite, { titel: "Reviermanagement", children: [aktuell && (_jsxs(_Fragment, { children: [_jsx(Revier, { aktuell: aktuell, onGeaendert: () => nachAenderung() }), _jsx(Gruppe, { titel: "Einrichtungen", children: _jsx("div", { style: { padding: '10px var(--abstand)' }, children: _jsx(Knopf, { variante: "sekundaer", onClick: () => navigieren('/reviermanagement/einrichtungen'), children: "Alle Einrichtungen (Tabelle)" }) }) }), aktuell.rolle === 'inhaber' ? (_jsxs(_Fragment, { children: [_jsx(MitgliederPanel, { revierId: aktuell.revier.id, eigeneId: userId }), _jsx(RevierdatenLoeschen, { revierId: aktuell.revier.id, onGeaendert: () => nachAenderung() })] })) : (_jsx(RevierVerlassen, { aktuell: aktuell, userId: userId, onVerlassen: () => nachAenderung() }))] })), _jsx(CodeEinloesen, { onEingeloest: nachAenderung })] }));
 }
 function Konto({ name, email, onGeaendert }) {
     const [neuerName, setNeuerName] = useState(name);

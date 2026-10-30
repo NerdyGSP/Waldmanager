@@ -305,6 +305,19 @@ export default function Karte({ k, eingebettet = false, panelZiel = null, aktual
                 m.addImage(e.id, einrichtungsBild('sonstiges', '#5d6d7e'), { pixelRatio: 2 });
         });
         m.on('load', () => {
+            // „Auf Karte zeigen“ aus der Einrichtungstabelle
+            try {
+                const f = sessionStorage.getItem('hegewerk:kartenfokus');
+                if (f) {
+                    sessionStorage.removeItem('hegewerk:kartenfokus');
+                    const x = JSON.parse(f);
+                    m.jumpTo({ center: [x.lng, x.lat], zoom: 18 });
+                    setEinrSheet(x);
+                }
+            }
+            catch {
+                /* ohne Fokus weiter */
+            }
             for (const id of ['grenze', 'zonen', 'einrichtungen', 'pirschwege', 'beobachtungen', 'abschuesse', 'heatquelle', 'zeichnung']) {
                 m.addSource(id, { type: 'geojson', data: LEER });
             }

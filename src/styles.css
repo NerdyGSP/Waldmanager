@@ -988,3 +988,16 @@ button.kachel:active { transform: none; }
 .bj-tn-tabelle .bj-zeile-aktionen { flex-wrap: nowrap; gap: 4px; }
 .bj-tn-tabelle .bj-zeile-aktionen button { padding: 2px 8px; min-height: 0; font-size: .78rem; }
 .bj-tn-tabelle .bj-detail { white-space: normal; }
+.einr-tabelle-rahmen { max-width: none !important; }
+.einr-dialog-rahmen { position: fixed; inset: 0; z-index: 50; background: rgba(0,0,0,.35); }
+.einr-dialog-rahmen .wte-sheet { position: absolute; }
+.einr-filter { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.einr-filter input[type=search] { flex: 1 1 220px; }
+.einr-zaehler { display: flex; gap: 6px; flex-wrap: wrap; }
+.einr-zaehler button { border: 1px solid var(--color-border-input); background: var(--color-surface); border-radius: 999px; padding: 4px 10px; font: inherit; font-size: .82rem; cursor: pointer; display: inline-flex; gap: 6px; align-items: center; }
+.einr-zaehler button[aria-pressed=true] { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
+.einr-tab { width: 100%; font-size: .85rem; border-collapse: collapse; }
+.einr-tab th, .einr-tab td { padding: 6px 10px; text-align: left; border-bottom: 1px solid var(--color-border); vertical-align: middle; }
+.einr-tab th button { border: 0; background: none; font: inherit; font-weight: 600; cursor: pointer; padding: 0; color: inherit; }
+.einr-tab td.aktion { white-space: nowrap; }
+.einr-tab td.aktion button { margin-right: 4px; }

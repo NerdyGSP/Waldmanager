@@ -26,6 +26,7 @@ export function EinrichtungSheet({
   onGeaendert,
   onVerschieben,
   onPosition,
+  startAnsicht,
 }: {
   k: RevierKontext;
   einr: EinrichtungInfo;
@@ -34,10 +35,11 @@ export function EinrichtungSheet({
   onGeaendert: (text: string) => void;
   onVerschieben: () => void;
   onPosition: (lng: number, lat: number) => Promise<'gespeichert' | 'gemerkt'>;
+  startAnsicht?: 'bearbeiten' | 'loeschen';
 }) {
   const typ = EINRICHTUNGSTYPEN.find((t) => t.wert === einr.typ);
   const [pos, setPos] = useState<{ lng: number; lat: number } | null>(null);
-  const [ansicht, setAnsicht] = useState<'start' | 'bearbeiten' | 'einmessen' | 'loeschen'>('start');
+  const [ansicht, setAnsicht] = useState<'start' | 'bearbeiten' | 'einmessen' | 'loeschen'>(startAnsicht ?? 'start');
   const [fehler, setFehler] = useState<string | null>(null);
   const [laeuft, setLaeuft] = useState(false);
   // bearbeiten
@@ -60,6 +62,12 @@ export function EinrichtungSheet({
     );
   }, [einr.id]);
 
+  useEffect(() => {
+    if (startAnsicht === 'loeschen') void loeschenPruefen();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const zurueck = () => (startAnsicht ? onSchliessen() : setAnsicht('start'));
   const links = navigationsLinks(einr.lat, einr.lng);
   const distanz = pos ? abstandM(pos, { lng: einr.lng, lat: einr.lat }) : null;
   const doppelt = !!name.trim() && nameVergeben(vergebeneNamen, name, einr.name);
@@ -189,7 +197,7 @@ export function EinrichtungSheet({
           </Auswahl>
           <Feld label="Bemerkung" value={bemerkung} onChange={(e) => setBemerkung(e.target.value)} />
           <div className="einr-aktionen">
-            <Knopf variante="ghost" onClick={() => setAnsicht('start')}>
+            <Knopf variante="ghost" onClick={zurueck}>
               Zurück
             </Knopf>
             <Knopf variante="akzent" disabled={laeuft || doppelt} onClick={() => void speichernBearbeiten()}>
@@ -211,7 +219,7 @@ export function EinrichtungSheet({
             </>
           )}
           <div className="einr-aktionen">
-            <Knopf variante="ghost" onClick={() => setAnsicht('start')}>
+            <Knopf variante="ghost" onClick={zurueck}>
               Abbrechen
             </Knopf>
             <Knopf variante="sekundaer" disabled={misst} onClick={messen}>
@@ -231,7 +239,7 @@ export function EinrichtungSheet({
             {jagden.length > 0 && ` Die Einrichtung ist bei ${jagden.length === 1 ? 'der Bewegungsjagd' : 'den Bewegungsjagden'} ${jagden.join(', ')} als Stand zugewiesen – diese Zuweisungen werden aufgehoben.`}
           </Hinweis>
           <div className="einr-aktionen">
-            <Knopf variante="ghost" onClick={() => setAnsicht('start')}>
+            <Knopf variante="ghost" onClick={zurueck}>
               Abbrechen
             </Knopf>
             <Knopf variante="gefahr" disabled={laeuft} onClick={() => void loeschen()}>

@@ -52,6 +52,13 @@ export function Reviermanagement({
       {aktuell && (
         <>
           <Revier aktuell={aktuell} onGeaendert={() => nachAenderung()} />
+          <Gruppe titel="Einrichtungen">
+            <div style={{ padding: '10px var(--abstand)' }}>
+              <Knopf variante="sekundaer" onClick={() => navigieren('/reviermanagement/einrichtungen')}>
+                Alle Einrichtungen (Tabelle)
+              </Knopf>
+            </div>
+          </Gruppe>
           {aktuell.rolle === 'inhaber' ? (
             <>
               <MitgliederPanel revierId={aktuell.revier.id} eigeneId={userId} />
