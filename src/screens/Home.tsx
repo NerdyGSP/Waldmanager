@@ -241,7 +241,6 @@ function DesktopLayout({
   });
   // Nach Modulwahl klappen die übrigen Module ein, das aktive bleibt sichtbar
   const [navZu, setNavZu] = useState(true);
-  const navUmschalten = () => setNavZu((z) => !z);
   const titel = NAVIGATION.find((n) => n.pfad === modul)?.titel ?? '';
   // Monitoring kann die ganze Breite einnehmen (Karte ausgeblendet) – Adresse /monitoring/voll
   const urlVoll = modul === 'monitoring' && unterpfad[0] === 'voll';
@@ -311,19 +310,18 @@ function DesktopLayout({
           </h1>
         </div>
 
-        {(voll || !eingeklappt) && (
-          <button className="desk-nav-schalter" onClick={navUmschalten} aria-expanded={!navZu} aria-controls="desk-nav">
-            <span>{navZu ? 'Alle Module zeigen' : 'Nur aktives Modul'}</span>
-            <span aria-hidden="true">{navZu ? '▾' : '▴'}</span>
-          </button>
-        )}
-        <nav id="desk-nav" className={`desk-nav ${navZu && (voll || !eingeklappt) ? 'desk-nav-zu' : ''}`} aria-label="Module">
+        <nav className={`desk-nav ${navZu && (voll || !eingeklappt) ? 'desk-nav-zu' : ''}`} aria-label="Module">
           {NAVIGATION.filter((n) => n.pfad !== 'masteradmin' || kontext.istMasteradmin).map((n) => (
             <button
               key={n.pfad}
               aria-current={modul === n.pfad}
               title={n.titel}
               onClick={() => {
+                // Klick auf das aktive Modul blendet die Menüübersicht ein bzw. wieder aus
+                if (modul === n.pfad && (voll || !eingeklappt)) {
+                  setNavZu((z) => !z);
+                  return;
+                }
                 // Im eingeklappten Menü öffnet ein Modul die Seitenleiste wieder (die Karte braucht sie nicht)
                 if (eingeklappt && n.pfad !== 'karte') einklappen(false);
                 setNavZu(true);
