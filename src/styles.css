@@ -1053,3 +1053,7 @@ button.kachel:active { transform: none; }
 .mitglieder-tabelle thead th { border-top: 0; font-size: 0.78rem; color: var(--text-leise); font-weight: 600; }
 .mitglieder-tabelle td small { display: block; color: var(--text-leise); font-size: 0.8rem; }
 .mitglieder-tabelle tr.offen td { opacity: 0.8; }
+
+.zonen-summe { margin-left: 6px; padding: 0 6px; border-radius: 9px; background: var(--akzent); color: #fff; font-size: 0.75rem; font-weight: 700; }
+
+.zonen-info-laufend { margin: 4px 16px 8px; font-size: 0.85rem; color: var(--text-leise); }

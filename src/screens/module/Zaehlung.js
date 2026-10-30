@@ -5,7 +5,8 @@ import { supabase } from '../../lib/supabase';
 import { fehlertext } from '../../lib/fehler';
 import { GESCHLECHTER, useWildarten, useZonen, useZonenEbenen, wildartName } from '../../lib/stammdaten';
 import { aktuellePosition, aktuellesWetter, wetterText } from '../../lib/geo';
-import { speichernOderMerken } from '../../lib/offline';
+import { speichernOderMerken, wartendeZaehlungen } from '../../lib/offline';
+import { useZaehlungGeaendert } from '../../lib/zaehlEreignis';
 import { datumDE, heuteISO, mondphase } from '../../lib/zeit';
 import { navigieren } from '../../lib/router';
 import { Auswahl, Feld, Gruppe, Hinweis, Knopf, Leer, Seite, Zaehler, Zeile, useRadHorizontal, WildartOptionen } from '../../components/ui';
@@ -250,13 +251,27 @@ function SitzungAnsicht({ k, sitzungId }) {
         if (s.error || z.error)
             setFehler(fehlertext(s.error ?? z.error));
         setSitzung(s.data);
-        setZeilen(z.data ?? []);
+        // Noch nicht übertragene Einträge (Offline-Warteschlange) werden über ihre ID eingemischt – nichts wird doppelt gezählt
+        const m = new Map((z.data ?? []).map((x) => [x.id, x]));
+        for (const w of wartendeZaehlungen(sitzungId)) {
+            const alt = m.get(w.id);
+            if (alt)
+                m.set(w.id, { ...alt, anzahl: w.anzahl });
+            else if (w.wildart_id)
+                m.set(w.id, { id: w.id, zone_id: w.zone_id, wildart_id: w.wildart_id, geschlecht: (w.geschlecht ?? 'unbekannt'), anzahl: w.anzahl });
+        }
+        setZeilen([...m.values()]);
         if (s.data?.status === 'abgeschlossen')
             setUebersicht(true);
     }, [sitzungId]);
     useEffect(() => {
         void laden();
     }, [laden]);
+    // Eingaben aus dem WTE-Modus der Karte (oder anderen Geräten nach der Synchronisation) auffrischen
+    useZaehlungGeaendert((e) => {
+        if (e.sitzungId === sitzungId && e.quelle === 'server')
+            void laden();
+    });
     // Erste Zone vorauswählen
     useEffect(() => {
         if (!zoneId && zonen[0])

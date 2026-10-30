@@ -7,6 +7,8 @@ import { navigieren } from '../../lib/router';
 import { datumDE } from '../../lib/zeit';
 import { Verlauf } from '../../components/diagramme';
 import { Symbol } from '../../components/symbole';
+import { useZaehlungGeaendert } from '../../lib/zaehlEreignis';
+import { wartendeZaehlungen } from '../../lib/offline';
 
 export type GewaehlteZone = { id: string; name: string; farbe: string | null; flaecheHa: number | null };
 
@@ -21,6 +23,39 @@ export function ZonenInfo({ zone, onSchliessen, onBearbeiten }: { zone: Gewaehlt
   const [messungen, setMessungen] = useState<Messung[] | null>(null);
   const [fehler, setFehler] = useState<string | null>(null);
   const [verlaufArt, setVerlaufArt] = useState('');
+  const [neu, setNeu] = useState(0);
+  const [laufend, setLaufend] = useState<{ summe: number; sitzungId: string } | null>(null);
+
+  // Eingaben in dieser Zone (auch aus dem WTE-Modus) frischen Tabelle, Verlauf und laufende Zählung auf
+  useZaehlungGeaendert((e) => {
+    if (e.zoneId === zone.id || e.quelle === 'server') setNeu((n) => n + 1);
+    if (e.zeile && e.zoneId === zone.id) setLaufend((l) => (l && l.sitzungId === e.sitzungId ? l : { summe: 0, sitzungId: e.sitzungId }));
+  });
+
+  // Laufende Zählung: Summe in dieser Zone, inklusive noch nicht übertragener Einträge
+  useEffect(() => {
+    let aktiv = true;
+    void (async () => {
+      const { data } = navigator.onLine
+        ? await supabase
+            .from('zaehlungen')
+            .select('id, anzahl, sitzung_id, sitzung:zaehlsitzungen!inner(status, geloescht_am)')
+            .eq('zone_id', zone.id)
+            .is('geloescht_am', null)
+            .eq('sitzung.status', 'offen')
+            .is('sitzung.geloescht_am', null)
+        : { data: null };
+      if (!aktiv) return;
+      const m = new Map<string, { anzahl: number; sitzung: string }>((data ?? []).map((z) => [z.id, { anzahl: z.anzahl, sitzung: z.sitzung_id }]));
+      const sitzungen = new Set([...m.values()].map((v) => v.sitzung));
+      for (const sid of sitzungen) for (const w of wartendeZaehlungen(sid)) if (w.zone_id === zone.id) m.set(w.id, { anzahl: w.anzahl, sitzung: sid });
+      const summe = [...m.values()].reduce((a, v) => a + v.anzahl, 0);
+      setLaufend(m.size ? { summe, sitzungId: [...sitzungen][0] ?? '' } : null);
+    })();
+    return () => {
+      aktiv = false;
+    };
+  }, [zone.id, neu]);
 
   useEffect(() => {
     let aktiv = true;
@@ -49,7 +84,7 @@ export function ZonenInfo({ zone, onSchliessen, onBearbeiten }: { zone: Gewaehlt
     return () => {
       aktiv = false;
     };
-  }, [zone.id]);
+  }, [zone.id, neu]);
 
   // Letzte Zählungen (neueste zuerst), je Zählung die Summe je Wildart
   const auswertung = useMemo(() => {
@@ -120,6 +155,11 @@ export function ZonenInfo({ zone, onSchliessen, onBearbeiten }: { zone: Gewaehlt
       </header>
 
       {fehler && <p className="feld-fehler">{fehler}</p>}
+      {laufend && (
+        <p className="zonen-info-laufend">
+          Laufende Zählung: <strong>{laufend.summe}</strong> Stück in dieser Zone
+        </p>
+      )}
 
       {auswertung.arten.length > 0 && (
         <div className="zonen-info-inhalt">

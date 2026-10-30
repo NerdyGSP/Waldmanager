@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from './supabase';
+import { zaehlungGeaendert } from './zaehlEreignis';
 const SCHLUESSEL = 'hegewerk.warteschlange';
 const EREIGNIS = 'hegewerk:warteschlange';
 function lesen() {
@@ -40,15 +41,38 @@ async function senden(e) {
 }
 // Speichert sofort, bei fehlender Verbindung landet der Eintrag in der Warteschlange.
 export async function speichernOderMerken(e) {
+    const zeile = e.tabelle === 'zaehlungen' ? zeileVon(e.daten) : null;
+    // Sofortige Anzeige (optimistisch), auch offline
+    if (zeile)
+        zaehlungGeaendert({ sitzungId: zeile.sitzung_id, zoneId: zeile.zone_id, quelle: 'lokal', zeile });
     if (navigator.onLine) {
         const r = await senden(e);
-        if (r.ok)
+        if (r.ok) {
+            if (zeile)
+                zaehlungGeaendert({ sitzungId: zeile.sitzung_id, zoneId: zeile.zone_id, quelle: 'server', zeile });
             return 'gespeichert';
-        if (!r.netz)
+        }
+        if (!r.netz) {
+            // Fehlgeschlagen: Ansichten neu vom Server laden, damit der optimistische Wert verschwindet
+            if (zeile)
+                zaehlungGeaendert({ sitzungId: zeile.sitzung_id, zoneId: zeile.zone_id, quelle: 'server' });
             throw new Error(r.fehler ?? 'Speichern fehlgeschlagen');
+        }
     }
     schreiben([...lesen().filter((x) => x.daten.id !== e.daten.id), e]);
     return 'gemerkt';
+}
+function zeileVon(d) {
+    return d.sitzung_id ? { id: d.id, sitzung_id: d.sitzung_id, zone_id: d.zone_id ?? null, anzahl: d.anzahl ?? 0, wildart_id: d.wildart_id, geschlecht: d.geschlecht } : null;
+}
+// Noch nicht übertragene Zählzeilen einer Sitzung (für die lokale Anzeige)
+export function wartendeZaehlungen(sitzungId) {
+    return lesen().flatMap((x) => {
+        if (x.tabelle !== 'zaehlungen')
+            return [];
+        const z = zeileVon(x.daten);
+        return z && z.sitzung_id === sitzungId ? [z] : [];
+    });
 }
 let laeuft = false;
 export async function warteschlangeAbarbeiten() {
@@ -62,6 +86,12 @@ export async function warteschlangeAbarbeiten() {
             // Fachliche Fehler (z. B. Revier gelöscht) verwerfen, Netzfehler behalten
             if (!r.ok && r.netz)
                 rest.push(e);
+            // Übertragen: Ansichten laden den Serverwert neu und ersetzen den lokalen Wert
+            if (e.tabelle === 'zaehlungen') {
+                const z = zeileVon(e.daten);
+                if (z && (r.ok || !r.netz))
+                    zaehlungGeaendert({ sitzungId: z.sitzung_id, zoneId: z.zone_id, quelle: 'server' });
+            }
         }
         schreiben(rest);
     }

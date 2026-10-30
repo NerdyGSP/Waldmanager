@@ -8,10 +8,20 @@ import type { Database } from '../../lib/database.types';
 import { Gruppe, Hinweis, Knopf, Leer, Seite, Segmente } from '../../components/ui';
 import { Balken, Verlauf, VerlaufMehrere, type Serie } from '../../components/diagramme';
 import { Symbol } from '../../components/symbole';
+import { useZaehlungGeaendert } from '../../lib/zaehlEreignis';
 import type { RevierKontext } from './kontext';
 
 type Vergleich = Database['public']['Functions']['quervergleich']['Returns'][number];
 type Sitzungssumme = { id: string; datum: string; arten: Record<string, number>; modus: string; breite: number; strecke: number | null; flaeche: number | null };
+
+// Zählwerte nach einer übertragenen Sichtung neu laden
+function useAuffrischen(): number {
+  const [n, setN] = useState(0);
+  useZaehlungGeaendert((e) => {
+    if (e.quelle === 'server') setN((x) => x + 1);
+  });
+  return n;
+}
 
 export function Monitoring({ k, breit = false, abgedockt = false }: { k: RevierKontext; breit?: boolean; abgedockt?: boolean }) {
   const voll = window.location.pathname.startsWith('/monitoring/voll');
@@ -26,6 +36,7 @@ export function Monitoring({ k, breit = false, abgedockt = false }: { k: RevierK
   const [fehler, setFehler] = useState<string | null>(null);
   const [verlaufArt, setVerlaufArt] = useState('rehwild');
 
+  const auffrischen = useAuffrischen();
   useEffect(() => {
     void (async () => {
       setFehler(null);
@@ -74,7 +85,7 @@ export function Monitoring({ k, breit = false, abgedockt = false }: { k: RevierK
       setVergleich(v.data ?? []);
       setHatFreigaben((f.count ?? 0) > 0);
     })();
-  }, [k.revierId, jahr]);
+  }, [k.revierId, jahr, auffrischen]);
 
   const gezaehlteArten = useMemo(() => {
     const ids = new Set(sitzungen.flatMap((s) => Object.keys(s.arten)));
@@ -288,6 +299,7 @@ function Jahresvergleich({ k, wildarten }: { k: RevierKontext; wildarten: Return
   const [fehler, setFehler] = useState<string | null>(null);
   const [laedt, setLaedt] = useState(true);
 
+  const auffrischen = useAuffrischen();
   useEffect(() => {
     let aktiv = true;
     const von = jahre[jahre.length - 1]!.von;
@@ -328,7 +340,7 @@ function Jahresvergleich({ k, wildarten }: { k: RevierKontext; wildarten: Return
     return () => {
       aktiv = false;
     };
-  }, [k.revierId, jahre]);
+  }, [k.revierId, jahre, auffrischen]);
 
   const verfuegbar = useMemo(() => {
     const ids = new Set([...sitzungen.flatMap((s) => Object.keys(s.arten)), ...abschuesse.map((x) => x.wildart_id)]);

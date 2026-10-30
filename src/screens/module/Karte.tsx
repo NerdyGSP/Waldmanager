@@ -33,7 +33,8 @@ import type { RevierKontext } from './kontext';
 import { Symbol } from '../../components/symbole';
 import { EinrichtungsOptionen } from '../../components/EinrichtungsOptionen';
 import { EinrichtungSheet, VerschiebeLeiste, type EinrichtungInfo } from './EinrichtungSheet';
-import { speichernOderMerken } from '../../lib/offline';
+import { speichernOderMerken, wartendeZaehlungen } from '../../lib/offline';
+import { useZaehlungGeaendert, useZonenSummen } from '../../lib/zaehlEreignis';
 import { GpsImport } from './GpsImport';
 import { useRoutenEbenen, ROUTENFOKUS, routenTypFarbe } from '../../lib/routen';
 import { ZeichnenSheet, type SheetArt, type SheetWerte } from './ZeichnenSheet';
@@ -340,6 +341,8 @@ export default function Karte({
   const [wteMenue, setWteMenue] = useState(false);
   const [wteZone, setWteZone] = useState<WteZone | null>(null);
   const [wteSitzung, setWteSitzung] = useState<WteSitzung | null>(null);
+  // Summe der Sichtungen je Zone in der laufenden Zählung (sofort sichtbar, auch offline)
+  const wteSummen = useZonenSummen(wte ? (wteSitzung?.id ?? null) : null, wartendeZaehlungen);
   const sitzungLaden = useCallback(async (): Promise<WteSitzung | null> => {
     const { data } = await supabase.from('zaehlsitzungen').select('id, datum, ebene_id').eq('revier_id', k.revierId).eq('status', 'offen').is('geloescht_am', null).maybeSingle();
     setWteSitzung(data ?? null);
@@ -393,6 +396,14 @@ export default function Karte({
       mitte: ((d as { mitte?: { coordinates?: number[] } | null }).mitte?.coordinates as [number, number] | undefined) ?? null,
     });
   }, [k.revierId, routenEbenenLaden]);
+
+  // Heatmap/Zählwerte nach einer übertragenen Sichtung auffrischen (gebündelt)
+  const heatTimer = useRef<number | null>(null);
+  useZaehlungGeaendert((e) => {
+    if (e.quelle !== 'server') return;
+    if (heatTimer.current) window.clearTimeout(heatTimer.current);
+    heatTimer.current = window.setTimeout(() => void laden(), 1500);
+  });
 
   // Karte initialisieren
   useEffect(() => {
@@ -647,12 +658,30 @@ export default function Karte({
       const el = document.createElement('div');
       el.className = 'zonen-beschriftung';
       el.dataset.ebene = String(f.properties?.ebene_id ?? 'ohne');
+      el.dataset.zone = String(f.properties?.id ?? '');
+      el.dataset.name = String(f.properties?.name ?? '');
       el.textContent = String(f.properties?.name ?? '');
       return new Marker({ element: el }).setLngLat(mittelpunkt(f.geometry)).addTo(m);
     });
     zonenBeschriftungenAnzeigen();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [daten, bereit, gefiltert, heatQuelle]);
+
+  // WTE-Modus: kleiner Zähler an der Zone
+  useEffect(() => {
+    for (const mk of zonenMarker.current) {
+      const el = mk.getElement();
+      const n = wte ? wteSummen[el.dataset.zone ?? ''] : undefined;
+      el.replaceChildren(el.dataset.name ?? '');
+      if (n) {
+        const b = document.createElement('span');
+        b.className = 'zonen-summe';
+        b.textContent = String(n);
+        b.title = 'Sichtungen in der laufenden Zählung';
+        el.appendChild(b);
+      }
+    }
+  }, [wteSummen, wte, daten, bereit, gefiltert, heatQuelle]);
 
   function zonenBeschriftungenAnzeigen() {
     for (const mk of zonenMarker.current) {

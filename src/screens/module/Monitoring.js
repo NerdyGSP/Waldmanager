@@ -8,6 +8,16 @@ import { navigieren } from '../../lib/router';
 import { Gruppe, Hinweis, Knopf, Leer, Seite, Segmente } from '../../components/ui';
 import { Balken, Verlauf, VerlaufMehrere } from '../../components/diagramme';
 import { Symbol } from '../../components/symbole';
+import { useZaehlungGeaendert } from '../../lib/zaehlEreignis';
+// Zählwerte nach einer übertragenen Sichtung neu laden
+function useAuffrischen() {
+    const [n, setN] = useState(0);
+    useZaehlungGeaendert((e) => {
+        if (e.quelle === 'server')
+            setN((x) => x + 1);
+    });
+    return n;
+}
 export function Monitoring({ k, breit = false, abgedockt = false }) {
     const voll = window.location.pathname.startsWith('/monitoring/voll');
     const wildarten = useWildarten();
@@ -20,6 +30,7 @@ export function Monitoring({ k, breit = false, abgedockt = false }) {
     const [hatFreigaben, setHatFreigaben] = useState(true);
     const [fehler, setFehler] = useState(null);
     const [verlaufArt, setVerlaufArt] = useState('rehwild');
+    const auffrischen = useAuffrischen();
     useEffect(() => {
         void (async () => {
             setFehler(null);
@@ -70,7 +81,7 @@ export function Monitoring({ k, breit = false, abgedockt = false }) {
             setVergleich(v.data ?? []);
             setHatFreigaben((f.count ?? 0) > 0);
         })();
-    }, [k.revierId, jahr]);
+    }, [k.revierId, jahr, auffrischen]);
     const gezaehlteArten = useMemo(() => {
         const ids = new Set(sitzungen.flatMap((s) => Object.keys(s.arten)));
         return wildarten.filter((w) => ids.has(w.id));
@@ -132,6 +143,7 @@ function Jahresvergleich({ k, wildarten }) {
     const [abschuesse, setAbschuesse] = useState([]);
     const [fehler, setFehler] = useState(null);
     const [laedt, setLaedt] = useState(true);
+    const auffrischen = useAuffrischen();
     useEffect(() => {
         let aktiv = true;
         const von = jahre[jahre.length - 1].von;
@@ -173,7 +185,7 @@ function Jahresvergleich({ k, wildarten }) {
         return () => {
             aktiv = false;
         };
-    }, [k.revierId, jahre]);
+    }, [k.revierId, jahre, auffrischen]);
     const verfuegbar = useMemo(() => {
         const ids = new Set([...sitzungen.flatMap((s) => Object.keys(s.arten)), ...abschuesse.map((x) => x.wildart_id)]);
         return wildarten.filter((w) => ids.has(w.id));

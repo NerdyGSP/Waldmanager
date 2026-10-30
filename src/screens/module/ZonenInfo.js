@@ -8,6 +8,8 @@ import { navigieren } from '../../lib/router';
 import { datumDE } from '../../lib/zeit';
 import { Verlauf } from '../../components/diagramme';
 import { Symbol } from '../../components/symbole';
+import { useZaehlungGeaendert } from '../../lib/zaehlEreignis';
+import { wartendeZaehlungen } from '../../lib/offline';
 const ANZAHL_ZAEHLUNGEN = 12;
 const ANZAHL_SPALTEN = 6;
 /** Informationsfenster am unteren Kartenrand: letzte Zählungen einer Zone als Tabelle und als Verlauf je Wildart */
@@ -16,6 +18,43 @@ export function ZonenInfo({ zone, onSchliessen, onBearbeiten }) {
     const [messungen, setMessungen] = useState(null);
     const [fehler, setFehler] = useState(null);
     const [verlaufArt, setVerlaufArt] = useState('');
+    const [neu, setNeu] = useState(0);
+    const [laufend, setLaufend] = useState(null);
+    // Eingaben in dieser Zone (auch aus dem WTE-Modus) frischen Tabelle, Verlauf und laufende Zählung auf
+    useZaehlungGeaendert((e) => {
+        if (e.zoneId === zone.id || e.quelle === 'server')
+            setNeu((n) => n + 1);
+        if (e.zeile && e.zoneId === zone.id)
+            setLaufend((l) => (l && l.sitzungId === e.sitzungId ? l : { summe: 0, sitzungId: e.sitzungId }));
+    });
+    // Laufende Zählung: Summe in dieser Zone, inklusive noch nicht übertragener Einträge
+    useEffect(() => {
+        let aktiv = true;
+        void (async () => {
+            const { data } = navigator.onLine
+                ? await supabase
+                    .from('zaehlungen')
+                    .select('id, anzahl, sitzung_id, sitzung:zaehlsitzungen!inner(status, geloescht_am)')
+                    .eq('zone_id', zone.id)
+                    .is('geloescht_am', null)
+                    .eq('sitzung.status', 'offen')
+                    .is('sitzung.geloescht_am', null)
+                : { data: null };
+            if (!aktiv)
+                return;
+            const m = new Map((data ?? []).map((z) => [z.id, { anzahl: z.anzahl, sitzung: z.sitzung_id }]));
+            const sitzungen = new Set([...m.values()].map((v) => v.sitzung));
+            for (const sid of sitzungen)
+                for (const w of wartendeZaehlungen(sid))
+                    if (w.zone_id === zone.id)
+                        m.set(w.id, { anzahl: w.anzahl, sitzung: sid });
+            const summe = [...m.values()].reduce((a, v) => a + v.anzahl, 0);
+            setLaufend(m.size ? { summe, sitzungId: [...sitzungen][0] ?? '' } : null);
+        })();
+        return () => {
+            aktiv = false;
+        };
+    }, [zone.id, neu]);
     useEffect(() => {
         let aktiv = true;
         setMessungen(null);
@@ -42,7 +81,7 @@ export function ZonenInfo({ zone, onSchliessen, onBearbeiten }) {
         return () => {
             aktiv = false;
         };
-    }, [zone.id]);
+    }, [zone.id, neu]);
     // Letzte Zählungen (neueste zuerst), je Zählung die Summe je Wildart
     const auswertung = useMemo(() => {
         const sitzungen = new Map();
@@ -83,7 +122,7 @@ export function ZonenInfo({ zone, onSchliessen, onBearbeiten }) {
                                         ? 'Zählungen werden geladen …'
                                         : auswertung.liste.length
                                             ? `${auswertung.liste.length} ${auswertung.liste.length === 1 ? 'Zählung' : 'Zählungen'}, zuletzt am ${datumDE(auswertung.liste[0].datum)}`
-                                            : 'Noch keine abgeschlossene Zählung'] })] }), onBearbeiten && (_jsx("button", { className: "knopf knopf-sekundaer klein", onClick: onBearbeiten, children: "Punkte bearbeiten" })), _jsx("button", { className: "knopf knopf-ghost klein", onClick: () => navigieren('/zaehlung'), children: "Zur Wildz\u00E4hlung" }), _jsx("button", { className: "zonen-info-zu", onClick: onSchliessen, "aria-label": "Informationsfenster schlie\u00DFen", children: _jsx(Symbol, { name: "schliessen", className: "symbol klein" }) })] }), fehler && _jsx("p", { className: "feld-fehler", children: fehler }), auswertung.arten.length > 0 && (_jsxs("div", { className: "zonen-info-inhalt", children: [_jsx("div", { className: "zonen-info-tabelle tabelle-rahmen", children: _jsxs("table", { className: "tabelle", children: [_jsx("thead", { children: _jsxs("tr", { children: [_jsx("th", { scope: "col", children: "Wildart" }), spalten.map((s) => (_jsx("th", { scope: "col", className: "zahl", children: kurz(s.datum) }, s.id))), _jsx("th", { scope: "col", className: "zahl", children: "\u00D8" }), _jsx("th", { scope: "col", className: "zahl", children: "Max" })] }) }), _jsx("tbody", { children: auswertung.arten.map((a) => (_jsxs("tr", { "aria-selected": a.id === verlaufArt, onClick: () => setVerlaufArt(a.id), className: "klickbar", children: [_jsx("th", { scope: "row", children: a.name }), a.werte.slice(0, ANZAHL_SPALTEN).map((w, i) => (_jsx("td", { className: `zahl ${w === 0 ? 'leise' : ''}`, children: w }, spalten[i].id))), _jsx("td", { className: "zahl leise", children: a.schnitt.toLocaleString('de-DE', { maximumFractionDigits: 1 }) }), _jsx("td", { className: "zahl stark", children: a.max })] }, a.id))) })] }) }), _jsxs("div", { className: "zonen-info-verlauf", children: [_jsxs("label", { className: "filter", children: [_jsx("span", { children: "Verlauf" }), _jsx("select", { value: verlaufArt, onChange: (e) => setVerlaufArt(e.target.value), "aria-label": "Wildart im Verlauf", children: auswertung.arten.map((a) => (_jsx("option", { value: a.id, children: a.name }, a.id))) })] }), verlaufsart && (_jsx(Verlauf, { titel: `${verlaufsart.name} in ${zone.name}`, punkte: [...auswertung.liste]
+                                            : 'Noch keine abgeschlossene Zählung'] })] }), onBearbeiten && (_jsx("button", { className: "knopf knopf-sekundaer klein", onClick: onBearbeiten, children: "Punkte bearbeiten" })), _jsx("button", { className: "knopf knopf-ghost klein", onClick: () => navigieren('/zaehlung'), children: "Zur Wildz\u00E4hlung" }), _jsx("button", { className: "zonen-info-zu", onClick: onSchliessen, "aria-label": "Informationsfenster schlie\u00DFen", children: _jsx(Symbol, { name: "schliessen", className: "symbol klein" }) })] }), fehler && _jsx("p", { className: "feld-fehler", children: fehler }), laufend && (_jsxs("p", { className: "zonen-info-laufend", children: ["Laufende Z\u00E4hlung: ", _jsx("strong", { children: laufend.summe }), " St\u00FCck in dieser Zone"] })), auswertung.arten.length > 0 && (_jsxs("div", { className: "zonen-info-inhalt", children: [_jsx("div", { className: "zonen-info-tabelle tabelle-rahmen", children: _jsxs("table", { className: "tabelle", children: [_jsx("thead", { children: _jsxs("tr", { children: [_jsx("th", { scope: "col", children: "Wildart" }), spalten.map((s) => (_jsx("th", { scope: "col", className: "zahl", children: kurz(s.datum) }, s.id))), _jsx("th", { scope: "col", className: "zahl", children: "\u00D8" }), _jsx("th", { scope: "col", className: "zahl", children: "Max" })] }) }), _jsx("tbody", { children: auswertung.arten.map((a) => (_jsxs("tr", { "aria-selected": a.id === verlaufArt, onClick: () => setVerlaufArt(a.id), className: "klickbar", children: [_jsx("th", { scope: "row", children: a.name }), a.werte.slice(0, ANZAHL_SPALTEN).map((w, i) => (_jsx("td", { className: `zahl ${w === 0 ? 'leise' : ''}`, children: w }, spalten[i].id))), _jsx("td", { className: "zahl leise", children: a.schnitt.toLocaleString('de-DE', { maximumFractionDigits: 1 }) }), _jsx("td", { className: "zahl stark", children: a.max })] }, a.id))) })] }) }), _jsxs("div", { className: "zonen-info-verlauf", children: [_jsxs("label", { className: "filter", children: [_jsx("span", { children: "Verlauf" }), _jsx("select", { value: verlaufArt, onChange: (e) => setVerlaufArt(e.target.value), "aria-label": "Wildart im Verlauf", children: auswertung.arten.map((a) => (_jsx("option", { value: a.id, children: a.name }, a.id))) })] }), verlaufsart && (_jsx(Verlauf, { titel: `${verlaufsart.name} in ${zone.name}`, punkte: [...auswertung.liste]
                                     .reverse()
                                     .map((s) => ({ label: kurz(s.datum), wert: s.arten.get(verlaufsart.id) ?? 0 })) }))] })] }))] }));
 }
