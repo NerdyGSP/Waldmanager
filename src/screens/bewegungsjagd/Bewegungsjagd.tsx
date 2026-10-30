@@ -9,8 +9,8 @@ import { EinrichtungsOptionen } from '../../components/EinrichtungsOptionen';
 import { EINRICHTUNGSTYPEN, useMitglieder } from '../../lib/stammdaten';
 import { TeilnehmerInfoDruck, TeilnehmerListeDruck, JagdtagMappeDruck } from './BjDruck';
 import { JagdleitungBlock, RettungspunkteBlock, StandKartenDialog, useBjVorbereitung } from './BjVorbereitung';
-import { nachAnstellern } from '../../lib/bjGruppen';
-import { codeAnzeigen, emailGueltig, JAGDARTEN, neuerEntwurf, teilnehmerCsv, type TeilnehmerEntwurf } from '../../lib/bewegungsjagd';
+import { BjTeilnehmerUebersicht } from './BjTeilnehmerUebersicht';
+import { emailGueltig, JAGDARTEN, neuerEntwurf, teilnehmerCsv, type TeilnehmerEntwurf } from '../../lib/bewegungsjagd';
 import type { Tables } from '../../lib/database.types';
 import { statusAm, useJagdzeiten } from '../../lib/jagdzeiten';
 import { useWildarten } from '../../lib/stammdaten';
@@ -576,21 +576,18 @@ function Assistent({ k }: { k: RevierKontext }) {
 // ---------- Auswertung ----------
 
 type Aufgabe = Pick<Tables<'aufgaben'>, 'id' | 'titel' | 'faellig_am' | 'status' | 'zugewiesen_an'>;
-type StatusFilter = 'alle' | 'eingeladen' | 'zugesagt' | 'abgesagt';
 
 function Auswertung({ k, id }: { k: RevierKontext; id: string }) {
   const [jagd, setJagd] = useState<Jagd | null>(null);
   const [tn, setTn] = useState<Teilnehmer[]>([]);
   const [aufgaben, setAufgaben] = useState<Aufgabe[]>([]);
   const [fehler, setFehler] = useState<string | null>(null);
-  const [filter, setFilter] = useState<StatusFilter>('alle');
   const [abschluss, setAbschluss] = useState(false);
   const [kommentar, setKommentar] = useState('');
   const [aufgabeTitel, setAufgabeTitel] = useState('');
   const [aufgabeFaellig, setAufgabeFaellig] = useState('');
   const [aufgabeWer, setAufgabeWer] = useState('');
   const [druck, setDruck] = useState<'info' | 'liste' | 'mappe' | null>(null);
-  const [zugeklappt, setZugeklappt] = useState<Set<string>>(new Set());
   const [standFuer, setStandFuer] = useState<Teilnehmer | null>(null);
   const [nachOffen, setNachOffen] = useState(false);
   const [nName, setNName] = useState('');
@@ -639,7 +636,6 @@ function Auswertung({ k, id }: { k: RevierKontext; id: string }) {
 
   if (!jagd) return fehler ? <Hinweis art="fehler">{fehler}</Hinweis> : <div className="laden">Lade …</div>;
   const offen = jagd.status === 'offen';
-  const sichtbar = tn.filter((t) => filter === 'alle' || t.status === filter);
   const stand = (eid: string | null) => einrichtungen.find((e) => e.id === eid);
   const marker: BjMarker[] = [
     ...(jagd.treffpunkt_lng != null && jagd.treffpunkt_lat != null ? [{ id: 'tp', lng: jagd.treffpunkt_lng, lat: jagd.treffpunkt_lat, art: 'treffpunkt' as const, label: 'Treffpunkt' }] : []),
@@ -759,71 +755,7 @@ function Auswertung({ k, id }: { k: RevierKontext; id: string }) {
     await laden();
   }
 
-  const anstellerListe = tn.filter((t) => t.ist_ansteller && t.aktiv);
-  const gruppiert = tn.some((t) => t.ist_ansteller);
-  const gruppen = nachAnstellern(sichtbar);
-  const haken = (t: Teilnehmer, feld: 'hegebeitrag_bezahlt' | 'schuesseltreiben_teilgenommen' | 'anwesend', label: string) => (
-    <label>
-      <input type="checkbox" checked={t[feld]} onChange={(e) => void aendern(t, { [feld]: e.target.checked })} /> {label}
-    </label>
-  );
-  const zeile = (t: Teilnehmer, imGruppe: boolean) => (
-    <div key={t.id} className={`bj-zeile ${t.aktiv ? '' : 'inaktiv'} ${imGruppe ? 'im-gruppe' : ''}`}>
-      <span>
-        <strong>{t.name}</strong> <span className={`badge ${t.status === 'zugesagt' ? 'badge-gruen' : t.status === 'abgesagt' ? 'badge-rot' : ''}`}>{t.status === 'eingeladen' ? 'offen' : t.status}</span>
-        {t.ist_ansteller && <> <span className="badge">Ansteller</span></>}
-        <br />
-        <small>
-          {t.email}{t.telefon ? ` · ${t.telefon}` : ''} · Code {codeAnzeigen(t.einladungscode)}
-          {t.mail_status && ` · Mail ${t.mail_status === 'gesendet' ? 'gesendet' : `Fehler (${t.mail_fehler ?? '?'})`}`}
-        </small>
-        {t.status === 'zugesagt' && (
-          <>
-            <br />
-            <small>
-              {[t.hat_hund && 'Hund', t.hat_hornblaeser && 'Hornbläser', t.auto_vorhanden && `Auto, ${t.mitfahrplaetze ?? 0} Mitfahrplätze`, t.schuesseltreiben_teilnahme && 'Schüsseltreiben', t.anschrift].filter(Boolean).join(' · ')}
-            </small>
-            <div className="bj-haken">
-              {jagd!.hegebeitrag_aktiv && haken(t, 'hegebeitrag_bezahlt', 'Hegebeitrag bezahlt')}
-              {jagd!.schuesseltreiben && haken(t, 'schuesseltreiben_teilgenommen', 'Schüsseltreiben teilgenommen')}
-              {haken(t, 'anwesend', 'bei Ansprache anwesend')}
-            </div>
-          </>
-        )}
-      </span>
-      <span className="bj-zeile-aktionen">
-        {offen ? (
-          <>
-            <label style={{ display: 'inline-flex', gap: 4, alignItems: 'center', fontSize: '.85rem' }}>
-              <input type="checkbox" checked={t.ist_ansteller} onChange={(e) => void aendern(t, { ist_ansteller: e.target.checked })} /> Ansteller
-            </label>
-            {!t.ist_ansteller && anstellerListe.length > 0 && (
-              <select aria-label={`Ansteller für ${t.name}`} value={t.ansteller_id ?? ''} onChange={(e) => void aendern(t, { ansteller_id: e.target.value || null })}>
-                <option value="">– ohne Ansteller –</option>
-                {anstellerListe.map((a) => (
-                  <option key={a.id} value={a.id}>{a.name}</option>
-                ))}
-              </select>
-            )}
-            <select aria-label={`Stand für ${t.name}`} value={t.zugeordnete_einrichtung_id ?? ''} onChange={(e) => void aendern(t, { zugeordnete_einrichtung_id: e.target.value || null })}>
-              <option value="">– kein Stand –</option>
-              {einrichtungen.filter((e) => e.typ === 'drueckjagdbock' || e.id === t.zugeordnete_einrichtung_id).map((e) => (
-                <option key={e.id} value={e.id}>
-                  {einrLabel(e)}
-                </option>
-              ))}
-            </select>
-            <Knopf variante="ghost" onClick={() => setStandFuer(t)}>Stand per Karte</Knopf>
-            {t.aktiv && t.status === 'eingeladen' && <Knopf variante="ghost" disabled={sendet} onClick={() => void erneutEinladen(t)}>Erneut einladen</Knopf>}
-            <Knopf variante="ghost" onClick={() => void aendern(t, { aktiv: !t.aktiv })}>{t.aktiv ? 'Deaktivieren' : 'Aktivieren'}</Knopf>
-            <Knopf variante="gefahr" onClick={() => void entfernen(t)}>Löschen</Knopf>
-          </>
-        ) : (
-          <small>{stand(t.zugeordnete_einrichtung_id) ? einrLabel(stand(t.zugeordnete_einrichtung_id)!) : ''}</small>
-        )}
-      </span>
-    </div>
-  );
+  const standLabel = (eid: string | null) => (stand(eid) ? einrLabel(stand(eid)!) : '');
 
   const link = `${window.location.origin}/bj/${jagd.id}`;
 
@@ -879,39 +811,18 @@ function Auswertung({ k, id }: { k: RevierKontext; id: string }) {
             </div>
           </div>
         )}
-        <div style={{ padding: '10px var(--abstand)' }}>
-          <Segmente<StatusFilter>
-            label="Statusfilter"
-            optionen={[{ wert: 'alle', label: 'Alle' }, { wert: 'eingeladen', label: 'Offen' }, { wert: 'zugesagt', label: 'Zugesagt' }, { wert: 'abgesagt', label: 'Abgesagt' }]}
-            wert={filter}
-            onAendern={setFilter}
-          />
-        </div>
-        {sichtbar.length === 0 && <Leer>Keine Teilnehmer in dieser Ansicht.</Leer>}
-        {!gruppiert && sichtbar.map((t) => zeile(t, false))}
-        {gruppiert &&
-          gruppen.map((g) => {
-            const key = g.ansteller?.id ?? 'ohne';
-            const zu = zugeklappt.has(key);
-            const umschalten = () => setZugeklappt((alt) => { const n = new Set(alt); if (n.has(key)) n.delete(key); else n.add(key); return n; });
-            return (
-              <div key={key}>
-                {g.ansteller ? (
-                  <>
-                    {zeile(g.ansteller, false)}
-                    <div className="bj-gruppe-kopf">
-                      <button onClick={umschalten} aria-expanded={!zu}>{zu ? '▸' : '▾'} Gruppe von {g.ansteller.name} ({g.mitglieder.length})</button>
-                    </div>
-                  </>
-                ) : (
-                  <div className="bj-gruppe-kopf">
-                    <button onClick={umschalten} aria-expanded={!zu}>{zu ? '▸' : '▾'} Ohne Gruppe ({g.mitglieder.length})</button>
-                  </div>
-                )}
-                {!zu && g.mitglieder.map((t) => zeile(t, true))}
-              </div>
-            );
-          })}
+        <BjTeilnehmerUebersicht
+          tn={tn}
+          offen={offen}
+          schuesseltreiben={jagd.schuesseltreiben}
+          staende={einrichtungen.filter((e) => e.typ === 'drueckjagdbock').map((e) => ({ id: e.id, label: einrLabel(e) }))}
+          standName={standLabel}
+          sendet={sendet}
+          onAendern={aendern}
+          onEntfernen={entfernen}
+          onErneutEinladen={erneutEinladen}
+          onStandPerKarte={setStandFuer}
+        />
       </Gruppe>
 
       <JagdleitungBlock key={`jl-${jagd.info_jagdleitung ?? ''}`} jagd={jagd} leitung={leitung} aenderbar={offen} onGeaendert={async () => { await vorbereitungLaden(); await laden(); }} />

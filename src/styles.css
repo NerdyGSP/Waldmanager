@@ -975,3 +975,16 @@ button.kachel:active { transform: none; }
   .wte-leiste.kompakt-mobil strong::before { content: '● '; }
   .wte-leiste.kompakt-mobil strong::after { content: ' aktiv'; font-weight: 500; }
 }
+.bj-filter { display: flex; gap: 8px; flex-wrap: wrap; }
+.bj-filter input[type=search] { flex: 1 1 220px; }
+.bj-tn-tabelle th button.link { font: inherit; font-weight: 600; text-decoration: none; color: inherit; }
+.bj-tn-tabelle tbody th[scope=row] { font-weight: 500; text-align: left; white-space: nowrap; }
+.bj-tn-tabelle tr.inaktiv { opacity: .55; }
+.bj-gruppe-zeile td { background: var(--color-neutral-soft, #eef1ee); font-weight: 600; }
+.bj-detail { display: grid; gap: 4px; padding: 6px 0; font-size: .9rem; }
+.bj-tn-tabelle { font-size: .82rem; width: 100%; }
+.bj-tn-tabelle th, .bj-tn-tabelle td { padding: 6px 8px; white-space: nowrap; vertical-align: middle; }
+.bj-tn-tabelle select { max-width: 120px; font-size: .8rem; padding: 2px 4px; min-height: 0; }
+.bj-tn-tabelle .bj-zeile-aktionen { flex-wrap: nowrap; gap: 4px; }
+.bj-tn-tabelle .bj-zeile-aktionen button { padding: 2px 8px; min-height: 0; font-size: .78rem; }
+.bj-tn-tabelle .bj-detail { white-space: normal; }

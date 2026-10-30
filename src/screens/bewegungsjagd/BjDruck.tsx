@@ -461,9 +461,9 @@ export function JagdtagMappeDruck({ jagd, tn, leitung, rettung, staende, standNa
       <td>{ja(t.hat_hornblaeser)}</td>
       <td>{t.auto_vorhanden ? `ja, ${t.mitfahrplaetze ?? 0} Pl.` : '–'}</td>
       {jagd.schuesseltreiben && <td>{ja(t.schuesseltreiben_teilnahme)}</td>}
-      {jagd.hegebeitrag_aktiv && <td style={{ textAlign: 'center' }}><Haken an={t.hegebeitrag_bezahlt} /></td>}
-      {jagd.schuesseltreiben && <td style={{ textAlign: 'center' }}><Haken an={t.schuesseltreiben_teilgenommen} /></td>}
-      <td style={{ textAlign: 'center' }}><Haken an={t.anwesend} /></td>
+      {jagd.hegebeitrag_aktiv && <td style={{ textAlign: 'center' }}><Haken an={false} /></td>}
+      {jagd.schuesseltreiben && <td style={{ textAlign: 'center' }}><Haken an={false} /></td>}
+      <td style={{ textAlign: 'center' }}><Haken an={false} /></td>
     </tr>
   );
   const spalten = 9 + (jagd.hegebeitrag_aktiv ? 1 : 0) + (jagd.schuesseltreiben ? 2 : 0);
