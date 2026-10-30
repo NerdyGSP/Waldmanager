@@ -62,6 +62,17 @@ export function Geoimport({ k }: { k: RevierKontext }) {
   }, [k.revierId, meldung]);
 
   const schicht = einlesung?.schichten[schichtNr];
+  // Erste Beispielwerte (nicht leer, verschieden) eines Attributfelds
+  const beispiele = (feld: string, n: number): string[] => {
+    const werte: string[] = [];
+    for (const f of schicht?.features ?? []) {
+      const v = (f.properties as Record<string, unknown> | null)?.[feld];
+      const t = v === null || v === undefined ? '' : String(v).trim();
+      if (t && !werte.includes(t)) werte.push(t.length > 40 ? `${t.slice(0, 40)}…` : t);
+      if (werte.length >= n) break;
+    }
+    return werte;
+  };
   const passend = useMemo(() => (schicht && ziel ? passendeObjekte(schicht, ziel) : []), [schicht, ziel]);
   const anzahlTeile = useMemo(() => (ziel ? passend.reduce((a, f) => a + einzelteile(f, ziel).length, 0) : 0), [passend, ziel]);
   const hatFehler = !!pruefung?.some((p) => p.status === 'fehler');
@@ -313,9 +324,13 @@ export function Geoimport({ k }: { k: RevierKontext }) {
                 {schicht.felder.map((f) => (
                   <option key={f} value={f}>
                     {f}
+                    {beispiele(f, 1)[0] ? ` – z. B. „${beispiele(f, 1)[0]}“` : ''}
                   </option>
                 ))}
               </Auswahl>
+            )}
+            {(ziel === 'zonen' || ziel === 'einrichtungen' || ziel === 'pirschwege') && namensfeld && beispiele(namensfeld, 3).length > 0 && (
+              <small style={{ color: "var(--text-leise)" }}>Beispielwerte: {beispiele(namensfeld, 3).map((b) => `„${b}“`).join(', ')}</small>
             )}
             {ziel === 'zonen' && ebenen.length > 0 && (
               <Auswahl label="Zonenebene" value={ebeneId} onChange={(e) => setEbeneId(e.target.value)}>
