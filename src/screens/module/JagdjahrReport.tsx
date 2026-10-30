@@ -196,7 +196,7 @@ function Inhalt({ d, o, jahre, strecke, zaehl, zaehlArten, diagrammArt, name, au
     );
     return (
       <Fragment key={a}>
-        <h3 style={{ margin: '10px 0 4px', fontSize: 'var(--fs-base)', color: ausdruck ? '#000' : undefined }}>{ARTEN.find((x) => x.art === a)!.titel}</h3>
+        <h3 style={{ margin: '10px 0 4px', fontSize: 'var(--fs-md)', color: ausdruck ? '#000' : undefined }}>{ARTEN.find((x) => x.art === a)!.titel}</h3>
         {rahmen(
           <table className={tab}>
             <thead>

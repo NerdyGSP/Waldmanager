@@ -22,6 +22,7 @@
 
 body {
   margin: 0;
+  font-size: var(--fs-md);
   background: var(--hintergrund);
   color: var(--text);
   min-height: 100dvh;
@@ -69,8 +70,7 @@ button, input, select { font: inherit; color: inherit; }
 /* Gruppierte Listen */
 .gruppe { display: grid; gap: 6px; }
 .gruppe-titel {
-  margin: 0 0 0 var(--abstand); font-size: var(--fs-xs); font-weight: 400; text-transform: uppercase;
-  letter-spacing: 0.02em; color: var(--text-leise);
+  margin: 0 0 0 var(--abstand); font-size: var(--fs-sm); font-weight: 500; color: var(--text-leise);
 }
 .gruppe-inhalt { background: var(--flaeche); border-radius: var(--radius); overflow: hidden; }
 .gruppe-fuss { margin: 0 var(--abstand); font-size: var(--fs-sm); color: var(--text-leise); }
@@ -182,7 +182,7 @@ button.kachel:active { transform: scale(0.98); }
 .seite form { display: grid; gap: 12px; }
 .seite-kopf { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 4px 12px; }
 .zurueck {
-  grid-column: 1 / -1; justify-self: start; border: 0; background: none; color: var(--akzent); font-size: var(--fs-base);
+  grid-column: 1 / -1; justify-self: start; border: 0; background: none; color: var(--akzent); font-size: var(--fs-md);
   padding: 4px 0; cursor: pointer;
 }
 .seite-titel { min-width: 0; }
@@ -223,7 +223,7 @@ button.kachel:active { transform: scale(0.98); }
 /* Segmente und Zähler */
 .segmente { justify-self: start; display: inline-flex; background: var(--linie); border-radius: var(--radius-sm); padding: 2px; gap: 2px; }
 .segmente button {
-  border: 0; background: transparent; border-radius: var(--radius-sm); padding: 6px 12px; font-size: var(--fs-base); cursor: pointer;
+  border: 0; background: transparent; border-radius: var(--radius-sm); padding: 6px 12px; font-size: var(--fs-md); cursor: pointer;
   min-width: 40px;
 }
 .segmente button[aria-checked='true'] { background: var(--flaeche); border: 1px solid var(--color-border); font-weight: 600; }
@@ -268,7 +268,7 @@ button.kachel:active { transform: scale(0.98); }
 .tabelle-rahmen { overflow-x: auto; background: var(--flaeche); border-radius: var(--radius); }
 .tabelle { width: 100%; border-collapse: collapse; font-size: var(--fs-md); }
 .tabelle th, .tabelle td { padding: 10px 12px; border-bottom: 0.5px solid var(--linie); text-align: left; white-space: nowrap; }
-.tabelle thead th { font-size: var(--fs-xs); text-transform: uppercase; color: var(--text-leise); font-weight: 500; }
+.tabelle thead th { font-size: var(--fs-sm); color: var(--text-leise); font-weight: 500; }
 .tabelle tbody th, .tabelle tfoot th { font-weight: 500; }
 .tabelle tfoot td, .tabelle tfoot th { border-bottom: 0; font-weight: 700; }
 .tabelle .zahl { text-align: right; font-variant-numeric: tabular-nums; }
@@ -335,7 +335,7 @@ button.kachel:active { transform: scale(0.98); }
   overflow-y: auto; background: var(--flaeche); border-radius: var(--radius); border: 1px solid var(--color-border);
   padding: 14px; display: grid; gap: 8px; align-content: start;
 }
-.karte-panel h3 { margin: 8px 0 0; font-size: var(--fs-xs); text-transform: uppercase; color: var(--text-leise); font-weight: 500; }
+.karte-panel h3 { margin: 8px 0 0; font-size: var(--fs-sm); color: var(--text-leise); font-weight: 500; }
 .karte-panel .knopf { padding: 10px 12px; font-size: var(--fs-md); }
 .karte-panel .leer { margin: 4px 0 0; }
 .karte-auswahl { border: 0; background: var(--akzent-hell); color: var(--akzent); padding: 10px 12px; border-radius: var(--radius); font-weight: 600; }
@@ -407,7 +407,7 @@ button.kachel:active { transform: scale(0.98); }
 .desk-marke .warteschlange { margin-left: auto; }
 .desk-revier, .desk-revier-name {
   margin-top: 16px; border: 0; background: none; padding: 0; color: var(--text-leise); font-size: var(--fs-xs);
-  font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer; max-width: 100%;
+  font-weight: 600; cursor: pointer; max-width: 100%;
 }
 .desk-revier-name { cursor: default; }
 .desk-kopf h1 { margin: 2px 0 0; font-size: var(--fs-h1); letter-spacing: -0.02em; }
@@ -476,6 +476,7 @@ button.kachel:active { transform: scale(0.98); }
    ====================================================================== */
 body { font-feature-settings: 'cv11', 'ss03'; font-weight: 400; }
 strong, b, h1, h2, h3 { font-weight: 500; }
+h3 { font-size: var(--fs-md); }
 .kennzahl strong, .zaehler output, .tabelle .zahl, .balken-zahl, .kopf-zahl { font-variant-numeric: tabular-nums; }
 
 /* Knöpfe: Akzent → Primär → Sekundär → Ghost */
@@ -521,13 +522,13 @@ strong, b, h1, h2, h3 { font-weight: 500; }
 .kennzahl { border-top: 3px solid var(--color-primary); }
 .kennzahl.hegering { border-top-color: var(--color-accent); }
 .kachel { border-top: 3px solid var(--color-primary); }
-.gruppe-titel { text-transform: none; letter-spacing: 0; font-size: var(--fs-sm); font-weight: 500; color: var(--color-text-muted); }
+.gruppe-titel { font-size: var(--fs-sm); font-weight: 500; color: var(--color-text-muted); }
 .zeile { border-bottom: 1px solid var(--color-border); }
 .zeile-knopf { border-bottom: 1px solid var(--color-border); }
 button.kachel:hover { border-color: var(--color-primary); }
 button.kachel:active { transform: none; }
 .tabelle th, .tabelle td { border-bottom: 1px solid var(--color-border); }
-.tabelle thead th { font-weight: 500; letter-spacing: 0.03em; }
+.tabelle thead th { font-weight: 500; }
 
 /* Badges */
 .warteschlange { font-size: var(--fs-xs); font-weight: 500; background: var(--color-accent-soft); color: var(--color-accent-text); border-radius: var(--radius-xs); padding: 2px 8px; }
@@ -679,7 +680,7 @@ button.kachel:active { transform: none; }
 .wildarten-wahl { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 4px 12px; padding: 4px 0 12px; }
 .schein-druck { background: var(--color-surface); border: 1px solid var(--color-border); border-top: 3px solid var(--color-primary); border-radius: var(--radius-md); padding: 20px; display: grid; gap: 14px; }
 .schein-druck h2 { margin: 0; font-size: 1.5rem; }
-.schein-revier { margin: 0; color: var(--color-text-muted); font-size: var(--fs-sm); text-transform: uppercase; letter-spacing: 0.05em; }
+.schein-revier { margin: 0; color: var(--color-text-muted); font-size: var(--fs-sm); }
 .schein-druck dl { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; }
 .schein-druck dt { color: var(--color-text-muted); font-size: var(--fs-md); }
 .schein-druck dd { margin: 0; }
@@ -957,7 +958,7 @@ button.kachel:active { transform: none; }
 .bj-druck-legende span { display: inline-flex; align-items: center; gap: 4px; }
 .bj-druck-seite.quer { break-before: page; page-break-before: always; }
 .bj-druck-seite.quer:first-child { break-before: auto; page-break-before: auto; }
-.bj-druck-seite h2.klein { font-size: var(--fs-base); margin: 6px 0 2px; }
+.bj-druck-seite h2.klein { font-size: var(--fs-md); margin: 6px 0 2px; }
 .bj-druck-kasten { border: 1px solid #888; padding: 6px 10px; margin: 8px 0; white-space: pre-wrap; }
 .bj-druck-haken { display: inline-block; width: 4mm; height: 4mm; border: 1px solid #000; vertical-align: middle; position: relative; }
 .bj-druck-haken.an::after { content: '✓'; position: absolute; inset: -2px 0 0 1px; font-size: 4mm; line-height: 1; }
@@ -967,14 +968,14 @@ button.kachel:active { transform: none; }
 /* Wildzählung-Zusammenfassung */
 .zr-kennzahlen { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
 .zr-karte { border: 2px solid #1e5c3a; border-radius: 6px; padding: 6px 12px; min-width: 120px; text-align: center; break-inside: avoid; background: #eef4ee; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-.zr-karte h3 { margin: 0 0 2px; font-size: var(--fs-base); }
+.zr-karte h3 { margin: 0 0 2px; font-size: var(--fs-md); }
 .zr-karte p { margin: 0; font-size: var(--fs-sm); color: #333; }
 .zr-karte .gross { font-size: 2rem; font-weight: 800; line-height: 1.1; color: #111; }
 .zr-karte .mittel { font-size: 1.3rem; font-weight: 700; margin-top: 4px; color: #111; }
 .zr-karte .klein { margin-top: 4px; font-size: var(--fs-xs); }
 .zr-tabelle .zahl { text-align: right; }
 .zr-tabelle tbody th { text-align: left; font-weight: 600; }
-.wte-menue .menue-gruppe { margin: 6px 12px 2px; font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .06em; color: var(--text-leise, #667); }
+.wte-menue .menue-gruppe { margin: 6px 12px 2px; font-size: var(--fs-sm); font-weight: 500; color: var(--text-leise, #667); }
 .wte-menue button:disabled { opacity: .45; cursor: default; }
 .wte-menue { max-height: calc(100% - 90px); overflow-y: auto; }
 .einr-aktionen { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 4px; }
@@ -1042,7 +1043,7 @@ button.kachel:active { transform: none; }
 .glocke-alle { border: 0; background: none; color: var(--akzent); font: inherit; font-size: var(--fs-sm); font-weight: 600; cursor: pointer; }
 .glocke-alle:disabled { color: var(--text-leise); cursor: default; opacity: 0.6; }
 .glocke-liste { overflow-y: auto; overscroll-behavior: contain; }
-.glocke-liste h3 { margin: 0; padding: 10px 14px 4px; font-size: var(--fs-xs); letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-leise); }
+.glocke-liste h3 { margin: 0; padding: 10px 14px 4px; font-size: var(--fs-sm); font-weight: 500; color: var(--text-leise); }
 .glocke-leer { margin: 0; padding: 22px 14px; color: var(--text-leise); text-align: center; }
 .glocke-zeile { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 14px; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .glocke-zeile:hover { background: color-mix(in srgb, var(--akzent) 8%, transparent); }
@@ -1066,7 +1067,7 @@ button.kachel:active { transform: none; }
 .badge-inaktiv { margin-left: 8px; padding: 1px 7px; border-radius: 9px; background: color-mix(in srgb, var(--gefahr) 16%, transparent); color: var(--gefahr); font-size: var(--fs-xs); font-weight: 600; }
 .mitglieder-tabelle { width: 100%; border-collapse: collapse; }
 .mitglieder-tabelle th, .mitglieder-tabelle td { text-align: left; padding: 8px var(--abstand); border-top: 1px solid var(--linie); vertical-align: middle; }
-.mitglieder-tabelle thead th { border-top: 0; font-size: var(--fs-xs); color: var(--text-leise); font-weight: 600; }
+.mitglieder-tabelle thead th { border-top: 0; font-size: var(--fs-sm); color: var(--text-leise); font-weight: 500; }
 .mitglieder-tabelle td small { display: block; color: var(--text-leise); font-size: var(--fs-sm); }
 .mitglieder-tabelle tr.offen td { opacity: 0.8; }
 
@@ -1092,14 +1093,14 @@ button.kachel:active { transform: none; }
 /* Einklappen – ein Muster (Komponente Einklappbar; Pfeil wie in Zonen & Routen) */
 .einklappbar-kopf { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; background: none; padding: 10px 2px; cursor: pointer; color: inherit; font: inherit; text-align: left; }
 .einklappbar-kopf:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
-.einklappbar-inhalt[hidden] { display: none; }
+.einklappbar > .einklappbar-inhalt[hidden] { display: none; }
 .chevron { display: inline-flex; color: var(--text-leise); flex: none; }
 .ev-karte { border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); }
 .ev-karte > .einklappbar-kopf { padding: 12px var(--abstand); font-weight: 600; }
 .ev-karte > .einklappbar-inhalt { padding: 0 12px 12px; display: grid; gap: 12px; }
 .ev-abschnitt { border-bottom: 0.5px solid var(--linie); }
 .ev-abschnitt:last-of-type { border-bottom: 0; }
-.ev-abschnitt > .einklappbar-kopf { font-size: var(--fs-xs); font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-leise); }
+.ev-abschnitt > .einklappbar-kopf { font-size: var(--fs-sm); font-weight: 500; color: var(--text-leise); }
 .ev-abschnitt > .einklappbar-inhalt { display: grid; gap: 8px; padding: 0 0 12px; }
 .ev-inline > .einklappbar-kopf { padding: 6px 0; font-size: var(--fs-md); color: var(--text-leise); }
 .ev-inline > .einklappbar-inhalt { padding: 4px 0 8px; }
@@ -1111,3 +1112,5 @@ button.kachel:active { transform: none; }
 .aktionsmenue .bj-zeile-aktionen { flex-direction: column; align-items: stretch; gap: 6px; }
 
 .link .chevron, .bj-gruppe-kopf .chevron { vertical-align: middle; margin-right: 2px; }
+
+@media (pointer: fine) { .feld input, .feld select, .karte-dialog input, .karte-dialog select, .karte-panel select { font-size: var(--fs-md); } }
