@@ -28,6 +28,9 @@ export function Einstellungen({
       <details className="einklappbar">
         <summary>Konto</summary>
         <Konto name={kontext.name} email={kontext.email} onGeaendert={() => nachAenderung()} />
+        <p className="gruppe-fuss" style={{ padding: '0 var(--abstand)' }}>
+          Datenschutz: Inhaber deiner Reviere sehen, wann du dich zuletzt angemeldet bzw. die App zuletzt genutzt hast (nur der Zeitpunkt, keine Orte oder Geräte).
+        </p>
       </details>
       <DarstellungWahl />
       <BenachrichtigungenWahl userId={userId} istInhaber={istInhaber} />

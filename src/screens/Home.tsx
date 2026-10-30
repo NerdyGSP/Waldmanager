@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { fehlertext } from '../lib/fehler';
+import { supabase } from '../lib/supabase';
 import { gemerktesRevier, revierMerken, useNutzerKontext, type Mitgliedschaft } from '../lib/useNutzerKontext';
 import { navigieren, usePfad } from '../lib/router';
 import { Glocke } from '../components/Glocke';
@@ -57,6 +58,16 @@ const SONDERSEITEN = ['einstellungen', 'reviermanagement', 'masteradmin'];
 
 export function Home({ session }: { session: Session }) {
   const kontext = useNutzerKontext(session.user.id);
+
+  // Letzte Aktivität melden (Server begrenzt auf einmal pro Stunde)
+  useEffect(() => {
+    const melden = () => {
+      if (document.visibilityState === 'visible') void supabase.rpc('aktivitaet_melden');
+    };
+    melden();
+    document.addEventListener('visibilitychange', melden);
+    return () => document.removeEventListener('visibilitychange', melden);
+  }, []);
   const [revierId, setRevierId] = useState<string | null>(gemerktesRevier());
   const pfad = usePfad();
   const offen = useWarteschlange();

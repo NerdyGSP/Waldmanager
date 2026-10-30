@@ -1,6 +1,7 @@
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { fehlertext } from '../lib/fehler';
+import { supabase } from '../lib/supabase';
 import { gemerktesRevier, revierMerken, useNutzerKontext } from '../lib/useNutzerKontext';
 import { navigieren, usePfad } from '../lib/router';
 import { Glocke } from '../components/Glocke';
@@ -50,6 +51,16 @@ const MODULE = [
 const SONDERSEITEN = ['einstellungen', 'reviermanagement', 'masteradmin'];
 export function Home({ session }) {
     const kontext = useNutzerKontext(session.user.id);
+    // Letzte Aktivität melden (Server begrenzt auf einmal pro Stunde)
+    useEffect(() => {
+        const melden = () => {
+            if (document.visibilityState === 'visible')
+                void supabase.rpc('aktivitaet_melden');
+        };
+        melden();
+        document.addEventListener('visibilitychange', melden);
+        return () => document.removeEventListener('visibilitychange', melden);
+    }, []);
     const [revierId, setRevierId] = useState(gemerktesRevier());
     const pfad = usePfad();
     const offen = useWarteschlange();

@@ -1045,3 +1045,11 @@ button.kachel:active { transform: none; }
 .legende-typ { display: inline-flex; align-items: center; gap: 5px; border: 0; background: none; padding: 3px 6px; margin: -3px -6px; border-radius: var(--radius-sm); font: inherit; color: inherit; cursor: pointer; }
 .legende-typ:hover { background: color-mix(in srgb, var(--akzent) 10%, transparent); }
 .legende-typ.aus { opacity: 0.45; text-decoration: line-through; }
+
+.aktiv-text { color: var(--text-leise); font-size: 0.85rem; }
+.badge-inaktiv { margin-left: 8px; padding: 1px 7px; border-radius: 9px; background: color-mix(in srgb, var(--gefahr) 16%, transparent); color: var(--gefahr); font-size: 0.72rem; font-weight: 600; }
+.mitglieder-tabelle { width: 100%; border-collapse: collapse; }
+.mitglieder-tabelle th, .mitglieder-tabelle td { text-align: left; padding: 8px var(--abstand); border-top: 1px solid var(--linie); vertical-align: middle; }
+.mitglieder-tabelle thead th { border-top: 0; font-size: 0.78rem; color: var(--text-leise); font-weight: 600; }
+.mitglieder-tabelle td small { display: block; color: var(--text-leise); font-size: 0.8rem; }
+.mitglieder-tabelle tr.offen td { opacity: 0.8; }

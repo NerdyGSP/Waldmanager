@@ -1262,6 +1262,7 @@ export type Database = {
           erstellt_am: string
           id: string
           name: string
+          zuletzt_aktiv_am: string | null
         }
         Insert: {
           aktualisiert_am?: string
@@ -1270,6 +1271,7 @@ export type Database = {
           erstellt_am?: string
           id: string
           name: string
+          zuletzt_aktiv_am?: string | null
         }
         Update: {
           aktualisiert_am?: string
@@ -1278,6 +1280,7 @@ export type Database = {
           erstellt_am?: string
           id?: string
           name?: string
+          zuletzt_aktiv_am?: string | null
         }
         Relationships: []
       }
@@ -1988,6 +1991,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      aktivitaet_melden: { Args: never; Returns: undefined }
       aufgaben_faellig_pruefen: {
         Args: { p_revier_id: string }
         Returns: undefined
@@ -2073,6 +2077,14 @@ export type Database = {
       revier_aufteilen_vorschau: {
         Args: { p_anzahl: number; p_revier_id: string }
         Returns: Json
+      }
+      revier_letzte_logins: {
+        Args: { p_revier_id: string }
+        Returns: {
+          letzter_login: string
+          user_id: string
+          zuletzt_aktiv_am: string
+        }[]
       }
       routen_ebene_loeschen: {
         Args: { p_ebene_id: string; p_mit_routen?: boolean }
