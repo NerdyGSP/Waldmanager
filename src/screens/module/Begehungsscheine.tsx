@@ -1,4 +1,4 @@
-import { createPortal } from 'react-dom';
+import { DruckPortal } from '../../components/DruckPortal';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { supabase } from '../../lib/supabase';
 import { fehlertext } from '../../lib/fehler';
@@ -110,7 +110,8 @@ function ScheinFenster({ k, schein, onZurueck, onBearbeiten }: { k: RevierKontex
     return () => window.removeEventListener('keydown', taste);
   }, [onZurueck]);
   // Schwebendes Fenster (≥ 900 px) bzw. Vollbild-Sheet (Handy), unabhängig von der Seitenleiste
-  return createPortal(
+  return (
+    <DruckPortal>
     <div className="schein-fenster" role="dialog" aria-label="Begehungsschein">
       <div className="schein-fenster-kopf">
         <h2>Begehungsschein</h2>
@@ -151,8 +152,8 @@ function ScheinFenster({ k, schein, onZurueck, onBearbeiten }: { k: RevierKontex
         </footer>
       </article>
       {k.istInhaber && <Knopf variante="sekundaer" onClick={onBearbeiten}>Bearbeiten</Knopf>}
-    </div>,
-    document.body,
+    </div>
+    </DruckPortal>
   );
 }
 

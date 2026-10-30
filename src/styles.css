@@ -700,9 +700,7 @@ button.kachel:active { transform: none; }
 .schein-unterschrift { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-top: 36px; }
 .schein-unterschrift span { border-top: 1px solid var(--color-text); padding-top: 4px; font-size: 0.8rem; color: var(--color-text-muted); }
 @media print {
-  body * { visibility: hidden; }
-  .schein-druck, .schein-druck * { visibility: visible; }
-  .schein-druck { position: absolute; left: 0; top: 0; width: 100%; border: 0; }
+  .schein-druck { border: 0; }
   .schein-status .badge { border: 1px solid #000; background: none; color: #000; }
 }
 
@@ -871,10 +869,12 @@ button.kachel:active { transform: none; }
 .bj-druck-quelle { position: absolute; right: 0; bottom: 0; background: rgba(255,255,255,.85); padding: 2px 6px; font-size: .7rem; }
 .bj-druck-liste { border-collapse: collapse; width: 100%; font-size: 9pt; } .bj-druck-liste th, .bj-druck-liste td { border: 1px solid #888; padding: 3px 5px; text-align: left; } .bj-druck-liste thead th { background: #e5e8e1; -webkit-print-color-adjust: exact; print-color-adjust: exact; } .bj-druck-liste tfoot td { background: #f1f3ee; }
 @media print {
-  body.bj-druckt #root { display: none !important; }
-  body.bj-druckt .bj-druck-ebene { position: static; background: none; padding: 0; display: block; overflow: visible; }
-  body.bj-druckt .bj-druck-leiste { display: none !important; }
-  body.bj-druckt .bj-druck-blatt { box-shadow: none; padding: 0; width: auto !important; min-height: 0 !important; overflow: visible; }
+  html, body { height: auto !important; overflow: visible !important; background: #fff !important; }
+  body.druckt > *:not(#druck-root) { display: none !important; }
+  body.druckt #druck-root { display: block !important; }
+  .bj-druck-ebene { position: static; background: none; padding: 0; display: block; overflow: visible; }
+  .bj-druck-leiste { display: none !important; }
+  .bj-druck-blatt { box-shadow: none; padding: 0; width: auto !important; min-height: 0 !important; overflow: visible; }
 }
 
 /* Windpfeile */

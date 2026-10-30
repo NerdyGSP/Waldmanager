@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { DruckPortal } from '../../components/DruckPortal';
 import { datumDE } from '../../lib/zeit';
 import type { Tables } from '../../lib/database.types';
 import { Knopf } from '../../components/ui';
@@ -15,12 +15,10 @@ export type Stand = { id: string; lng: number; lat: number; name: string | null;
 // Gemeinsamer Rahmen: Vollbild-Ebene mit Werkzeugleiste, beim Drucken nur das Blatt
 export function Druckrahmen({ querformat, onZu, leiste, children }: { querformat: boolean; onZu: () => void; leiste?: React.ReactNode; children: React.ReactNode }) {
   useEffect(() => {
-    document.body.classList.add('bj-druckt');
     const stil = document.createElement('style');
     stil.textContent = `@page { size: A4 ${querformat ? 'landscape' : 'portrait'}; margin: 12mm; }`;
     document.head.appendChild(stil);
     return () => {
-      document.body.classList.remove('bj-druckt');
       stil.remove();
     };
   }, [querformat]);
@@ -29,7 +27,8 @@ export function Druckrahmen({ querformat, onZu, leiste, children }: { querformat
     window.addEventListener('keydown', esc);
     return () => window.removeEventListener('keydown', esc);
   }, [onZu]);
-  return createPortal(
+  return (
+    <DruckPortal>
     <div className="bj-druck-ebene" role="dialog" aria-modal="true">
       <div className="bj-druck-leiste">
         <Knopf variante="ghost" onClick={onZu}>‹ Zurück</Knopf>
@@ -37,8 +36,8 @@ export function Druckrahmen({ querformat, onZu, leiste, children }: { querformat
         {leiste}
       </div>
       <div className={`bj-druck-blatt ${querformat ? 'quer' : 'hoch'}`}>{children}</div>
-    </div>,
-    document.body,
+    </div>
+    </DruckPortal>
   );
 }
 
