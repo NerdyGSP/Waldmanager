@@ -11,6 +11,7 @@ import { datumDE, heuteISO, mondphase } from '../../lib/zeit';
 import { navigieren } from '../../lib/router';
 import { Auswahl, Feld, Gruppe, Hinweis, Knopf, Leer, Seite, Zaehler, Zeile, useRadHorizontal, WildartOptionen } from '../../components/ui';
 import { ZaehlReport } from './ZaehlReport';
+import { ZaehlMatrix } from './ZaehlMatrix';
 import { FlaechenmodusWahl, modusText, STANDARD_BREITE_M } from './FlaechenmodusWahl';
 import { WteRoutenWahl, useWteRouten } from '../../components/WteRoutenWahl';
 import { SitzungsdatenFormular } from './SitzungsdatenFormular';
@@ -339,8 +340,26 @@ function SitzungAnsicht({ k, sitzungId }) {
                     void laden();
             } }));
     }
+    // Dieselbe Matrix wie die Übersicht (Zonen × Wildarten), im Format der Import-Vorlage
+    function csvExport() {
+        const zelle = (t) => (/[;"\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t);
+        const arten = wildarten.filter((w) => zeilen.some((z) => z.wildart_id === w.id && z.anzahl > 0));
+        const zeilenIds = [...new Set(zeilen.filter((z) => z.anzahl > 0).map((z) => z.zone_id))];
+        const name = (id) => (id ? (alleZonen.find((z) => z.id === id)?.name ?? 'entfernte Zone') : 'Gesamtrevier');
+        const summe = (zone, art) => zeilen.filter((z) => z.zone_id === zone && z.wildart_id === art).reduce((a, z) => a + z.anzahl, 0);
+        const text = '\uFEFF' +
+            [['Zone', ...arten.map((a) => a.name)], ...zeilenIds.map((id) => [name(id), ...arten.map((a) => String(summe(id, a.id) || ''))])]
+                .map((r) => r.map(zelle).join(';'))
+                .join('\r\n') +
+            '\r\n';
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }));
+        a.download = `wildzaehlung-${sitzung?.datum ?? 'export'}.csv`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+    }
     if (uebersicht) {
-        return (_jsxs(Seite, { titel: titel, untertitel: untertitel, zurueck: () => navigieren('/zaehlung'), children: [fehler && _jsx(Hinweis, { art: "fehler", children: fehler }), _jsx(AuditZeile, { tabelle: "zaehlsitzungen", id: sitzung.id, aktualisierung: sitzung.status }), _jsx(Gesamtuebersicht, { zeilen: zeilen, zonen: alleZonen, wildarten: wildarten }), _jsx(FlaechenGruppe, { sitzung: sitzung, revierId: k.revierId, onGeaendert: () => void laden(), onRouten: setRoutenAnzahl }), sitzung.bemerkung && _jsxs(Leer, { children: ["Bemerkung: ", sitzung.bemerkung] }), sitzung.status === 'offen' ? (_jsxs(_Fragment, { children: [_jsx(Knopf, { onClick: abschliessen, disabled: sitzung.flaechenmodus === 'strecke' && routenAnzahl === 0, children: "Z\u00E4hlung abschlie\u00DFen" }), _jsx(Knopf, { variante: "sekundaer", onClick: () => setUebersicht(false), children: "Weiter z\u00E4hlen" })] })) : (_jsxs(_Fragment, { children: [_jsx(Knopf, { variante: "akzent", onClick: () => setReport(true), children: "Report drucken" }), darfLoeschen && (_jsx(Knopf, { variante: "sekundaer", onClick: () => setBearbeiten(true), children: "Sitzungsdaten bearbeiten (Datum, Wetter, Zeiten)" })), _jsx(Knopf, { variante: "sekundaer", onClick: wiederOeffnen, children: "Z\u00E4hlung wieder \u00F6ffnen" })] })), report && (_jsx(ZaehlReport, { revierId: k.revierId, revierName: k.revierName, sitzung: sitzung, ebeneName: ebenen.find((x) => x.id === sitzung.ebene_id)?.name ?? null, zeilen: zeilen, zonen: alleZonen, wildarten: wildarten, onZu: () => setReport(false) })), darfLoeschen && (_jsx(Knopf, { variante: "gefahr", onClick: loeschen, children: "Z\u00E4hlung l\u00F6schen" }))] }));
+        return (_jsxs(Seite, { titel: titel, untertitel: untertitel, zurueck: () => navigieren('/zaehlung'), children: [fehler && _jsx(Hinweis, { art: "fehler", children: fehler }), _jsx(AuditZeile, { tabelle: "zaehlsitzungen", id: sitzung.id, aktualisierung: sitzung.status }), _jsx(ZaehlMatrix, { revierId: k.revierId, sitzung: sitzung, zeilen: zeilen, zonen: alleZonen, ebenen: ebenen, wildarten: wildarten }), _jsx(FlaechenGruppe, { sitzung: sitzung, revierId: k.revierId, onGeaendert: () => void laden(), onRouten: setRoutenAnzahl }), sitzung.bemerkung && _jsxs(Leer, { children: ["Bemerkung: ", sitzung.bemerkung] }), _jsx(Knopf, { variante: "sekundaer", onClick: () => csvExport(), children: "Als CSV exportieren (Matrix)" }), sitzung.status === 'offen' ? (_jsxs(_Fragment, { children: [_jsx(Knopf, { onClick: abschliessen, disabled: sitzung.flaechenmodus === 'strecke' && routenAnzahl === 0, children: "Z\u00E4hlung abschlie\u00DFen" }), _jsx(Knopf, { variante: "sekundaer", onClick: () => setUebersicht(false), children: "Weiter z\u00E4hlen" })] })) : (_jsxs(_Fragment, { children: [_jsx(Knopf, { variante: "akzent", onClick: () => setReport(true), children: "Report drucken" }), darfLoeschen && (_jsx(Knopf, { variante: "sekundaer", onClick: () => setBearbeiten(true), children: "Sitzungsdaten bearbeiten (Datum, Wetter, Zeiten)" })), _jsx(Knopf, { variante: "sekundaer", onClick: wiederOeffnen, children: "Z\u00E4hlung wieder \u00F6ffnen" })] })), report && (_jsx(ZaehlReport, { revierId: k.revierId, revierName: k.revierName, sitzung: sitzung, ebeneName: ebenen.find((x) => x.id === sitzung.ebene_id)?.name ?? null, zeilen: zeilen, zonen: alleZonen, wildarten: wildarten, onZu: () => setReport(false) })), darfLoeschen && (_jsx(Knopf, { variante: "gefahr", onClick: loeschen, children: "Z\u00E4hlung l\u00F6schen" }))] }));
     }
     const zid = zoneId || null;
     const zoneZeilen = zeilen

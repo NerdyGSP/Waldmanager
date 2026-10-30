@@ -1057,3 +1057,15 @@ button.kachel:active { transform: none; }
 .zonen-summe { margin-left: 6px; padding: 0 6px; border-radius: 9px; background: var(--akzent); color: #fff; font-size: 0.75rem; font-weight: 700; }
 
 .zonen-info-laufend { margin: 4px 16px 8px; font-size: 0.85rem; color: var(--text-leise); }
+
+/* WTE-Übersicht (ZaehlMatrix) */
+.matrix { max-height: 65vh; overflow: auto; }
+.matrix thead th { position: sticky; top: 0; background: var(--flaeche); z-index: 2; }
+.matrix tbody th, .matrix tfoot th, .matrix thead th:first-child { position: sticky; left: 0; background: var(--flaeche); z-index: 1; }
+.matrix thead th:first-child { z-index: 3; }
+.matrix-gruppe th, .matrix-gruppe td { background: color-mix(in srgb, var(--flaeche) 92%, var(--text) 8%); }
+.matrix-gruppe th { background: color-mix(in srgb, var(--flaeche) 92%, var(--text) 8%); }
+.matrix-karten { display: grid; gap: 8px; }
+.matrix-karte { background: var(--flaeche); border-radius: var(--radius); padding: 10px 12px; display: grid; gap: 4px; }
+.matrix-karte ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.matrix-karte li { display: flex; justify-content: space-between; }

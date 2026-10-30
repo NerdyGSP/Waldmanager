@@ -12,6 +12,7 @@ import type { Enums, Json } from '../../lib/database.types';
 import { Auswahl, Feld, Gruppe, Hinweis, Knopf, Leer, Seite, Zaehler, Zeile, useRadHorizontal, WildartOptionen } from '../../components/ui';
 import type { RevierKontext } from './kontext';
 import { ZaehlReport } from './ZaehlReport';
+import { ZaehlMatrix } from './ZaehlMatrix';
 import { FlaechenmodusWahl, modusText, STANDARD_BREITE_M, type Flaechenmodus } from './FlaechenmodusWahl';
 import { WteRoutenWahl, useWteRouten } from '../../components/WteRoutenWahl';
 import { SitzungsdatenFormular } from './SitzungsdatenFormular';
@@ -477,14 +478,37 @@ function SitzungAnsicht({ k, sitzungId }: { k: RevierKontext; sitzungId: string 
     );
   }
 
+  // Dieselbe Matrix wie die Übersicht (Zonen × Wildarten), im Format der Import-Vorlage
+  function csvExport() {
+    const zelle = (t: string) => (/[;"\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t);
+    const arten = wildarten.filter((w) => zeilen.some((z) => z.wildart_id === w.id && z.anzahl > 0));
+    const zeilenIds = [...new Set(zeilen.filter((z) => z.anzahl > 0).map((z) => z.zone_id))];
+    const name = (id: string | null) => (id ? (alleZonen.find((z) => z.id === id)?.name ?? 'entfernte Zone') : 'Gesamtrevier');
+    const summe = (zone: string | null, art: string) => zeilen.filter((z) => z.zone_id === zone && z.wildart_id === art).reduce((a, z) => a + z.anzahl, 0);
+    const text =
+      '\uFEFF' +
+      [['Zone', ...arten.map((a) => a.name)], ...zeilenIds.map((id) => [name(id), ...arten.map((a) => String(summe(id, a.id) || ''))])]
+        .map((r) => r.map(zelle).join(';'))
+        .join('\r\n') +
+      '\r\n';
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }));
+    a.download = `wildzaehlung-${sitzung?.datum ?? 'export'}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
   if (uebersicht) {
     return (
       <Seite titel={titel} untertitel={untertitel} zurueck={() => navigieren('/zaehlung')}>
         {fehler && <Hinweis art="fehler">{fehler}</Hinweis>}
         <AuditZeile tabelle="zaehlsitzungen" id={sitzung.id} aktualisierung={sitzung.status} />
-        <Gesamtuebersicht zeilen={zeilen} zonen={alleZonen} wildarten={wildarten} />
+        <ZaehlMatrix revierId={k.revierId} sitzung={sitzung} zeilen={zeilen} zonen={alleZonen} ebenen={ebenen} wildarten={wildarten} />
         <FlaechenGruppe sitzung={sitzung} revierId={k.revierId} onGeaendert={() => void laden()} onRouten={setRoutenAnzahl} />
         {sitzung.bemerkung && <Leer>Bemerkung: {sitzung.bemerkung}</Leer>}
+        <Knopf variante="sekundaer" onClick={() => csvExport()}>
+          Als CSV exportieren (Matrix)
+        </Knopf>
         {sitzung.status === 'offen' ? (
           <>
             <Knopf onClick={abschliessen} disabled={sitzung.flaechenmodus === 'strecke' && routenAnzahl === 0}>

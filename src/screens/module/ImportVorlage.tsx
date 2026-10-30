@@ -1,5 +1,4 @@
-import { useMemo, useState } from 'react';
-import { wildartFinden } from '../../lib/csv';
+import { useState } from 'react';
 import { useZonenEbenen, type Zone } from '../../lib/stammdaten';
 import { Auswahl, Gruppe, Knopf } from '../../components/ui';
 
@@ -17,13 +16,10 @@ export function vorlageErzeugen(zonenNamen: string[], arten: string[]): string {
 export function VorlageGruppe({ revierId, zonen, wildarten }: { revierId: string; zonen: Zone[]; wildarten: Array<{ id: string; name: string }> }) {
   const { ebenen } = useZonenEbenen(revierId);
   const [ebeneId, setEbeneId] = useState('');
-  const [extra, setExtra] = useState<string[]>([]);
-  const haupt = useMemo(() => HAUPTARTEN.map((n) => wildartFinden(n, wildarten)).filter((x): x is string => !!x), [wildarten]);
   const gewaehlteZonen = zonen.filter((z) => (ebeneId ? z.ebeneId === ebeneId : true));
-  const weitere = wildarten.filter((w) => !haupt.includes(w.id));
 
   function herunterladen() {
-    const arten = [...haupt, ...extra].map((id) => wildarten.find((w) => w.id === id)?.name ?? id);
+    const arten = wildarten.map((w) => w.name); // alle Wildarten in der Reihenfolge der Auswahl
     const text = '﻿' + vorlageErzeugen(gewaehlteZonen.map((z) => z.name), arten);
     const url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }));
     const a = document.createElement('a');
@@ -36,7 +32,7 @@ export function VorlageGruppe({ revierId, zonen, wildarten }: { revierId: string
   return (
     <Gruppe
       titel="Vorlage für eine Zählung herunterladen"
-      fuss="Zeilen = Zonen, Spalten = Wildarten, wie in der gedruckten Zusammenfassung. Leere Zellen zählen als 0. Datum und Wetter gibst du beim Import an."
+      fuss="Zeilen = Zonen, Spalten = alle Wildarten in der Reihenfolge der Auswahl. Leere Zellen zählen als 0. Datum und Wetter gibst du beim Import an."
     >
       {ebenen.length > 0 && (
         <Auswahl label="Zonen" value={ebeneId} onChange={(e) => setEbeneId(e.target.value)}>
@@ -47,33 +43,6 @@ export function VorlageGruppe({ revierId, zonen, wildarten }: { revierId: string
             </option>
           ))}
         </Auswahl>
-      )}
-      {weitere.length > 0 && (
-        <Auswahl
-          label="Weitere Wildart ergänzen"
-          value=""
-          onChange={(e) => {
-            const id = e.target.value;
-            if (id && !extra.includes(id)) setExtra([...extra, id]);
-          }}
-        >
-          <option value="">– auswählen –</option>
-          {weitere.filter((w) => !extra.includes(w.id)).map((w) => (
-            <option key={w.id} value={w.id}>
-              {w.name}
-            </option>
-          ))}
-        </Auswahl>
-      )}
-      {extra.length > 0 && (
-        <p className="gruppe-fuss">
-          Zusätzlich:{' '}
-          {extra.map((id) => (
-            <button key={id} type="button" className="link" onClick={() => setExtra(extra.filter((x) => x !== id))} aria-label="Wildart wieder entfernen">
-              {wildarten.find((w) => w.id === id)?.name} ✕{' '}
-            </button>
-          ))}
-        </p>
       )}
       <Knopf variante="sekundaer" onClick={herunterladen}>
         Vorlage herunterladen
