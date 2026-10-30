@@ -1613,6 +1613,49 @@ export type Database = {
           },
         ]
       }
+      zaehlsitzung_routen: {
+        Row: {
+          erstellt_am: string
+          revier_id: string
+          route_id: string
+          sitzung_id: string
+        }
+        Insert: {
+          erstellt_am?: string
+          revier_id: string
+          route_id: string
+          sitzung_id: string
+        }
+        Update: {
+          erstellt_am?: string
+          revier_id?: string
+          route_id?: string
+          sitzung_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "zaehlsitzung_routen_revier_id_fkey"
+            columns: ["revier_id"]
+            isOneToOne: false
+            referencedRelation: "reviere"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "zaehlsitzung_routen_route_id_fkey"
+            columns: ["route_id"]
+            isOneToOne: false
+            referencedRelation: "pirschwege"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "zaehlsitzung_routen_sitzung_id_fkey"
+            columns: ["sitzung_id"]
+            isOneToOne: false
+            referencedRelation: "zaehlsitzungen"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       zaehlsitzungen: {
         Row: {
           abgeschlossen_am: string | null

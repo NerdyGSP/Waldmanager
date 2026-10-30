@@ -12,6 +12,7 @@ import { Auswahl, Feld, Gruppe, Hinweis, Knopf, Leer, Seite, Zaehler, Zeile, use
 import type { RevierKontext } from './kontext';
 import { ZaehlReport } from './ZaehlReport';
 import { FlaechenmodusWahl, modusText, STANDARD_BREITE_M, type Flaechenmodus } from './FlaechenmodusWahl';
+import { WteRoutenWahl, useWteRouten } from '../../components/WteRoutenWahl';
 import { SitzungsdatenFormular } from './SitzungsdatenFormular';
 import { alsSitzungsZeile, vonSitzungsZeile } from '../../lib/sitzungsdaten';
 
@@ -125,6 +126,16 @@ function NeueSitzung({ k, onAbbrechen }: { k: RevierKontext; onAbbrechen: () => 
   const [wetter, setWetter] = useState<Wetter | null>(null);
   const [wetterStatus, setWetterStatus] = useState('Wetter wird abgerufen …');
   const [fehler, setFehler] = useState<string | null>(null);
+  const wteRouten = useWteRouten(k.revierId, modus === 'strecke');
+  const [routenIds, setRoutenIds] = useState<string[]>([]);
+  const [routenVorbelegt, setRoutenVorbelegt] = useState(false);
+  // Vorbelegung: alle WTE-Routen, die Auswahl lässt sich ändern
+  useEffect(() => {
+    if (wteRouten && !routenVorbelegt) {
+      setRoutenIds(wteRouten.map((r) => r.id));
+      setRoutenVorbelegt(true);
+    }
+  }, [wteRouten, routenVorbelegt]);
   const mond = mondphase(new Date(`${datum}T20:00:00`));
 
   useEffect(() => {
@@ -162,6 +173,12 @@ function NeueSitzung({ k, onAbbrechen }: { k: RevierKontext; onAbbrechen: () => 
       setFehler(fehlertext(error));
       return;
     }
+    if (modus === 'strecke' && routenIds.length) {
+      const { error: e2 } = await supabase.from('zaehlsitzung_routen').insert(routenIds.map((route_id) => ({ sitzung_id: data.id, route_id, revier_id: k.revierId })));
+      if (e2) {
+        setFehler(`Zählung gestartet, aber die Routen konnten nicht zugeordnet werden: ${fehlertext(e2)}`);
+      }
+    }
     navigieren(`/zaehlung/${data.id}`);
   }
 
@@ -181,6 +198,7 @@ function NeueSitzung({ k, onAbbrechen }: { k: RevierKontext; onAbbrechen: () => 
             </Auswahl>
           )}
           <FlaechenmodusWahl modus={modus} breite={breite} onModus={setModus} onBreite={setBreite} />
+          {modus === 'strecke' && <WteRoutenWahl routen={wteRouten} gewaehlt={routenIds} onAendern={setRoutenIds} />}
           <Zeile label="Wetter" wert={wetterStatus} />
           <Zeile label="Mond" wert={`${mond.name}, ${mond.beleuchtung} % beleuchtet`} />
           <Feld label="Bemerkung" placeholder="z. B. Scheinwerferzählung" value={bemerkung} onChange={(e) => setBemerkung(e.target.value)} />
@@ -239,7 +257,8 @@ function FlaechenGruppe({ sitzung, revierId, onGeaendert, onRouten }: { sitzung:
   const [fehler, setFehler] = useState<string | null>(null);
   const [laeuft, setLaeuft] = useState(false);
   const [neuLadenZaehler, setNeuLadenZaehler] = useState(0);
-  const [routenListe, setRoutenListe] = useState<Array<{ id: string; name: string; zaehlsitzung_id: string | null; km: number | null; datum: string | null }>>([]);
+  const routenListe = useWteRouten(revierId, modus === 'strecke');
+  const [gewaehlt, setGewaehlt] = useState<string[]>([]);
   const geaendert = modus !== sitzung.flaechenmodus || breite !== sitzung.streifenbreite_m;
   const abgeschlossen = sitzung.status === 'abgeschlossen';
 
@@ -256,39 +275,34 @@ function FlaechenGruppe({ sitzung, revierId, onGeaendert, onRouten }: { sitzung:
     };
   }, [sitzung.id, modus, breite, sitzung.status, neuLadenZaehler]);
 
-  // Vorhandene WTE-Routen des Reviers (aus WTE-relevanten Ebenen), die dieser Zählung zugeordnet werden können
+  // Zugeordnete Routen dieser Zählung
   useEffect(() => {
-    if (modus !== 'strecke') return;
     let aktiv = true;
     void supabase
-      .from('pirschwege')
-      .select('id, name, zaehlsitzung_id, routen_ebenen!inner(wte_aktiv), zaehlsitzungen(datum)')
-      .eq('revier_id', revierId)
-      .eq('typ', 'wte_route')
-      .eq('routen_ebenen.wte_aktiv', true)
-      .is('geloescht_am', null)
-      .order('name')
+      .from('zaehlsitzung_routen')
+      .select('route_id')
+      .eq('sitzung_id', sitzung.id)
       .then(({ data }) => {
-        if (!aktiv) return;
-        setRoutenListe(
-          (data ?? []).map((r) => ({
-            id: r.id,
-            name: r.name,
-            zaehlsitzung_id: r.zaehlsitzung_id,
-            km: null,
-            datum: (r.zaehlsitzungen as { datum?: string } | null)?.datum ?? null,
-          })),
-        );
+        if (aktiv) setGewaehlt((data ?? []).map((r) => r.route_id));
       });
     return () => {
       aktiv = false;
     };
-  }, [revierId, modus, neuLadenZaehler]);
+  }, [sitzung.id, neuLadenZaehler]);
 
-  async function routeZuordnen(id: string, an: boolean) {
+  async function routenAendern(ids: string[]) {
     setFehler(null);
-    const { error } = await supabase.from('pirschwege').update({ zaehlsitzung_id: an ? sitzung.id : null }).eq('id', id);
-    if (error) setFehler(fehlertext(error));
+    const neu = ids.filter((i) => !gewaehlt.includes(i));
+    const weg = gewaehlt.filter((i) => !ids.includes(i));
+    setGewaehlt(ids);
+    if (neu.length) {
+      const { error } = await supabase.from('zaehlsitzung_routen').insert(neu.map((route_id) => ({ sitzung_id: sitzung.id, route_id, revier_id: revierId })));
+      if (error) setFehler(fehlertext(error));
+    }
+    if (weg.length) {
+      const { error } = await supabase.from('zaehlsitzung_routen').delete().eq('sitzung_id', sitzung.id).in('route_id', weg);
+      if (error) setFehler(fehlertext(error));
+    }
     setNeuLadenZaehler((n) => n + 1);
   }
 
@@ -313,34 +327,9 @@ function FlaechenGruppe({ sitzung, revierId, onGeaendert, onRouten }: { sitzung:
     <Gruppe titel="Gezählte Fläche" fuss={abgeschlossen ? 'Die Fläche wird beim Abschluss festgeschrieben. Ändern von Modus oder Breite berechnet sie neu.' : 'Wird beim Abschluss der Zählung festgeschrieben.'}>
       <FlaechenmodusWahl modus={modus} breite={breite} onModus={setModus} onBreite={setBreite} />
       {fehltRoute && (
-        <Hinweis art="warnung">Dieser Zählung ist noch keine WTE-Route zugeordnet. Im Modus „Strecke × Breite“ lässt sie sich so nicht abschließen. Ordne unten eine vorhandene WTE-Route zu oder zeichne, zeichne per GPS auf oder importiere eine über das Menü „+ NEU“ auf der Karte.</Hinweis>
+        <Hinweis art="warnung">Dieser Zählung ist noch keine WTE-Route zugeordnet. Im Modus „Strecke × Breite“ lässt sie sich so nicht abschließen. Wähle unten vorhandene WTE-Routen aus oder zeichne, zeichne per GPS auf oder importiere eine über das Menü „+ NEU“ auf der Karte.</Hinweis>
       )}
-      {modus === 'strecke' && !abgeschlossen && (
-        <div style={{ padding: '4px var(--abstand) 8px' }}>
-          <strong style={{ fontSize: '0.9rem' }}>WTE-Routen dieser Zählung</strong>
-          {routenListe.length === 0 ? (
-            <p className="gruppe-fuss" style={{ margin: '4px 0 0' }}>Keine WTE-Routen in WTE-relevanten Ebenen vorhanden.</p>
-          ) : (
-            <ul style={{ listStyle: 'none', margin: '6px 0 0', padding: 0, display: 'grid', gap: 4 }}>
-              {routenListe.map((r) => {
-                const hier = r.zaehlsitzung_id === sitzung.id;
-                const anderswo = !!r.zaehlsitzung_id && !hier;
-                return (
-                  <li key={r.id}>
-                    <label style={{ display: 'flex', gap: 8, alignItems: 'center', opacity: anderswo ? 0.6 : 1 }}>
-                      <input type="checkbox" checked={hier} disabled={anderswo} onChange={(e) => void routeZuordnen(r.id, e.target.checked)} />
-                      <span>
-                        {r.name}
-                        {anderswo && <small style={{ color: 'var(--text-leise)' }}> · gehört zur Zählung vom {r.datum ? datumDE(r.datum) : 'früherer Zählung'}</small>}
-                      </span>
-                    </label>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
-      )}
+      {modus === 'strecke' && !abgeschlossen && <WteRoutenWahl routen={routenListe} gewaehlt={gewaehlt} onAendern={(ids) => void routenAendern(ids)} />}
       <Zeile
         label="Fläche"
         wert={
