@@ -2,15 +2,7 @@
 // Aufruf nur durch Revierinhaber: Die Daten werden mit dem JWT des Aufrufers gelesen (RLS).
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
-const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-const ABSENDER = { name: 'Hegewerk', email: 'noreply@hegewerk.app' };
-const BASIS = 'https://hegewerk.app';
-
-const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
-const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
+import { BASIS, CORS, absender, esc, json, replyTo } from '../_shared/mail.ts';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
@@ -36,6 +28,15 @@ Deno.serve(async (req) => {
   if (nurIds) tq = tq.in('id', nurIds);
   const { data: teilnehmer } = await tq;
 
+  // Absender „Revier <Name> · Hegewerk“; Antworten an die Antwortadresse der Jagd, sonst an den Inhaber
+  const { data: revier } = await supabase.from('reviere').select('name').eq('id', jagd.revier_id).maybeSingle();
+  const { data: u } = await supabase.auth.getUser();
+  let inhaberMail: string | null = null;
+  const { data: inh } = await supabase.from('revier_mitglieder').select('profiles(email)').eq('revier_id', jagd.revier_id).eq('rolle', 'inhaber').limit(1).maybeSingle();
+  inhaberMail = (inh as { profiles?: { email?: string } | null } | null)?.profiles?.email ?? u?.user?.email ?? null;
+  const ABSENDER = absender(revier?.name);
+  const ANTWORT = replyTo(jagd.antwort_an, inhaberMail);
+
   const datum = new Date(jagd.datum + 'T12:00:00').toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
   const zeit = jagd.uhrzeit ? ` um ${String(jagd.uhrzeit).slice(0, 5)} Uhr` : '';
   const ergebnisse: Array<{ id: string; ok: boolean; fehler?: string }> = [];
@@ -59,6 +60,7 @@ ${jagd.einladungstext ? `<p style="white-space:pre-line">${esc(jagd.einladungste
         headers: { 'api-key': key, 'content-type': 'application/json', accept: 'application/json' },
         body: JSON.stringify({
           sender: ABSENDER,
+          ...(ANTWORT ? { replyTo: ANTWORT } : {}),
           to: [{ email: t.email, name: t.name }],
           subject: `Einladung: ${jagd.titel} am ${new Date(jagd.datum + 'T12:00:00').toLocaleDateString('de-DE')}`,
           htmlContent: html,

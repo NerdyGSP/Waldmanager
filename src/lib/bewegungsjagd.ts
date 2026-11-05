@@ -58,6 +58,7 @@ export type BjLadeErgebnis = {
     status: string;
   };
   ich: {
+    id?: string;
     name: string;
     anschrift: string | null;
     telefon?: string | null;

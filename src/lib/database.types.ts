@@ -598,6 +598,7 @@ export type Database = {
           ansteller_id: string | null
           antwort_am: string | null
           auto_vorhanden: boolean | null
+          bestaetigung_gesendet_am: string | null
           bewegungsjagd_id: string
           einladungscode: string
           email: string
@@ -623,6 +624,7 @@ export type Database = {
           ansteller_id?: string | null
           antwort_am?: string | null
           auto_vorhanden?: boolean | null
+          bestaetigung_gesendet_am?: string | null
           bewegungsjagd_id: string
           einladungscode?: string
           email: string
@@ -648,6 +650,7 @@ export type Database = {
           ansteller_id?: string | null
           antwort_am?: string | null
           auto_vorhanden?: boolean | null
+          bestaetigung_gesendet_am?: string | null
           bewegungsjagd_id?: string
           einladungscode?: string
           email?: string
@@ -697,6 +700,7 @@ export type Database = {
           abgeschlossen_von: string | null
           abschlusskommentar: string | null
           aktualisiert_am: string
+          antwort_an: string | null
           art: string
           datum: string
           einladungstext: string | null
@@ -724,6 +728,7 @@ export type Database = {
           abgeschlossen_von?: string | null
           abschlusskommentar?: string | null
           aktualisiert_am?: string
+          antwort_an?: string | null
           art?: string
           datum: string
           einladungstext?: string | null
@@ -751,6 +756,7 @@ export type Database = {
           abgeschlossen_von?: string | null
           abschlusskommentar?: string | null
           aktualisiert_am?: string
+          antwort_an?: string | null
           art?: string
           datum?: string
           einladungstext?: string | null
@@ -2037,6 +2043,7 @@ export type Database = {
         Returns: boolean
       }
       bj_laden: { Args: { p_code: string; p_jagd: string }; Returns: Json }
+      bj_mail_daten: { Args: { p_code: string; p_jagd: string }; Returns: Json }
       einladung_einloesen: { Args: { p_code: string }; Returns: string }
       einladung_erstellen: {
         Args: {

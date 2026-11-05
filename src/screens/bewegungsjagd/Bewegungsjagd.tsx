@@ -213,6 +213,10 @@ function Assistent({ k }: { k: RevierKontext }) {
   const [neuTelefon, setNeuTelefon] = useState('');
   // 3 Details
   const [text, setText] = useState('');
+  const [antwortAn, setAntwortAn] = useState('');
+  useEffect(() => {
+    void supabase.auth.getUser().then(({ data }) => setAntwortAn((a) => a || data.user?.email || ''));
+  }, []);
   const [st, setSt] = useState(false);
   const [stAdresse, setStAdresse] = useState('');
   const [stPflicht, setStPflicht] = useState(false);
@@ -276,6 +280,7 @@ function Assistent({ k }: { k: RevierKontext }) {
       if (!aktive.length) return setFehler('Bitte mindestens einen aktiven Teilnehmer angeben.');
       if (aktive.some(ungueltig)) return setFehler('Bitte ungültige E-Mail-Adressen korrigieren, entfernen oder deaktivieren.');
     }
+    if (schritt === 2 && antwortAn.trim() && !/^[^@\s<>",;]+@[^@\s<>",;]+\.[^@\s<>",;]+$/.test(antwortAn.trim())) return setFehler('Bitte eine gültige Adresse für „Antworten an“ angeben oder das Feld leeren.');
     if (schritt === 2 && hb && !(Number(hbBetrag.replace(',', '.')) > 0)) return setFehler('Bitte einen Hegebeitrag größer 0 angeben.');
     if (schritt === 3) return void anlegen();
     setSchritt(schritt + 1);
@@ -299,6 +304,7 @@ function Assistent({ k }: { k: RevierKontext }) {
         hegebeitrag_aktiv: hb,
         hegebeitrag_betrag: betrag,
         einladungstext: text.trim() || null,
+        antwort_an: antwortAn.trim() || null,
       })
       .select('id')
       .single();
@@ -468,11 +474,12 @@ function Assistent({ k }: { k: RevierKontext }) {
 
       {schritt === 2 && (
         <>
-          <Gruppe titel="Details" fuss="Hund, Jagdhornbläser sowie Auto und Mitfahrplätze fragen wir bei der Zusage automatisch ab.">
+          <Gruppe titel="Details" fuss="Antworten auf Einladung und Bestätigung gehen an die Adresse „Antworten an“ (Standard: deine E-Mail). Hund, Jagdhornbläser sowie Auto und Mitfahrplätze fragen wir bei der Zusage automatisch ab.">
             <label className="bj-text">
               <span>Einladungstext (erscheint in der E-Mail und auf der Anmeldeseite)</span>
               <textarea value={text} onChange={(e) => setText(e.target.value)} />
             </label>
+            <Feld label="Antworten an" type="email" inputMode="email" autoComplete="off" value={antwortAn} onChange={(e) => setAntwortAn(e.target.value)} placeholder="E-Mail für Rückfragen der Teilnehmer" />
             <JaNein label="Schüsseltreiben" wert={st} onAendern={setSt} />
             {st && (
               <>

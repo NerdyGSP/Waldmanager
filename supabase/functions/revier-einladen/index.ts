@@ -2,14 +2,7 @@
 // Die Berechtigung prüft die RPC einladung_erstellen mit dem JWT des Aufrufers (nur Inhaber/Masteradmin).
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
-const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-const ABSENDER = { name: 'Hegewerk', email: 'noreply@hegewerk.app' };
-const BASIS = 'https://hegewerk.app';
-const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
-const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
+import { BASIS, CORS, absender, esc, json } from '../_shared/mail.ts';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
@@ -55,7 +48,7 @@ Deno.serve(async (req) => {
     const r = await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
       headers: { 'api-key': key, 'content-type': 'application/json', accept: 'application/json' },
-      body: JSON.stringify({ sender: ABSENDER, to: [{ email }], subject: `Einladung ins Revier ${revier?.name ?? ''}`, htmlContent: html }),
+      body: JSON.stringify({ sender: absender(revier?.name), to: [{ email }], subject: `Einladung ins Revier ${revier?.name ?? ''}`, htmlContent: html }),
     });
     ok = r.ok;
     if (!ok) fehler = `Brevo ${r.status}: ${(await r.text()).slice(0, 200)}`;

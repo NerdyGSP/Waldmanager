@@ -1117,3 +1117,15 @@ button.kachel:active { transform: none; }
 .link .chevron, .bj-gruppe-kopf .chevron { vertical-align: middle; margin-right: 2px; }
 
 @media (pointer: fine) { .feld input, .feld select, .karte-dialog input, .karte-dialog select, .karte-panel select { font-size: var(--fs-md); } }
+
+/* Teilnehmerseite: Zusage-Ansicht, Absage-Dialog */
+.bj-ergebnis { display: flex; gap: 12px; align-items: flex-start; }
+.bj-ergebnis h1 { outline: none; font-size: var(--fs-h2); }
+.bj-haken { flex: none; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: var(--color-primary); color: #fff; font-weight: 700; }
+.bj-status { margin: 0 0 2px; font-size: var(--fs-md); font-weight: 600; color: var(--color-primary); }
+.bj-absagen-zeile { display: flex; justify-content: center; padding: 12px 0 24px; }
+.bj-absagen { color: var(--color-danger); }
+.bj-abs-overlay { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.5); display: grid; place-items: center; padding: 16px; }
+.bj-abs { width: min(440px, 100%); background: var(--color-bg); color: var(--color-text); border: 1px solid var(--color-border-input); border-radius: var(--radius-md); padding: 18px; display: grid; gap: 12px; box-shadow: 0 12px 40px rgba(0,0,0,.35); }
+.bj-abs h2 { margin: 0; font-size: var(--fs-h2); }
+.bj-abs p { margin: 0; font-size: var(--fs-md); }
