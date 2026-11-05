@@ -13,6 +13,17 @@ const STIL: StyleSpecification = {
   },
   layers: [{ id: 'osm', type: 'raster', source: 'osm' }],
 };
+STIL.sources.luftbild = {
+  type: 'raster',
+  tiles: [
+    'https://opendata.lgln.niedersachsen.de/doorman/noauth/dop_wms?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&FORMAT=image/jpeg&LAYERS=ni_dop20&STYLES=&CRS=EPSG:3857&WIDTH=256&HEIGHT=256&BBOX={bbox-epsg-3857}',
+  ],
+  tileSize: 256,
+  maxzoom: 19,
+  attribution: '© GeoBasis-DE/LGLN',
+};
+// Luftbild (Niedersachsen) über der OpenStreetMap-Karte; außerhalb der Abdeckung bleibt OSM sichtbar
+STIL.layers.push({ id: 'luftbild', type: 'raster', source: 'luftbild' });
 
 export type BjMarker = { id: string; lng: number; lat: number; art: 'treffpunkt' | 'bock' | 'eigener' | 'frei' | 'belegt' | 'rettung'; label?: string };
 
