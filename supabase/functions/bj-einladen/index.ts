@@ -2,7 +2,7 @@
 // Aufruf nur durch Revierinhaber: Die Daten werden mit dem JWT des Aufrufers gelesen (RLS).
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
-import { BASIS, CORS, absender, esc, json, replyTo } from '../_shared/mail.ts';
+import { BASIS, CORS, absender, esc, json, replyTo, zeitraumText } from '../_shared/mail.ts';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
   const ANTWORT = replyTo(jagd.antwort_an, inhaberMail);
 
   const datum = new Date(jagd.datum + 'T12:00:00').toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
-  const zeit = jagd.uhrzeit ? ` um ${String(jagd.uhrzeit).slice(0, 5)} Uhr` : '';
+  const zeit = jagd.uhrzeit ? `, ${zeitraumText(jagd.uhrzeit, jagd.ende_uhrzeit)}` : '';
   const ergebnisse: Array<{ id: string; ok: boolean; fehler?: string }> = [];
 
   for (const t of teilnehmer ?? []) {

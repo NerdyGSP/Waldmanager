@@ -704,6 +704,7 @@ export type Database = {
           art: string
           datum: string
           einladungstext: string | null
+          ende_uhrzeit: string | null
           erstellt_am: string
           erstellt_von: string | null
           geaendert_von: string | null
@@ -732,6 +733,7 @@ export type Database = {
           art?: string
           datum: string
           einladungstext?: string | null
+          ende_uhrzeit?: string | null
           erstellt_am?: string
           erstellt_von?: string | null
           geaendert_von?: string | null
@@ -760,6 +762,7 @@ export type Database = {
           art?: string
           datum?: string
           einladungstext?: string | null
+          ende_uhrzeit?: string | null
           erstellt_am?: string
           erstellt_von?: string | null
           geaendert_von?: string | null
@@ -976,6 +979,7 @@ export type Database = {
           akteur_id: string | null
           akteur_name: string | null
           anzahl: number
+          detail: string | null
           erstellt_am: string
           gruppe: string
           hervorgehoben: boolean
@@ -992,6 +996,7 @@ export type Database = {
           akteur_id?: string | null
           akteur_name?: string | null
           anzahl?: number
+          detail?: string | null
           erstellt_am?: string
           gruppe: string
           hervorgehoben?: boolean
@@ -1008,6 +1013,7 @@ export type Database = {
           akteur_id?: string | null
           akteur_name?: string | null
           anzahl?: number
+          detail?: string | null
           erstellt_am?: string
           gruppe?: string
           hervorgehoben?: boolean
@@ -2023,7 +2029,7 @@ export type Database = {
         Returns: undefined
       }
       bj_absagen_loeschen: {
-        Args: { p_code: string; p_jagd: string }
+        Args: { p_code: string; p_grund?: string; p_jagd: string }
         Returns: boolean
       }
       bj_antworten: {

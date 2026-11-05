@@ -4,7 +4,7 @@ import { datumDE } from '../../lib/zeit';
 import type { Tables } from '../../lib/database.types';
 import { Knopf } from '../../components/ui';
 import { QrCode } from '../../components/QrCode';
-import { navigationsLinks } from '../../lib/bewegungsjagd';
+import { navigationsLinks, zeitraumUhr } from '../../lib/bewegungsjagd';
 import { EINRICHTUNGSTYPEN } from '../../lib/stammdaten';
 import { nachAnstellern } from '../../lib/bjGruppen';
 import { DruckKarte, teilePunkte, type KartenPunkt } from './DruckKarte';
@@ -56,6 +56,7 @@ export type JagdInfo = {
   art: string;
   datum: string;
   uhrzeit: string | null;
+  ende_uhrzeit?: string | null;
   lng: number | null;
   lat: number | null;
   schuesseltreiben: boolean;
@@ -73,6 +74,7 @@ const jagdInfo = (j: Jagd): JagdInfo => ({
   art: j.art,
   datum: j.datum,
   uhrzeit: j.uhrzeit,
+  ende_uhrzeit: j.ende_uhrzeit ?? null,
   lng: j.treffpunkt_lng,
   lat: j.treffpunkt_lat,
   schuesseltreiben: j.schuesseltreiben,
@@ -95,8 +97,8 @@ const tnInfo = (t: Teilnehmer): TnInfo => ({
 
 const typLabel = (typ: string) => EINRICHTUNGSTYPEN.find((t) => t.wert === typ)?.label ?? typ;
 const standLabel = (e: { name: string | null; typ: string }) => e.name || typLabel(e.typ);
-const zeitText = (j: { datum: string; uhrzeit: string | null }) =>
-  `${new Date(`${j.datum}T12:00:00`).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}${j.uhrzeit ? `, ${j.uhrzeit.slice(0, 5)} Uhr` : ''}`;
+const zeitText = (j: { datum: string; uhrzeit: string | null; ende_uhrzeit?: string | null }) =>
+  `${new Date(`${j.datum}T12:00:00`).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}${j.uhrzeit ? `, ${zeitraumUhr(j.uhrzeit, j.ende_uhrzeit)}` : ''}`;
 
 // Adresse des Treffpunkts (OpenStreetMap Nominatim), nur ein einzelner Abruf
 function useAdresse(lat: number | null, lng: number | null) {
@@ -134,7 +136,7 @@ function InfoSeite({ jagd, tn, stand, boecke, rettung, leitung, ansteller, hinwe
       <table className="bj-druck-tabelle">
         <tbody>
           <tr><th>Datum</th><td>{new Date(`${jagd.datum}T12:00:00`).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}</td></tr>
-          {jagd.uhrzeit && <tr><th>Uhrzeit</th><td>{jagd.uhrzeit.slice(0, 5)} Uhr</td></tr>}
+          {jagd.uhrzeit && <tr><th>Uhrzeit</th><td>{zeitraumUhr(jagd.uhrzeit, jagd.ende_uhrzeit)}</td></tr>}
           {hatTreffpunkt && (
             <tr>
               <th>Treffpunkt</th>
@@ -373,7 +375,7 @@ export function TeilnehmerListeDruck({ jagd, tn, standName, onZu }: { jagd: Jagd
       }
     >
       <h1 style={{ fontSize: '1.3rem' }}>Teilnehmerliste · {jagd.titel}</h1>
-      <p className="art">{jagd.art} · {datumDE(jagd.datum)}{jagd.uhrzeit ? `, ${jagd.uhrzeit.slice(0, 5)} Uhr` : ''} · Stand {stand}</p>
+      <p className="art">{jagd.art} · {datumDE(jagd.datum)}{jagd.uhrzeit ? `, ${zeitraumUhr(jagd.uhrzeit, jagd.ende_uhrzeit)}` : ''} · Stand {stand}</p>
       <table className="bj-druck-liste">
         <thead>
           <tr>

@@ -1,12 +1,12 @@
 // Bestätigungs-Mail mit Kalendereintrag (.ics) nach einer Zusage. Öffentlich aufrufbar: Empfänger ist ausschließlich
 // die in der Datenbank gespeicherte Adresse; bj_mail_daten prüft Code, Status und die 10-Minuten-Sperre.
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import { ABSENDER_ADRESSE, BASIS, CORS, absender, codeAnzeige, esc, json, replyTo } from '../_shared/mail.ts';
+import { ABSENDER_ADRESSE, BASIS, CORS, absender, codeAnzeige, esc, json, replyTo, zeitraumText } from '../_shared/mail.ts';
 import { erzeugeIcs } from '../_shared/ics.ts';
 
 type Daten = {
   email: string; name: string; teilnehmer_id: string; code: string; revier: string | null; antwort_an: string | null; inhaber_email: string | null;
-  jagd: { id: string; titel: string; art: string; datum: string; uhrzeit: string | null; lng: number | null; lat: number | null; schuesseltreiben: boolean; schuesseltreiben_adresse: string | null; anmeldung_pflicht: boolean; hegebeitrag_aktiv: boolean; hegebeitrag_betrag: number | null };
+  jagd: { id: string; titel: string; art: string; datum: string; uhrzeit: string | null; ende_uhrzeit: string | null; lng: number | null; lat: number | null; schuesseltreiben: boolean; schuesseltreiben_adresse: string | null; anmeldung_pflicht: boolean; hegebeitrag_aktiv: boolean; hegebeitrag_betrag: number | null };
   ich: { anschrift: string | null; telefon: string | null; hund: boolean | null; horn: boolean | null; auto: boolean | null; plaetze: number | null; schuessel: boolean | null };
   stand: { name: string | null } | null;
   ansteller: { name: string; telefon: string | null } | null;
@@ -43,7 +43,7 @@ Deno.serve(async (req) => {
 
   const datumKurz = new Date(j.datum + 'T12:00:00').toLocaleDateString('de-DE');
   const datumLang = new Date(j.datum + 'T12:00:00').toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
-  const zeit = j.uhrzeit ? `, ${String(j.uhrzeit).slice(0, 5)} Uhr` : '';
+  const zeit = j.uhrzeit ? `, ${zeitraumText(j.uhrzeit, j.ende_uhrzeit)}` : '';
   const link = `${BASIS}/bj/${j.id}?code=${codeAnzeige(d.code)}`;
   const nav = j.lat != null && j.lng != null
     ? { apple: `https://maps.apple.com/?ll=${j.lat},${j.lng}&q=Treffpunkt`, google: `https://www.google.com/maps/dir/?api=1&destination=${j.lat},${j.lng}` }
@@ -78,7 +78,7 @@ ${d.ansteller || d.jagdleitung.length ? `<h3 style="margin:16px 0 6px">Ansprechp
     d.stand ? `Stand: ${d.stand.name ?? 'zugewiesen'}` : 'Stand: wird noch zugewiesen',
     ...d.jagdleitung.map((l) => `${l.funktion || 'Jagdleitung'}: ${l.name}${l.telefon ? ` (${l.telefon})` : ''}`),
   ].join('\n');
-  const ics = erzeugeIcs({ uid: d.teilnehmer_id, titel: j.titel, datum: j.datum, uhrzeit: j.uhrzeit, lat: j.lat, lng: j.lng, beschreibung, url: link });
+  const ics = erzeugeIcs({ uid: d.teilnehmer_id, titel: j.titel, datum: j.datum, uhrzeit: j.uhrzeit, ende: j.ende_uhrzeit, sequence: Math.floor(Date.now() / 60000), lat: j.lat, lng: j.lng, beschreibung, url: link });
 
   const antwort = replyTo(d.antwort_an, d.inhaber_email);
   try {

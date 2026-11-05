@@ -47,6 +47,7 @@ export type BjLadeErgebnis = {
     art: string;
     datum: string;
     uhrzeit: string | null;
+    ende_uhrzeit?: string | null;
     lng: number | null;
     lat: number | null;
     schuesseltreiben: boolean;
@@ -77,3 +78,7 @@ export type BjLadeErgebnis = {
   boecke: Array<{ id: string; name: string | null; lng: number; lat: number }>;
   stand?: { id: string; name: string | null; typ: string; bemerkung: string | null; lng: number; lat: number } | null;
 };
+
+/** „08:30–13:00 Uhr“ bzw. „08:30 Uhr“; leer ohne Uhrzeit */
+export const zeitraumUhr = (beginn: string | null | undefined, ende?: string | null) =>
+  beginn ? `${beginn.slice(0, 5)}${ende ? `–${ende.slice(0, 5)}` : ''} Uhr` : '';

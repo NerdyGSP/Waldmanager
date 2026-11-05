@@ -1055,6 +1055,7 @@ button.kachel:active { transform: none; }
 .glocke-symbol { flex: none; width: 28px; text-align: center; font-size: 1.15rem; }
 .glocke-text { flex: 1; min-width: 0; display: grid; gap: 1px; }
 .glocke-text strong { font-size: var(--fs-md); font-weight: 600; overflow-wrap: anywhere; }
+.glocke-text small.glocke-detail { font-style: italic; overflow-wrap: anywhere; }
 .glocke-text small { color: var(--text-leise); font-size: var(--fs-xs); }
 .glocke-punkt { flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--akzent); }
 @media (max-width: 600px) {
@@ -1129,6 +1130,9 @@ button.kachel:active { transform: none; }
 .bj-abs { width: min(440px, 100%); background: var(--color-bg); color: var(--color-text); border: 1px solid var(--color-border-input); border-radius: var(--radius-md); padding: 18px; display: grid; gap: 12px; box-shadow: 0 12px 40px rgba(0,0,0,.35); }
 .bj-abs h2 { margin: 0; font-size: var(--fs-h2); }
 .bj-abs p { margin: 0; font-size: var(--fs-md); }
+.bj-abs-grund { display: grid; gap: 4px; font-size: var(--fs-md); }
+.bj-abs-grund textarea { font: inherit; font-size: var(--fs-md); padding: 8px 10px; border: 1px solid var(--color-border-input); border-radius: var(--radius-md); background: var(--color-bg); color: var(--color-text); resize: vertical; }
+.bj-abs-grund small { color: var(--text-leise); font-size: var(--fs-xs); }
 
 /* Offline-Hinweis */
 .offline-leiste { position: sticky; top: 0; z-index: 70; display: flex; gap: 10px; align-items: center; justify-content: center; padding: calc(6px + env(safe-area-inset-top)) 12px 6px; background: #b26a00; color: #fff; font-size: var(--fs-sm); text-align: center; }

@@ -12,7 +12,7 @@ import { TeilnehmerInfoDruck, TeilnehmerListeDruck, JagdtagMappeDruck } from './
 import { BjStrecke, streckeText, useBjStrecke } from './BjStrecke';
 import { JagdleitungBlock, RettungspunkteBlock, StandKartenDialog, useBjVorbereitung } from './BjVorbereitung';
 import { BjTeilnehmerUebersicht } from './BjTeilnehmerUebersicht';
-import { emailGueltig, JAGDARTEN, neuerEntwurf, teilnehmerCsv, type TeilnehmerEntwurf } from '../../lib/bewegungsjagd';
+import { emailGueltig, JAGDARTEN, neuerEntwurf, teilnehmerCsv, zeitraumUhr, type TeilnehmerEntwurf } from '../../lib/bewegungsjagd';
 import type { Tables } from '../../lib/database.types';
 import { statusAm, useJagdzeiten } from '../../lib/jagdzeiten';
 import { GESCHLECHTER, useWildarten, wildartName } from '../../lib/stammdaten';
@@ -204,6 +204,7 @@ function Assistent({ k }: { k: RevierKontext }) {
   const [art, setArt] = useState<(typeof JAGDARTEN)[number]>('Drückjagd');
   const [datum, setDatum] = useState(heuteISO());
   const [uhrzeit, setUhrzeit] = useState('09:00');
+  const [ende, setEnde] = useState('');
   const [treffpunkt, setTreffpunkt] = useState<[number, number] | null>(null);
   const [karteOffen, setKarteOffen] = useState(false);
   // 2 Teilnehmer
@@ -274,6 +275,7 @@ function Assistent({ k }: { k: RevierKontext }) {
     setFehler(null);
     if (schritt === 0) {
       if (!titel.trim() || !datum) return setFehler('Bitte Titel und Datum angeben.');
+      if (ende && uhrzeit && ende <= uhrzeit) return setFehler('Das Ende muss nach dem Beginn liegen.');
       if (!treffpunkt) return setFehler('Bitte den Treffpunkt auf der Karte festlegen.');
     }
     if (schritt === 1) {
@@ -297,6 +299,7 @@ function Assistent({ k }: { k: RevierKontext }) {
         art,
         datum,
         uhrzeit: uhrzeit || null,
+        ende_uhrzeit: uhrzeit && ende ? ende : null,
         treffpunkt: treffpunkt ? punktEWKT(treffpunkt[0], treffpunkt[1]) : null,
         schuesseltreiben: st,
         schuesseltreiben_adresse: st ? stAdresse.trim() || null : null,
@@ -360,7 +363,9 @@ function Assistent({ k }: { k: RevierKontext }) {
             ))}
           </Auswahl>
           <Feld label="Datum" type="date" min={heuteISO()} value={datum} onChange={(e) => setDatum(e.target.value)} />
-          <Feld label="Uhrzeit" type="time" value={uhrzeit} onChange={(e) => setUhrzeit(e.target.value)} />
+          <Feld label="Uhrzeit" type="time" value={uhrzeit} onChange={(e) => { setUhrzeit(e.target.value); if (!e.target.value) setEnde(''); }} />
+          <Feld label="Ende (optional)" type="time" value={ende} min={uhrzeit || undefined} disabled={!uhrzeit} onChange={(e) => setEnde(e.target.value)} />
+          {uhrzeit && ende && ende <= uhrzeit && <Hinweis art="fehler">Das Ende muss nach dem Beginn liegen.</Hinweis>}
           <SchonzeitHinweis bundesland={k.bundesland} datum={datum} />
           <div className="bj-ja-nein">
             <span>{treffpunkt ? `Treffpunkt: ${treffpunkt[1].toFixed(5)}, ${treffpunkt[0].toFixed(5)}` : 'Treffpunkt noch nicht gesetzt'}</span>
@@ -778,7 +783,7 @@ function Auswertung({ k, id }: { k: RevierKontext; id: string }) {
         <AuditZeile tabelle="bewegungsjagden" id={jagd.id} aktualisierung={jagd.status} />
         <p style={{ margin: '4px 0 0', color: 'var(--color-text-muted)' }}>
           {jagd.art} · {datumDE(jagd.datum)}
-          {jagd.uhrzeit ? `, ${jagd.uhrzeit.slice(0, 5)} Uhr` : ''} ·{' '}
+          {jagd.uhrzeit ? `, ${zeitraumUhr(jagd.uhrzeit, jagd.ende_uhrzeit)}` : ''} ·{' '}
           <span className={`badge ${offen ? 'badge-gruen' : ''}`}>{offen ? 'Offen' : 'Abgeschlossen'}</span>
         </p>
       </div>

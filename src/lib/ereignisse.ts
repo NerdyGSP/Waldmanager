@@ -13,6 +13,7 @@ export type Ereignis = {
   ziel_id: string | null;
   anzahl: number;
   hervorgehoben: boolean;
+  detail: string | null;
   erstellt_am: string;
 };
 
@@ -74,7 +75,7 @@ export function useEreignisse(revierId: string | null, userId: string): Ereignis
     const [ev, gel, profil] = await Promise.all([
       supabase
         .from('ereignisse')
-        .select('id, typ, gruppe, akteur_id, akteur_name, titel, ziel_typ, ziel_id, anzahl, hervorgehoben, erstellt_am')
+        .select('id, typ, gruppe, akteur_id, akteur_name, titel, ziel_typ, ziel_id, anzahl, hervorgehoben, detail, erstellt_am')
         .eq('revier_id', revierId)
         .order('erstellt_am', { ascending: false })
         .limit(200),

@@ -4,6 +4,8 @@ export type IcsTermin = {
   titel: string;
   datum: string; // YYYY-MM-DD
   uhrzeit?: string | null; // HH:MM[:SS] (Europe/Berlin)
+  ende?: string | null; // HH:MM[:SS], nach dem Beginn
+  sequence?: number; // steigt mit jeder neuen Mail, damit ein Import den Termin aktualisiert
   lat?: number | null;
   lng?: number | null;
   beschreibung?: string;
@@ -64,11 +66,15 @@ export function erzeugeIcs(t: IcsTermin, jetzt: Date = new Date()): string {
     'BEGIN:VEVENT',
     `UID:${t.uid}@hegewerk.app`,
     `DTSTAMP:${stamp}`,
+    `SEQUENCE:${t.sequence ?? Math.floor(Date.now() / 60000)}`,
   );
   const zeit = t.uhrzeit?.match(/^(\d{1,2}):(\d{2})/);
   if (zeit) {
     const start = new Date(Date.UTC(y, m - 1, d, Number(zeit[1]), Number(zeit[2])));
-    const ende = new Date(start.getTime() + (t.dauerStunden ?? 4) * 3600000);
+    const endeZeit = t.ende?.match(/^(\d{1,2}):(\d{2})/);
+    const ende = endeZeit && Number(endeZeit[1]) * 60 + Number(endeZeit[2]) > Number(zeit[1]) * 60 + Number(zeit[2])
+      ? new Date(Date.UTC(y, m - 1, d, Number(endeZeit[1]), Number(endeZeit[2])))
+      : new Date(start.getTime() + (t.dauerStunden ?? 4) * 3600000);
     zeilen.push(`DTSTART;TZID=Europe/Berlin:${lokal(start)}`, `DTEND;TZID=Europe/Berlin:${lokal(ende)}`);
   } else {
     const tag = (dt: Date) => `${dt.getUTCFullYear()}${p2(dt.getUTCMonth() + 1)}${p2(dt.getUTCDate())}`;

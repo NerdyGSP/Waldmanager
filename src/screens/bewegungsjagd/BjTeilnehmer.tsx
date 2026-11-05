@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { fehlertext } from '../../lib/fehler';
-import { codeAnzeigen, navigationsLinks, type BjLadeErgebnis } from '../../lib/bewegungsjagd';
+import { codeAnzeigen, navigationsLinks, zeitraumUhr, type BjLadeErgebnis } from '../../lib/bewegungsjagd';
 import { icsHerunterladen } from '../../lib/ics';
 import { datumDE } from '../../lib/zeit';
 import { Feld, Hinweis, Knopf, Gruppe, Segmente, Zeile } from '../../components/ui';
@@ -18,8 +18,8 @@ const MAIL_TEXT: Record<Exclude<MailStatus, null | 'sendet'>, string> = {
   fehler: 'Bestätigungs-Mail konnte nicht gesendet werden. Diese Seite bleibt über deinen Link erreichbar.',
 };
 
-const langesDatum = (iso: string, uhrzeit: string | null) =>
-  new Date(iso + 'T12:00:00').toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) + (uhrzeit ? `, ${uhrzeit.slice(0, 5)} Uhr` : '');
+const langesDatum = (iso: string, uhrzeit: string | null, ende?: string | null) =>
+  new Date(iso + 'T12:00:00').toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) + (uhrzeit ? `, ${zeitraumUhr(uhrzeit, ende)}` : '');
 
 // Öffentliche Anmeldeseite /bj/:id – Zugang nur mit Einladungscode, ohne Konto
 export function BjTeilnehmer({ jagdId }: { jagdId: string }) {
@@ -124,10 +124,10 @@ export function BjTeilnehmer({ jagdId }: { jagdId: string }) {
     );
   }
 
-  async function absagen() {
+  async function absagen(grund: string) {
     setLaedt(true);
     setAbsageFehler(null);
-    const { data, error } = await supabase.rpc('bj_absagen_loeschen', { p_jagd: jagdId, p_code: code });
+    const { data, error } = await supabase.rpc('bj_absagen_loeschen', { p_jagd: jagdId, p_code: code, p_grund: grund.trim() || undefined });
     setLaedt(false);
     if (error || !data) return setAbsageFehler(error ? fehlertext(error) : 'Die Absage konnte nicht gesendet werden. Bitte versuche es erneut.');
     setAbsageOffen(false);
@@ -161,7 +161,7 @@ export function BjTeilnehmer({ jagdId }: { jagdId: string }) {
   }
 
   const absageDialog = absageOffen && (
-    <AbsageDialog titel={j.titel} datum={datumDE(j.datum)} laedt={laedt} fehler={absageFehler} onAbbrechen={() => { setAbsageOffen(false); setAbsageFehler(null); if (ansicht === 'assistent') setZusage(daten.ich.status === 'zugesagt' ? true : null); }} onSenden={() => void absagen()} />
+    <AbsageDialog titel={j.titel} datum={datumDE(j.datum)} laedt={laedt} fehler={absageFehler} onAbbrechen={() => { setAbsageOffen(false); setAbsageFehler(null); if (ansicht === 'assistent') setZusage(daten.ich.status === 'zugesagt' ? true : null); }} onSenden={(g) => void absagen(g)} />
   );
 
   // ----- Zusage-Ansicht -----
@@ -174,7 +174,7 @@ export function BjTeilnehmer({ jagdId }: { jagdId: string }) {
       <main className="bj-teiln">
         <Ergebnis titel={j.titel} status={geschlossen ? 'Zusage gespeichert – Jagd abgeschlossen' : 'Zusage gespeichert'}>
           <p style={{ margin: '4px 0 0', color: 'var(--color-text-muted)' }}>{j.art}</p>
-          <p style={{ margin: '2px 0 0' }}>{langesDatum(j.datum, j.uhrzeit)}</p>
+          <p style={{ margin: '2px 0 0' }}>{langesDatum(j.datum, j.uhrzeit, j.ende_uhrzeit)}</p>
         </Ergebnis>
         {geschlossen && <Hinweis>Diese Jagd ist abgeschlossen. Änderungen sind nicht mehr möglich.</Hinweis>}
         {mail === 'sendet' && <Hinweis>Bestätigung wird gesendet …</Hinweis>}
@@ -241,6 +241,7 @@ export function BjTeilnehmer({ jagdId }: { jagdId: string }) {
                     titel: j.titel,
                     datum: j.datum,
                     uhrzeit: j.uhrzeit,
+                    ende: j.ende_uhrzeit,
                     lat: j.lat,
                     lng: j.lng,
                     beschreibung: `Deine Seite: ${window.location.origin}/bj/${jagdId}?code=${code}`,
@@ -273,6 +274,7 @@ export function BjTeilnehmer({ jagdId }: { jagdId: string }) {
               art: j.art,
               datum: j.datum,
               uhrzeit: j.uhrzeit,
+              ende_uhrzeit: j.ende_uhrzeit ?? null,
               lng: j.lng,
               lat: j.lat,
               schuesseltreiben: j.schuesseltreiben,
@@ -303,7 +305,7 @@ export function BjTeilnehmer({ jagdId }: { jagdId: string }) {
         <h1>{j.titel}</h1>
         <p style={{ margin: '4px 0 0', color: 'var(--color-text-muted)' }}>
           {j.art} · {datumDE(j.datum)}
-          {j.uhrzeit ? `, ${j.uhrzeit.slice(0, 5)} Uhr` : ''}
+          {j.uhrzeit ? `, ${zeitraumUhr(j.uhrzeit, j.ende_uhrzeit)}` : ''}
         </p>
       </div>
 
@@ -417,7 +419,8 @@ function Ergebnis({ titel, status, children }: { titel: string; status: string; 
 }
 
 // Absage-Dialog: Fokusfalle, Escape und Klick auf den Hintergrund = Abbrechen
-function AbsageDialog({ titel, datum, laedt, fehler, onAbbrechen, onSenden }: { titel: string; datum: string; laedt: boolean; fehler: string | null; onAbbrechen: () => void; onSenden: () => void }) {
+function AbsageDialog({ titel, datum, laedt, fehler, onAbbrechen, onSenden }: { titel: string; datum: string; laedt: boolean; fehler: string | null; onAbbrechen: () => void; onSenden: (grund: string) => void }) {
+  const [grund, setGrund] = useState('');
   const box = useRef<HTMLDivElement>(null);
   const doch = useRef<HTMLButtonElement>(null);
   const abbrechen = useCallback(() => { if (!laedt) onAbbrechen(); }, [laedt, onAbbrechen]);
@@ -430,7 +433,7 @@ function AbsageDialog({ titel, datum, laedt, fehler, onAbbrechen, onSenden }: { 
     const taste = (e: KeyboardEvent) => {
       if (e.key === 'Escape') return abbrechen();
       if (e.key !== 'Tab' || !box.current) return;
-      const el = [...box.current.querySelectorAll<HTMLElement>('button:not([disabled])')];
+      const el = [...box.current.querySelectorAll<HTMLElement>('button:not([disabled]), textarea:not([disabled])')];
       if (!el.length) return;
       const erstes = el[0]!;
       const letztes = el[el.length - 1]!;
@@ -446,10 +449,15 @@ function AbsageDialog({ titel, datum, laedt, fehler, onAbbrechen, onSenden }: { 
       <div ref={box} className="bj-abs" role="alertdialog" aria-modal="true" aria-labelledby="bj-abs-titel" aria-describedby="bj-abs-text" onClick={(e) => e.stopPropagation()}>
         <h2 id="bj-abs-titel">Absage für {titel} am {datum}?</h2>
         <p id="bj-abs-text">Deine Angaben werden sofort gelöscht. Dein Stand wird frei. Dein Code wird ungültig – für eine spätere Teilnahme brauchst du eine neue Einladung.</p>
+        <label className="bj-abs-grund">
+          <span>Grund (optional)</span>
+          <textarea rows={3} maxLength={200} value={grund} disabled={laedt} onChange={(e) => setGrund(e.target.value)} />
+          <small>{grund.length}/200 · Nur für den Revierinhaber sichtbar, wird nach 30 Tagen gelöscht.</small>
+        </label>
         {fehler && <Hinweis art="fehler">{fehler}</Hinweis>}
         <div className="bj-dialog-knoepfe">
           <button ref={doch} type="button" className="knopf knopf-akzent" onClick={abbrechen}>Doch teilnehmen</button>
-          <button type="button" className="knopf knopf-gefahr" disabled={laedt} onClick={onSenden}>{laedt ? 'Sende …' : 'Absage senden'}</button>
+          <button type="button" className="knopf knopf-gefahr" disabled={laedt} onClick={() => onSenden(grund)}>{laedt ? 'Sende …' : 'Absage senden'}</button>
         </div>
       </div>
     </div>
@@ -468,7 +476,7 @@ function Anstellinfo({ daten }: { daten: BjLadeErgebnis }) {
       <div className="bj-text">
         <span style={{ color: 'inherit' }}>
           <strong>Treffpunkt und Zeit:</strong> {datumDE(j.datum)}
-          {j.uhrzeit ? `, ${j.uhrzeit.slice(0, 5)} Uhr` : ''}
+          {j.uhrzeit ? `, ${zeitraumUhr(j.uhrzeit, j.ende_uhrzeit)}` : ''}
         </span>
         {daten.ansteller && (
           <span style={{ color: 'inherit' }}>

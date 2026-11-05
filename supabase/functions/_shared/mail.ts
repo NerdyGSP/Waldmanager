@@ -32,3 +32,7 @@ export function replyTo(antwortAn: unknown, inhaberMail: unknown): { email: stri
 }
 
 export const codeAnzeige = (c: string) => `${c.slice(0, 4)}-${c.slice(4)}`;
+
+/** „08:30–13:00 Uhr“ bzw. „08:30 Uhr“, leer ohne Uhrzeit */
+export const zeitraumText = (beginn: unknown, ende?: unknown) =>
+  beginn ? `${String(beginn).slice(0, 5)}${ende ? `–${String(ende).slice(0, 5)}` : ''} Uhr` : '';

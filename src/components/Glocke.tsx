@@ -92,6 +92,7 @@ export function Glocke({ revierId, userId, className = '' }: { revierId: string 
                           <span className="glocke-symbol" aria-hidden="true">{symbolFuer(e)}</span>
                           <span className="glocke-text">
                             <strong>{e.titel}</strong>
+                            {e.detail && <small className="glocke-detail">Grund: {e.detail}</small>}
                             <small>
                               {e.akteur_name ?? 'Unbekannt'} · {zeitText(e, g.titel === 'Älter')}
                             </small>
