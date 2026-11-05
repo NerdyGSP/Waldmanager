@@ -4,6 +4,8 @@ import { fehlertext } from '../../lib/fehler';
 import { GESCHLECHTER, useMitglieder, useWildarten, useZonen, wildartName } from '../../lib/stammdaten';
 import { aktuellesJagdjahr, datumZeitDE, letzteJagdjahre, lokalDatumZeit } from '../../lib/zeit';
 import { aktuellePosition, punktEWKT } from '../../lib/geo';
+import { speichernOderMerken, useWarteschlange, wartendeAbschuesse } from '../../lib/offline';
+import type { TablesInsert } from '../../lib/database.types';
 import { PositionWaehlen } from '../../components/PositionWaehlen';
 import type { Enums } from '../../lib/database.types';
 import { jagdzeitWarnung, useJagdzeiten } from '../../lib/jagdzeiten';
@@ -44,6 +46,7 @@ export function Abschuesse({ k, unterpfad = [] }: { k: RevierKontext; unterpfad?
   const startArt = unterpfad[0] === 'fang' ? 'fang' : 'abschuss';
   const falleVor = unterpfad[0] === 'fang' ? (unterpfad[1] ?? '') : ''; // Falle aus dem Einrichtungs-Sheet vorbelegt
   const [fehler, setFehler] = useState<string | null>(null);
+  const wartend = useWarteschlange();
 
   const laden = useCallback(async () => {
     const { data, error } = await supabase
@@ -55,12 +58,35 @@ export function Abschuesse({ k, unterpfad = [] }: { k: RevierKontext; unterpfad?
       .lte('erlegt_am', `${jahr.bis}T23:59:59`)
       .order('erlegt_am', { ascending: false });
     if (error) setFehler(fehlertext(error));
-    setListe(data ?? []);
+    // Noch nicht übertragene (offline erfasste) Einträge dieses Jagdjahres vorn einmischen
+    const bekannt = new Set((data ?? []).map((x) => x.id));
+    const lokal: Abschuss[] = wartendeAbschuesse(k.revierId)
+      .filter((w) => !bekannt.has(w.id) && w.erlegt_am >= `${jahr.von}T00:00:00` && w.erlegt_am <= `${jahr.bis}T23:59:59`)
+      .map((w) => ({
+        id: w.id,
+        erlegt_am: w.erlegt_am ?? new Date().toISOString(),
+        wildart_id: w.wildart_id ?? null,
+        geschlecht: (w.geschlecht ?? 'unbekannt') as Enums<'geschlecht'>,
+        altersklasse: w.altersklasse ?? null,
+        gewicht_kg: w.gewicht_kg ?? null,
+        zone_id: w.zone_id ?? null,
+        erleger_id: w.erleger_id ?? null,
+        erfasst_von: w.erfasst_von ?? null,
+        bemerkung: w.bemerkung ?? null,
+        art: w.art ?? 'abschuss',
+        einrichtung_id: w.einrichtung_id ?? null,
+        fang_ergebnis: w.fang_ergebnis ?? null,
+        fang_zustand: w.fang_zustand ?? null,
+        erleger_name: w.erleger_name ?? null,
+        bewegungsjagd_id: w.bewegungsjagd_id ?? null,
+        fallwild_ursache: w.fallwild_ursache ?? null,
+      }));
+    setListe([...lokal, ...(data ?? [])]);
   }, [k.revierId, jahr]);
 
   useEffect(() => {
     void laden();
-  }, [laden]);
+  }, [laden, wartend]);
 
   // Strecke = Abschüsse + tatsächlich gefangene Tiere
   const zaehltZurStrecke = (x: { art: string; fang_ergebnis: string | null }) => x.art === 'abschuss' || (x.art === 'fang' && x.fang_ergebnis === 'gefangen');
@@ -226,11 +252,20 @@ function AbschussFormular({ k, vorlage, startArt, falleVor = '', onFertig }: { k
       bemerkung: bemerkung.trim() || null,
       ...(position ? { geom: punktEWKT(position.lon, position.lat) } : {}),
     };
-    const { error } = vorlage
-      ? await supabase.from('abschuesse').update(daten).eq('id', vorlage.id)
-      : await supabase.from('abschuesse').insert(daten);
+    // Neue Einträge laufen über die Offline-Warteschlange (client-seitige ID); Änderungen brauchen Netz
+    let fehlerObjekt: unknown = null;
+    if (vorlage) {
+      const { error } = await supabase.from('abschuesse').update(daten).eq('id', vorlage.id);
+      fehlerObjekt = error;
+    } else {
+      try {
+        await speichernOderMerken({ tabelle: 'abschuesse', daten: { ...daten, id: crypto.randomUUID(), erfasst_von: k.userId } as TablesInsert<'abschuesse'> & { id: string } });
+      } catch (err) {
+        fehlerObjekt = err;
+      }
+    }
     setSpeichert(false);
-    if (error) setFehler(fehlertext(error));
+    if (fehlerObjekt) setFehler(fehlertext(fehlerObjekt));
     else await onFertig();
   }
 

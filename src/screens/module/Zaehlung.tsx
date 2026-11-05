@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { fehlertext } from '../../lib/fehler';
 import { GESCHLECHTER, useWildarten, useZonen, useZonenEbenen, wildartName, type Wildart, type Zone } from '../../lib/stammdaten';
 import { aktuellePosition, aktuellesWetter, wetterText, type Wetter } from '../../lib/geo';
-import { speichernOderMerken, wartendeZaehlungen } from '../../lib/offline';
+import { speichernOderMerken, useWarteschlange, wartendeSitzungen, wartendeZaehlungen, wartenderAbschluss } from '../../lib/offline';
 import { useZaehlungGeaendert } from '../../lib/zaehlEreignis';
 import { datumDE, heuteISO, mondphase } from '../../lib/zeit';
 import { navigieren } from '../../lib/router';
@@ -35,6 +35,26 @@ type Sitzung = {
   flaeche_ha: number | null;
 };
 
+// Lokale Anzeige einer noch nicht übertragenen Zählung
+function sitzungAusEintrag(d: { id: string; datum: string; beginn?: string | null; wetter?: Json | null; mondphase?: string | null; bemerkung?: string | null; erstellt_von?: string | null; ebene_id?: string | null; flaechenmodus?: string; streifenbreite_m?: number }): Sitzung {
+  return {
+    id: d.id,
+    datum: d.datum,
+    beginn: d.beginn ?? null,
+    ende: null,
+    status: 'offen',
+    wetter: d.wetter ?? null,
+    mondphase: d.mondphase ?? null,
+    bemerkung: d.bemerkung ?? null,
+    erstellt_von: d.erstellt_von ?? null,
+    ebene_id: d.ebene_id ?? null,
+    flaechenmodus: d.flaechenmodus ?? 'zonen',
+    streifenbreite_m: d.streifenbreite_m ?? STANDARD_BREITE_M,
+    strecke_km: null,
+    flaeche_ha: null,
+  };
+}
+
 type Zaehlzeile = {
   id: string;
   zone_id: string | null;
@@ -53,6 +73,7 @@ function SitzungsListe({ k }: { k: RevierKontext }) {
   const [sitzungen, setSitzungen] = useState<Array<Sitzung & { summe: number }>>([]);
   const [neu, setNeu] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
+  const wartend = useWarteschlange();
 
   useEffect(() => {
     void supabase
@@ -64,14 +85,16 @@ function SitzungsListe({ k }: { k: RevierKontext }) {
       .order('beginn', { ascending: false })
       .then(({ data, error }) => {
         if (error) setFehler(fehlertext(error));
-        setSitzungen(
-          (data ?? []).map(({ zaehlungen, ...s }) => ({
-            ...s,
-            summe: zaehlungen.filter((z) => !z.geloescht_am).reduce((a, z) => a + z.anzahl, 0),
-          })),
-        );
+        const vomServer = (data ?? []).map(({ zaehlungen, ...s }) => ({
+          ...s,
+          summe: zaehlungen.filter((z) => !z.geloescht_am).reduce((a, z) => a + z.anzahl, 0),
+        }));
+        // Noch nicht übertragene (offline angelegte) Zählungen vorn einmischen
+        const bekannt = new Set(vomServer.map((x) => x.id));
+        const lokal = wartendeSitzungen(k.revierId).filter((w) => !bekannt.has(w.daten.id)).map((w) => ({ ...sitzungAusEintrag(w.daten), summe: w.summe }));
+        setSitzungen([...lokal, ...vomServer]);
       });
-  }, [k.revierId]);
+  }, [k.revierId, wartend]);
 
   if (neu) return <NeueSitzung k={k} onAbbrechen={() => setNeu(false)} />;
 
@@ -155,32 +178,31 @@ function NeueSitzung({ k, onAbbrechen }: { k: RevierKontext; onAbbrechen: () => 
   async function starten(e: FormEvent) {
     e.preventDefault();
     setFehler(null);
-    const { data, error } = await supabase
-      .from('zaehlsitzungen')
-      .insert({
-        revier_id: k.revierId,
-        datum,
-        beginn: new Date().toISOString(),
-        mondphase: `${mond.name} (${mond.beleuchtung} %)`,
-        wetter: wetter ? (wetter as unknown as Json) : null,
-        bemerkung: bemerkung.trim() || null,
-        ebene_id: ebeneId || null,
-        flaechenmodus: modus,
-        streifenbreite_m: STANDARD_BREITE_M,
-      })
-      .select('id')
-      .single();
-    if (error) {
-      setFehler(fehlertext(error));
+    // Client-seitige ID: die Zählung funktioniert auch ohne Netz und wird später übertragen
+    const id = crypto.randomUUID();
+    try {
+      await speichernOderMerken({
+        tabelle: 'zaehlsitzungen',
+        daten: {
+          id,
+          revier_id: k.revierId,
+          erstellt_von: k.userId,
+          datum,
+          beginn: new Date().toISOString(),
+          mondphase: `${mond.name} (${mond.beleuchtung} %)`,
+          wetter: wetter ? (wetter as unknown as Json) : null,
+          bemerkung: bemerkung.trim() || null,
+          ebene_id: ebeneId || null,
+          flaechenmodus: modus,
+          streifenbreite_m: STANDARD_BREITE_M,
+        },
+        routen: modus === 'strecke' ? routenIds : [],
+      });
+    } catch (err) {
+      setFehler(fehlertext(err));
       return;
     }
-    if (modus === 'strecke' && routenIds.length) {
-      const { error: e2 } = await supabase.from('zaehlsitzung_routen').insert(routenIds.map((route_id) => ({ sitzung_id: data.id, route_id, revier_id: k.revierId })));
-      if (e2) {
-        setFehler(`Zählung gestartet, aber die Routen konnten nicht zugeordnet werden: ${fehlertext(e2)}`);
-      }
-    }
-    navigieren(`/zaehlung/${data.id}`);
+    navigieren(`/zaehlung/${id}`);
   }
 
   return (
@@ -378,8 +400,16 @@ function SitzungAnsicht({ k, sitzungId }: { k: RevierKontext; sitzungId: string 
         .maybeSingle(),
       supabase.from('zaehlungen').select('id, zone_id, wildart_id, geschlecht, anzahl').eq('sitzung_id', sitzungId).is('geloescht_am', null),
     ]);
-    if (s.error || z.error) setFehler(fehlertext(s.error ?? z.error));
-    setSitzung(s.data);
+    // Offline angelegte oder abgeschlossene Zählung: lokalen Stand verwenden, bis sie übertragen ist
+    let sd: Sitzung | null = s.data;
+    if (!sd) {
+      const w = wartendeSitzungen(k.revierId).find((x) => x.daten.id === sitzungId);
+      if (w) sd = sitzungAusEintrag(w.daten);
+    }
+    const abschluss = wartenderAbschluss(sitzungId);
+    if (sd && abschluss) sd = { ...sd, status: 'abgeschlossen', ende: abschluss };
+    if ((s.error || z.error) && !(sd && !s.data)) setFehler(fehlertext(s.error ?? z.error));
+    setSitzung(sd);
     // Noch nicht übertragene Einträge (Offline-Warteschlange) werden über ihre ID eingemischt – nichts wird doppelt gezählt
     const m = new Map<string, Zaehlzeile>((z.data ?? []).map((x) => [x.id, x as Zaehlzeile]));
     for (const w of wartendeZaehlungen(sitzungId)) {
@@ -388,8 +418,8 @@ function SitzungAnsicht({ k, sitzungId }: { k: RevierKontext; sitzungId: string 
       else if (w.wildart_id) m.set(w.id, { id: w.id, zone_id: w.zone_id, wildart_id: w.wildart_id, geschlecht: (w.geschlecht ?? 'unbekannt') as Enums<'geschlecht'>, anzahl: w.anzahl });
     }
     setZeilen([...m.values()]);
-    if (s.data?.status === 'abgeschlossen') setUebersicht(true);
-  }, [sitzungId]);
+    if (sd?.status === 'abgeschlossen') setUebersicht(true);
+  }, [sitzungId, k.revierId]);
 
   useEffect(() => {
     void laden();
@@ -426,11 +456,11 @@ function SitzungAnsicht({ k, sitzungId }: { k: RevierKontext; sitzungId: string 
   }
 
   async function abschliessen() {
-    const { error } = await supabase
-      .from('zaehlsitzungen')
-      .update({ status: 'abgeschlossen', ende: new Date().toISOString() })
-      .eq('id', sitzungId);
-    if (error) setFehler(fehlertext(error));
+    try {
+      await speichernOderMerken({ tabelle: 'zaehlsitzung_abschluss', daten: { id: sitzungId, ende: new Date().toISOString() } });
+    } catch (err) {
+      setFehler(fehlertext(err));
+    }
     await laden();
     setUebersicht(true);
   }

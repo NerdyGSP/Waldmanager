@@ -8,7 +8,13 @@ import { zaehlungGeaendert, type ZaehlZeile } from './zaehlEreignis';
 type Eintrag =
   | { tabelle: 'beobachtungen'; daten: TablesInsert<'beobachtungen'> & { id: string } }
   | { tabelle: 'zaehlungen'; daten: TablesInsert<'zaehlungen'> & { id: string } }
-  | { tabelle: 'einrichtungen'; daten: { id: string; geom: string } }; // Position einmessen/verschieben
+  | { tabelle: 'einrichtungen'; daten: { id: string; geom: string } } // Position einmessen/verschieben
+  | { tabelle: 'zaehlsitzungen'; daten: TablesInsert<'zaehlsitzungen'> & { id: string }; routen?: string[] } // neue Zählung
+  | { tabelle: 'zaehlsitzung_abschluss'; daten: { id: string; ende: string } } // Zählung abschließen
+  | { tabelle: 'abschuesse'; daten: TablesInsert<'abschuesse'> & { id: string } }; // Abschuss, Fallwild, Fang (neu)
+
+// Eindeutiger Schlüssel je Eintrag (Abschluss und Anlage einer Sitzung teilen sich die ID)
+const schluessel = (e: Eintrag) => `${e.tabelle}:${e.daten.id}`;
 
 const SCHLUESSEL = 'hegewerk.warteschlange';
 const EREIGNIS = 'hegewerk:warteschlange';
@@ -37,19 +43,47 @@ function istNetzfehler(fehler: unknown): boolean {
 
 async function senden(e: Eintrag): Promise<{ ok: boolean; netz: boolean; fehler?: string }> {
   try {
-    const { error } =
-      e.tabelle === 'beobachtungen'
-        ? await supabase.from('beobachtungen').upsert(e.daten, { onConflict: 'id' })
-        : e.tabelle === 'einrichtungen'
-          ? await supabase.from('einrichtungen').update({ geom: e.daten.geom }).eq('id', e.daten.id)
-          : await supabase.from('zaehlungen').upsert(e.daten, { onConflict: 'id' });
+    let error: { message: string; code?: string } | null;
+    switch (e.tabelle) {
+      case 'beobachtungen':
+        ({ error } = await supabase.from('beobachtungen').upsert(e.daten, { onConflict: 'id' }));
+        break;
+      case 'einrichtungen':
+        ({ error } = await supabase.from('einrichtungen').update({ geom: e.daten.geom }).eq('id', e.daten.id));
+        break;
+      case 'zaehlungen':
+        ({ error } = await supabase.from('zaehlungen').upsert(e.daten, { onConflict: 'id' }));
+        break;
+      case 'zaehlsitzungen': {
+        // Bereits übertragene Zeilen werden übersprungen (wiederholtes Senden ist unschädlich)
+        ({ error } = await supabase.from('zaehlsitzungen').upsert(e.daten, { onConflict: 'id', ignoreDuplicates: true }));
+        if (!error && e.routen?.length) {
+          ({ error } = await supabase
+            .from('zaehlsitzung_routen')
+            .upsert(e.routen.map((route_id) => ({ sitzung_id: e.daten.id, route_id, revier_id: e.daten.revier_id })), { onConflict: 'sitzung_id,route_id', ignoreDuplicates: true }));
+        }
+        break;
+      }
+      case 'zaehlsitzung_abschluss':
+        ({ error } = await supabase.from('zaehlsitzungen').update({ status: 'abgeschlossen', ende: e.daten.ende }).eq('id', e.daten.id));
+        break;
+      case 'abschuesse':
+        ({ error } = await supabase.from('abschuesse').upsert(e.daten, { onConflict: 'id', ignoreDuplicates: true }));
+        break;
+    }
     if (!error) return { ok: true, netz: false };
     // Abgelaufene Anmeldung ist kein fachlicher Fehler: Eintrag behalten, bis das Token erneuert ist
-    const abgelaufen = /jwt|token|expired|not authenticated/i.test(error.message) || (error as { code?: string }).code === 'PGRST301';
+    const abgelaufen = /jwt|token|expired|not authenticated/i.test(error.message) || error.code === 'PGRST301';
     return { ok: false, netz: istNetzfehler(error) || abgelaufen, fehler: error.message };
   } catch (err) {
     return { ok: false, netz: true, fehler: String(err) };
   }
+}
+
+// Hängt der Eintrag von einer noch wartenden Zählung ab? Dann muss er hinter ihr in der Warteschlange bleiben.
+function haengtVonWartenderSitzung(e: Eintrag): boolean {
+  const sitzungId = e.tabelle === 'zaehlungen' ? e.daten.sitzung_id : e.tabelle === 'zaehlsitzung_abschluss' ? e.daten.id : null;
+  return !!sitzungId && lesen().some((x) => x.tabelle === 'zaehlsitzungen' && x.daten.id === sitzungId);
 }
 
 // Speichert sofort, bei fehlender Verbindung landet der Eintrag in der Warteschlange.
@@ -57,7 +91,7 @@ export async function speichernOderMerken(e: Eintrag): Promise<'gespeichert' | '
   const zeile = e.tabelle === 'zaehlungen' ? zeileVon(e.daten) : null;
   // Sofortige Anzeige (optimistisch), auch offline
   if (zeile) zaehlungGeaendert({ sitzungId: zeile.sitzung_id, zoneId: zeile.zone_id, quelle: 'lokal', zeile });
-  if (navigator.onLine) {
+  if (navigator.onLine && !haengtVonWartenderSitzung(e)) {
     const r = await senden(e);
     if (r.ok) {
       if (zeile) zaehlungGeaendert({ sitzungId: zeile.sitzung_id, zoneId: zeile.zone_id, quelle: 'server', zeile });
@@ -69,7 +103,9 @@ export async function speichernOderMerken(e: Eintrag): Promise<'gespeichert' | '
       throw new Error(r.fehler ?? 'Speichern fehlgeschlagen');
     }
   }
-  schreiben([...lesen().filter((x) => x.daten.id !== e.daten.id), e]);
+  schreiben([...lesen().filter((x) => schluessel(x) !== schluessel(e)), e]);
+  // Online, aber abhängig von einer wartenden Zählung: sofort in der richtigen Reihenfolge senden
+  if (navigator.onLine) void warteschlangeAbarbeiten();
   return 'gemerkt';
 }
 
@@ -84,6 +120,27 @@ export function wartendeZaehlungen(sitzungId: string): ZaehlZeile[] {
     const z = zeileVon(x.daten);
     return z && z.sitzung_id === sitzungId ? [z] : [];
   });
+}
+
+// Noch nicht übertragene neue Zählungen eines Reviers (für die lokale Anzeige)
+export function wartendeSitzungen(revierId: string): Array<{ daten: TablesInsert<'zaehlsitzungen'> & { id: string }; summe: number }> {
+  const liste = lesen();
+  return liste.flatMap((x) =>
+    x.tabelle === 'zaehlsitzungen' && x.daten.revier_id === revierId
+      ? [{ daten: x.daten, summe: liste.reduce((a, z) => (z.tabelle === 'zaehlungen' && z.daten.sitzung_id === x.daten.id ? a + (z.daten.anzahl ?? 0) : a), 0) }]
+      : [],
+  );
+}
+
+// Wartender Abschluss einer Zählung (Zeitpunkt) oder null
+export function wartenderAbschluss(sitzungId: string): string | null {
+  const x = lesen().find((e) => e.tabelle === 'zaehlsitzung_abschluss' && e.daten.id === sitzungId);
+  return x && x.tabelle === 'zaehlsitzung_abschluss' ? x.daten.ende : null;
+}
+
+// Noch nicht übertragene neue Abschüsse/Fänge eines Reviers (für die lokale Anzeige)
+export function wartendeAbschuesse(revierId: string): Array<TablesInsert<'abschuesse'> & { id: string }> {
+  return lesen().flatMap((x) => (x.tabelle === 'abschuesse' && x.daten.revier_id === revierId ? [x.daten] : []));
 }
 
 let laeuft = false;
