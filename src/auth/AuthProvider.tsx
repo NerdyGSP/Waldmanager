@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { offlineCacheLeeren } from '../lib/offlineCache';
 
 type AuthState = {
   session: Session | null;
@@ -24,6 +25,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const { data } = supabase.auth.onAuthStateChange((ereignis, neueSession) => {
       setSession(neueSession);
+      if (ereignis === 'SIGNED_OUT') void offlineCacheLeeren();
       if (ereignis === 'PASSWORD_RECOVERY') setPasswortNeuSetzen(true);
     });
     return () => data.subscription.unsubscribe();

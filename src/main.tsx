@@ -16,9 +16,9 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>,
 );
 
-// Kartenkacheln auf dem Gerät zwischenspeichern (spart mobile Daten)
+// Service Worker: App-Hülle für den Start ohne Netz und Kartenkacheln auf dem Gerät
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
-    void navigator.serviceWorker.register('/sw.js').catch(() => undefined);
+    void navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).catch(() => undefined);
   });
 }

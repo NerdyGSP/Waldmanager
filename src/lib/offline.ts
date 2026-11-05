@@ -44,7 +44,9 @@ async function senden(e: Eintrag): Promise<{ ok: boolean; netz: boolean; fehler?
           ? await supabase.from('einrichtungen').update({ geom: e.daten.geom }).eq('id', e.daten.id)
           : await supabase.from('zaehlungen').upsert(e.daten, { onConflict: 'id' });
     if (!error) return { ok: true, netz: false };
-    return { ok: false, netz: istNetzfehler(error), fehler: error.message };
+    // Abgelaufene Anmeldung ist kein fachlicher Fehler: Eintrag behalten, bis das Token erneuert ist
+    const abgelaufen = /jwt|token|expired|not authenticated/i.test(error.message) || (error as { code?: string }).code === 'PGRST301';
+    return { ok: false, netz: istNetzfehler(error) || abgelaufen, fehler: error.message };
   } catch (err) {
     return { ok: false, netz: true, fehler: String(err) };
   }
@@ -90,6 +92,10 @@ export async function warteschlangeAbarbeiten(): Promise<void> {
   if (laeuft || !navigator.onLine) return;
   laeuft = true;
   try {
+    if (lesen().length === 0) return;
+    // Erst die Sitzung erneuern (online), sonst scheitert das Senden mit abgelaufenem Token
+    const { data: sitzung } = await supabase.auth.getSession();
+    if (!sitzung.session) return;
     const rest: Eintrag[] = [];
     for (const e of lesen()) {
       const r = await senden(e);
