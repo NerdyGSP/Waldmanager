@@ -1043,6 +1043,153 @@ export type Database = {
           },
         ]
       }
+      flaechen: {
+        Row: {
+          aktualisiert_am: string
+          ebene_id: string
+          erstellt_am: string
+          erstellt_von: string | null
+          flaeche_ha: number
+          flaeche_im_revier_ha: number
+          frucht_roh: string | null
+          fruchtgruppe: string
+          geaendert_von: string | null
+          geom: unknown
+          id: string
+          name: string
+          revier_id: string
+          schlag_nr: string | null
+        }
+        Insert: {
+          aktualisiert_am?: string
+          ebene_id: string
+          erstellt_am?: string
+          erstellt_von?: string | null
+          flaeche_ha: number
+          flaeche_im_revier_ha: number
+          frucht_roh?: string | null
+          fruchtgruppe?: string
+          geaendert_von?: string | null
+          geom: unknown
+          id?: string
+          name?: string
+          revier_id: string
+          schlag_nr?: string | null
+        }
+        Update: {
+          aktualisiert_am?: string
+          ebene_id?: string
+          erstellt_am?: string
+          erstellt_von?: string | null
+          flaeche_ha?: number
+          flaeche_im_revier_ha?: number
+          frucht_roh?: string | null
+          fruchtgruppe?: string
+          geaendert_von?: string | null
+          geom?: unknown
+          id?: string
+          name?: string
+          revier_id?: string
+          schlag_nr?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flaechen_ebene_id_fkey"
+            columns: ["ebene_id"]
+            isOneToOne: false
+            referencedRelation: "flaechen_ebenen"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flaechen_erstellt_von_fkey"
+            columns: ["erstellt_von"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flaechen_geaendert_von_fkey"
+            columns: ["geaendert_von"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flaechen_revier_id_fkey"
+            columns: ["revier_id"]
+            isOneToOne: false
+            referencedRelation: "reviere"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      flaechen_ebenen: {
+        Row: {
+          aktualisiert_am: string
+          anbaujahr: number | null
+          art: string
+          erstellt_am: string
+          erstellt_von: string | null
+          farben: Json
+          geaendert_von: string | null
+          id: string
+          name: string
+          quelle: string | null
+          revier_id: string
+          sortierung: number
+        }
+        Insert: {
+          aktualisiert_am?: string
+          anbaujahr?: number | null
+          art?: string
+          erstellt_am?: string
+          erstellt_von?: string | null
+          farben?: Json
+          geaendert_von?: string | null
+          id?: string
+          name: string
+          quelle?: string | null
+          revier_id: string
+          sortierung?: number
+        }
+        Update: {
+          aktualisiert_am?: string
+          anbaujahr?: number | null
+          art?: string
+          erstellt_am?: string
+          erstellt_von?: string | null
+          farben?: Json
+          geaendert_von?: string | null
+          id?: string
+          name?: string
+          quelle?: string | null
+          revier_id?: string
+          sortierung?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flaechen_ebenen_erstellt_von_fkey"
+            columns: ["erstellt_von"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flaechen_ebenen_geaendert_von_fkey"
+            columns: ["geaendert_von"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flaechen_ebenen_revier_id_fkey"
+            columns: ["revier_id"]
+            isOneToOne: false
+            referencedRelation: "reviere"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       freigaben: {
         Row: {
           freigegeben_am: string
@@ -1082,6 +1229,61 @@ export type Database = {
             columns: ["wildart_id"]
             isOneToOne: false
             referencedRelation: "wildarten"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      frucht_zuordnungen: {
+        Row: {
+          aktualisiert_am: string
+          erstellt_am: string
+          erstellt_von: string | null
+          fruchtgruppe: string
+          geaendert_von: string | null
+          id: string
+          revier_id: string
+          roh_normalisiert: string
+        }
+        Insert: {
+          aktualisiert_am?: string
+          erstellt_am?: string
+          erstellt_von?: string | null
+          fruchtgruppe: string
+          geaendert_von?: string | null
+          id?: string
+          revier_id: string
+          roh_normalisiert: string
+        }
+        Update: {
+          aktualisiert_am?: string
+          erstellt_am?: string
+          erstellt_von?: string | null
+          fruchtgruppe?: string
+          geaendert_von?: string | null
+          id?: string
+          revier_id?: string
+          roh_normalisiert?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "frucht_zuordnungen_erstellt_von_fkey"
+            columns: ["erstellt_von"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "frucht_zuordnungen_geaendert_von_fkey"
+            columns: ["geaendert_von"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "frucht_zuordnungen_revier_id_fkey"
+            columns: ["revier_id"]
+            isOneToOne: false
+            referencedRelation: "reviere"
             referencedColumns: ["id"]
           },
         ]
@@ -2067,6 +2269,18 @@ export type Database = {
           revier_name: string
           rolle: string
         }[]
+      }
+      feld_fruchtgruppe_setzen: {
+        Args: { p_alle?: boolean; p_flaeche: string; p_gruppe: string }
+        Returns: number
+      }
+      felder_laden: {
+        Args: { p_ebene?: string; p_revier: string }
+        Returns: Json
+      }
+      flaechen_importieren: {
+        Args: { p_ebene: string; p_objekte: Json }
+        Returns: Json
       }
       grenze_setzen: {
         Args: { p_geojson: Json; p_revier_id: string }

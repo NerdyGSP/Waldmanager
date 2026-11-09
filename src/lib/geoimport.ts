@@ -15,7 +15,7 @@ export type GeoSchicht = {
 };
 export type Einlesung = {
   dateiname: string;
-  format: 'Shapefile' | 'GeoPackage';
+  format: 'Shapefile' | 'GeoPackage' | 'GeoJSON';
   schichten: GeoSchicht[];
   pruefung: Pruefschritt[];
 };
@@ -77,6 +77,8 @@ export async function geodatenLesen(datei: File): Promise<Einlesung> {
     if (endung !== 'gpkg') pruefung.push(warn(`Dateiendung „.${endung}“ passt nicht zum Inhalt (SQLite/GeoPackage)`));
     return geopackageLesen(datei.name, bytes, pruefung);
   }
+  const kopf = new TextDecoder().decode(bytes.subarray(0, 200)).replace(/^\uFEFF/, '').trimStart();
+  if (endung === 'geojson' || endung === 'json' || kopf.startsWith('{')) return geojsonLesen(datei.name, bytes, pruefung);
   if (endung === 'shp' || endung === 'dbf') {
     throw new GeoImportFehler('Bitte das Shapefile als ZIP-Archiv mit allen Teildateien hochladen.', [
       ...pruefung,
@@ -87,6 +89,38 @@ export async function geodatenLesen(datei: File): Promise<Einlesung> {
     ...pruefung,
     fehl('Weder ZIP-Archiv (Shapefile) noch GeoPackage erkannt – die Datei ist beschädigt oder hat ein anderes Format'),
   ]);
+}
+
+// ---------- GeoJSON (WGS84 nach RFC 7946) ----------
+
+function geojsonLesen(dateiname: string, bytes: Uint8Array, pruefung: Pruefschritt[]): Einlesung {
+  let json: { type?: string; features?: unknown; crs?: { properties?: { name?: string } }; geometry?: unknown };
+  try {
+    json = JSON.parse(new TextDecoder().decode(bytes).replace(/^\uFEFF/, ''));
+  } catch {
+    throw new GeoImportFehler('Die GeoJSON-Datei ist fehlerhaft.', [...pruefung, fehl('Kein gültiges JSON – Datei beschädigt oder abgeschnitten?')]);
+  }
+  const crs = json.crs?.properties?.name ?? '';
+  const epsg = Number(crs.match(/(?:EPSG[:/]+|EPSG::)(\d{4,5})/i)?.[1] ?? 4326);
+  if (!/CRS84/i.test(crs) && !WGS84_GLEICH.has(epsg)) {
+    throw new GeoImportFehler('Das Koordinatensystem wird nicht unterstützt.', [
+      ...pruefung,
+      fehl(`GeoJSON im Koordinatensystem EPSG:${epsg} – bitte als WGS84 (EPSG:4326) exportieren oder Shapefile/GeoPackage verwenden`),
+    ]);
+  }
+  const roh: Feature<Geometry | null, Record<string, unknown> | null>[] =
+    json.type === 'FeatureCollection' && Array.isArray(json.features)
+      ? (json.features as Feature<Geometry | null, Record<string, unknown> | null>[]).filter((f) => f && f.type === 'Feature')
+      : json.type === 'Feature'
+        ? [json as unknown as Feature<Geometry | null, Record<string, unknown> | null>]
+        : [];
+  if (!roh.length) throw new GeoImportFehler('Keine Objekte gefunden.', [...pruefung, fehl('Keine Features in der GeoJSON-Datei (erwartet: FeatureCollection)')]);
+  if (roh.length > MAX_FEATURES) {
+    throw new GeoImportFehler('Zu viele Objekte.', [...pruefung, fehl(`${roh.length.toLocaleString('de-DE')} Objekte – Maximum ${MAX_FEATURES.toLocaleString('de-DE')} je Datei`)]);
+  }
+  pruefung.push(ok('GeoJSON gelesen (WGS84)'));
+  const schicht = schichtBauen(dateiname.replace(/\.[^.]+$/, ''), roh, '', pruefung, null);
+  return abschliessen(dateiname, 'GeoJSON', schicht ? [schicht] : [], pruefung);
 }
 
 // ---------- Shapefile ----------
@@ -577,8 +611,8 @@ function abschliessen(dateiname: string, format: Einlesung['format'], schichten:
 
 // ---------- Hilfen für den Dialog ----------
 
-export type Ziel = 'grenze' | 'zonen' | 'einrichtungen' | 'pirschwege' | 'treiberrouten' | 'wte_routen';
-const ZIEL_ART: Record<Ziel, Flaechenart> = { grenze: 'Polygon', zonen: 'Polygon', einrichtungen: 'Point', pirschwege: 'LineString', treiberrouten: 'LineString', wte_routen: 'LineString' };
+export type Ziel = 'grenze' | 'zonen' | 'einrichtungen' | 'pirschwege' | 'treiberrouten' | 'wte_routen' | 'felder';
+const ZIEL_ART: Record<Ziel, Flaechenart> = { grenze: 'Polygon', zonen: 'Polygon', einrichtungen: 'Point', pirschwege: 'LineString', treiberrouten: 'LineString', wte_routen: 'LineString', felder: 'Polygon' };
 
 export const artVon = (g: Geometry): Flaechenart => (g.type.endsWith('Polygon') ? 'Polygon' : g.type.endsWith('LineString') ? 'LineString' : 'Point');
 

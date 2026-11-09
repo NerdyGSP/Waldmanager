@@ -1138,3 +1138,7 @@ button.kachel:active { transform: none; }
 .offline-leiste { position: sticky; top: 0; z-index: 70; display: flex; gap: 10px; align-items: center; justify-content: center; padding: calc(6px + env(safe-area-inset-top)) 12px 6px; background: #b26a00; color: #fff; font-size: var(--fs-sm); text-align: center; }
 .offline-tipp { background: var(--color-primary); }
 .offline-leiste button { flex: none; border: 1px solid #fff; background: transparent; color: #fff; border-radius: var(--radius-sm); padding: 2px 10px; cursor: pointer; }
+
+.farbpunkt { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; vertical-align: baseline; border: 1px solid rgba(0,0,0,.25); }
+.feld-zuordnung select { max-width: 55%; }
+.status-offen { color: var(--color-danger, #c0392b); font-weight: 600; }

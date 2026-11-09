@@ -21,6 +21,7 @@ import { nameVergeben, useZonen, useZonenEbenen, ZONENFARBEN } from '../../lib/s
 import type { Enums, Json } from '../../lib/database.types';
 import { Auswahl, Gruppe, Hinweis, Knopf, Leer } from '../../components/ui';
 import type { RevierKontext } from './kontext';
+import { FeldImport } from './FeldImport';
 
 const ZIELE: Array<{ wert: Ziel; titel: string; text: string; geometrie: string }> = [
   { wert: 'grenze', titel: 'Reviergrenze', text: 'Ersetzt die vorhandene Grenze des Reviers.', geometrie: 'Flächen' },
@@ -29,6 +30,7 @@ const ZIELE: Array<{ wert: Ziel; titel: string; text: string; geometrie: string 
   { wert: 'pirschwege', titel: 'Pirschwege', text: 'Wege und Pfade als Linien.', geometrie: 'Linien' },
   { wert: 'treiberrouten', titel: 'Treiberrouten', text: 'Laufwege der Treiber bei Bewegungsjagden als Linien.', geometrie: 'Linien' },
   { wert: 'wte_routen', titel: 'WTE-Routen', text: 'Zählstrecken der Wildtiererfassung als Linien.', geometrie: 'Linien' },
+  { wert: 'felder', titel: 'Feldgrenzen (Schläge)', text: 'Schlaggrenzen mit Fruchtart, in Fruchtfarben auf der Karte.', geometrie: 'Flächen' },
 ];
 const ARTEN: Record<string, string> = {
   Point: 'Punkt',
@@ -274,13 +276,13 @@ export function Geoimport({ k }: { k: RevierKontext }) {
       {ziel && !einlesung && (
         <Gruppe
           titel={`2 · Datei für ${zielInfo?.titel} wählen`}
-          fuss="Shapefile als ZIP (mit .shp, .dbf, .prj) oder GeoPackage (.gpkg). Die Datei wird zuerst auf deinem Gerät geprüft und erst nach deiner Bestätigung importiert. Andere Koordinatensysteme werden nach WGS84 umgerechnet."
+          fuss="Shapefile als ZIP (mit .shp, .dbf, .prj), GeoPackage (.gpkg) oder GeoJSON (.geojson, WGS84). Die Datei wird zuerst auf deinem Gerät geprüft und erst nach deiner Bestätigung importiert. Andere Koordinatensysteme werden nach WGS84 umgerechnet."
         >
           <label className={`knopf knopf-primaer datei-knopf${laedt ? ' deaktiviert' : ''}`} style={{ margin: 12 }}>
-            {laedt ? 'Datei wird geprüft …' : 'Shapefile (.zip) oder GeoPackage (.gpkg) wählen'}
+            {laedt ? 'Datei wird geprüft …' : 'Shapefile (.zip), GeoPackage oder GeoJSON wählen'}
             <input
               type="file"
-              accept=".zip,.gpkg,application/zip,application/geopackage+sqlite3"
+              accept=".zip,.gpkg,.geojson,.json,application/zip,application/geopackage+sqlite3,application/geo+json,application/json"
               disabled={laedt}
               onChange={(e) => {
                 const datei = e.target.files?.[0];
@@ -313,7 +315,41 @@ export function Geoimport({ k }: { k: RevierKontext }) {
         </>
       )}
 
-      {einlesung && schicht && ziel && (
+      {einlesung && schicht && ziel === 'felder' && (
+        <>
+          {einlesung.schichten.length > 1 && (
+            <Gruppe titel="Ebene in der Datei">
+              <Auswahl label="Ebene in der Datei" value={schichtNr} onChange={(e) => schichtWechseln(Number(e.target.value))}>
+                {einlesung.schichten.map((s, i) => (
+                  <option key={s.name} value={i}>
+                    {s.name} ({s.features.length})
+                  </option>
+                ))}
+              </Auswahl>
+            </Gruppe>
+          )}
+          {passend.length === 0 ? (
+            <>
+              <Hinweis art="fehler">Diese Ebene enthält keine Flächen. Wähle eine andere Ebene oder ein anderes Importziel.</Hinweis>
+              <Knopf variante="ghost" onClick={() => zuruecksetzen(true)}>Andere Datei wählen</Knopf>
+            </>
+          ) : (
+            <FeldImport
+              key={`${einlesung.dateiname}-${schichtNr}`}
+              k={k}
+              schicht={schicht}
+              dateiname={einlesung.dateiname}
+              onFertig={(m) => {
+                zuruecksetzen(true);
+                setMeldung(m);
+              }}
+              onAndereDatei={() => zuruecksetzen(true)}
+            />
+          )}
+        </>
+      )}
+
+      {einlesung && schicht && ziel && ziel !== 'felder' && (
         <>
           <Gruppe titel={`3 · ${zielInfo?.titel} aus „${einlesung.dateiname}“`}>
             {einlesung.schichten.length > 1 && (
