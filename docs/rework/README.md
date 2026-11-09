@@ -12,6 +12,7 @@ Bedienschicht, Kartenkern und Offline-Sync. Das ausführliche Konzept liegt als 
 | [ARCHITEKTUR.md](ARCHITEKTUR.md) | Zielbild: Bereiche, Kartenmodi, Kartenkern, Daten, Offline |
 | [ENTSCHEIDUNGEN.md](ENTSCHEIDUNGEN.md) | Offene Entscheidungen und was bis dahin gilt |
 | [ABNAHME-GERAETE.md](ABNAHME-GERAETE.md) | Checkliste für iPhone, iPad und Windows-Browser |
+| [klickdummy/](klickdummy/LIESMICH.md) | Von Benjamin bestätigtes Zielbild der Oberfläche |
 
 ## So läuft ein Arbeitspaket
 

@@ -12,6 +12,7 @@ Das Projekt wird schrittweise umgebaut (Rework). Vor jeder Arbeit daran:
 2. `docs/rework/ARBEITSPAKETE.md` – das Arbeitspaket (AP), an dem du arbeitest
 3. `docs/rework/ARCHITEKTUR.md` – Zielbild, wenn das AP Struktur berührt
 4. `docs/rework/ENTSCHEIDUNGEN.md` – offene Entscheidungen und was bis dahin gilt
+5. `docs/rework/klickdummy/LIESMICH.md` – verbindliches Zielbild der Oberfläche, sobald ein AP Sichtbares ändert
 
 Ein AP pro Sitzung und pro Pull Request. Am Ende `STATUS.md` aktualisieren.
 

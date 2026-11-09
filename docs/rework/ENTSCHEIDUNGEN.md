@@ -30,3 +30,4 @@ mit Datum nach unten.
 | --- | --- |
 | 9.11.2026 | Umbau in Phasen statt Neubau; Supabase, RLS-Modell, Fachlogik und Design bleiben (Arbeitsgrundlage, von Benjamin mit dem Auftrag zum Fundament bestätigt) |
 | 9.11.2026 | Gespeicherte Ebenen-Reihenfolge wird beim Hinzukommen einer Ebene ergänzt statt zurückgesetzt |
+| 9.11.2026 | Der Klickdummy in `docs/rework/klickdummy/` ist das verbindliche Zielbild der Oberfläche (von Benjamin bestätigt) |
