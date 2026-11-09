@@ -8,19 +8,21 @@ import type { RevierKontext } from './kontext';
 import { Symbol } from '../../components/symbole';
 import { AufteilenDialog } from './AufteilenDialog';
 import { Routen } from './Routen';
+import { FelderVerwaltung } from './FelderVerwaltung';
 
 // Modul „Zonen & Routen“: Umschalter oben, darunter Zonen (wie bisher) oder Routen
 export function Zonen({ k, unterpfad = [] }: { k: RevierKontext; unterpfad?: string[] }) {
   const routen = unterpfad[0] === 'routen';
+  const felder = unterpfad[0] === 'felder';
   return (
-    <Seite titel="Zonen & Routen" untertitel={routen ? 'Routenebenen und Routen · Farbe je Route über den Farbpunkt' : 'Erfassungszonen und individuelle Zonenebenen · Farbe je Zone über den Farbpunkt'}>
-      <Segmente<'zonen' | 'routen'>
+    <Seite titel="Zonen & Routen" untertitel={felder ? 'Feldgrenzen (Schläge) je Anbaujahr · Fruchtfarben' : routen ? 'Routenebenen und Routen · Farbe je Route über den Farbpunkt' : 'Erfassungszonen und individuelle Zonenebenen · Farbe je Zone über den Farbpunkt'}>
+      <Segmente<'zonen' | 'routen' | 'felder'>
         label="Ansicht"
-        optionen={[{ wert: 'zonen', label: 'Zonen' }, { wert: 'routen', label: 'Routen' }]}
-        wert={routen ? 'routen' : 'zonen'}
-        onAendern={(w) => navigieren(w === 'routen' ? '/zonen/routen' : '/zonen')}
+        optionen={[{ wert: 'zonen', label: 'Zonen' }, { wert: 'routen', label: 'Routen' }, { wert: 'felder', label: 'Felder' }]}
+        wert={felder ? 'felder' : routen ? 'routen' : 'zonen'}
+        onAendern={(w) => navigieren(w === 'routen' ? '/zonen/routen' : w === 'felder' ? '/zonen/felder' : '/zonen')}
       />
-      {routen ? <Routen k={k} /> : <ZonenListe k={k} />}
+      {felder ? <FelderVerwaltung k={k} /> : routen ? <Routen k={k} /> : <ZonenListe k={k} />}
     </Seite>
   );
 }

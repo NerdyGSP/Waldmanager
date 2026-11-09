@@ -3,7 +3,7 @@
 const DB_NAME = 'hegewerk-offline';
 const STORE = 'antworten';
 const MAX_ALTER_MS = 30 * 24 * 3600 * 1000;
-const LESENDE_RPC = new Set(['karte_daten', 'zonen_flaechen', 'quervergleich', 'jagdjahr_report', 'bj_laden', 'revier_letzte_logins', 'masteradmin_letzte_logins']);
+const LESENDE_RPC = new Set(['karte_daten', 'felder_laden', 'zonen_flaechen', 'quervergleich', 'jagdjahr_report', 'bj_laden', 'revier_letzte_logins', 'masteradmin_letzte_logins']);
 
 type Eintrag = { status: number; body: string; headers: Array<[string, string]>; zeit: number };
 

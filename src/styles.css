@@ -1142,3 +1142,7 @@ button.kachel:active { transform: none; }
 .farbpunkt { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; vertical-align: baseline; border: 1px solid rgba(0,0,0,.25); }
 .feld-zuordnung select { max-width: 55%; }
 .status-offen { color: var(--color-danger, #c0392b); font-weight: 600; }
+.feld-daten { display: grid; grid-template-columns: max-content 1fr; gap: 2px 12px; margin: 8px 0 0; font-size: var(--fs-md); }
+.feld-daten dt { color: var(--text-leise); }
+.feld-daten dd { margin: 0; overflow-wrap: anywhere; }
+.feld-aendern { display: grid; gap: 8px; margin-top: 10px; }

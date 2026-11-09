@@ -37,6 +37,9 @@ import { EinrichtungSheet, VerschiebeLeiste, type EinrichtungInfo } from './Einr
 import { speichernOderMerken, wartendeZaehlungen } from '../../lib/offline';
 import { useZaehlungGeaendert, useZonenSummen } from '../../lib/zaehlEreignis';
 import { GpsImport } from './GpsImport';
+import { FeldSheet } from './FeldSheet';
+import { useFelder, gruppenFarbe, type FeldProps } from '../../lib/felder';
+import { FRUCHTGRUPPEN, normalisieren } from '../../lib/fruchtgruppen';
 import { useRoutenEbenen, ROUTENFOKUS, routenTypFarbe } from '../../lib/routen';
 import { ZeichnenSheet, type SheetArt, type SheetWerte } from './ZeichnenSheet';
 
@@ -67,10 +70,11 @@ const STANDARD_ZENTRUM: [number, number] = [9.47, 52.2]; // Raum Bad Münder
 
 
 // Logische Kartenebenen: jede besteht aus einer oder mehreren MapLibre-Schichten
-type EbenenId = 'einrichtungen' | 'abschuesse' | 'pirschwege' | 'treiberrouten' | 'wteRouten' | 'heatmap' | 'grenze' | 'zonen' | 'luftbild';
+type EbenenId = 'einrichtungen' | 'abschuesse' | 'pirschwege' | 'treiberrouten' | 'wteRouten' | 'heatmap' | 'grenze' | 'zonen' | 'felder' | 'luftbild';
 const EBENEN_SCHICHTEN: Record<EbenenId, string[]> = {
   luftbild: ['luftbild'],
   zonen: ['zonen-flaeche', 'zonen-linie', 'zonen-auswahl'],
+  felder: ['felder-flaeche', 'felder-linie'],
   grenze: ['grenze-linie'],
   heatmap: ['heatmap'],
   pirschwege: ['pirschwege-linie'],
@@ -80,7 +84,7 @@ const EBENEN_SCHICHTEN: Record<EbenenId, string[]> = {
   einrichtungen: ['einrichtungen-punkt'],
 };
 // oben → unten
-const STANDARD_REIHENFOLGE: EbenenId[] = ['einrichtungen', 'abschuesse', 'pirschwege', 'treiberrouten', 'wteRouten', 'heatmap', 'grenze', 'zonen', 'luftbild'];
+const STANDARD_REIHENFOLGE: EbenenId[] = ['einrichtungen', 'abschuesse', 'pirschwege', 'treiberrouten', 'wteRouten', 'heatmap', 'grenze', 'zonen', 'felder', 'luftbild'];
 const STANDARD_DECKKRAFT: Record<EbenenId, number> = {
   einrichtungen: 1,
   abschuesse: 1,
@@ -90,6 +94,7 @@ const STANDARD_DECKKRAFT: Record<EbenenId, number> = {
   heatmap: 0.75,
   grenze: 1,
   zonen: 0.55,
+  felder: 0.45,
   luftbild: 1,
 };
 const EBENEN_SPEICHER = 'hegewerk.karte.ebenen';
@@ -98,6 +103,11 @@ function ebenenEinstellungenLesen(): { reihenfolge: EbenenId[]; deckkraft: Recor
   try {
     const roh = JSON.parse(localStorage.getItem(EBENEN_SPEICHER) ?? 'null') as { reihenfolge?: string[]; deckkraft?: Record<string, number> } | null;
     const reihenfolge = roh?.reihenfolge;
+    // Ältere Speicherstände ohne „Felder“: Ebene über dem Luftbild einfügen
+    if (Array.isArray(reihenfolge) && !reihenfolge.includes('felder')) {
+      const i = reihenfolge.indexOf('luftbild');
+      reihenfolge.splice(i < 0 ? reihenfolge.length : i, 0, 'felder');
+    }
     const gueltig = Array.isArray(reihenfolge) && reihenfolge.length === STANDARD_REIHENFOLGE.length && STANDARD_REIHENFOLGE.every((id) => reihenfolge.includes(id));
     const deckkraft = { ...STANDARD_DECKKRAFT };
     for (const id of STANDARD_REIHENFOLGE) {
@@ -153,6 +163,7 @@ type HeatQuelle = 'zaehlungen' | 'beobachtungen' | 'abschuesse';
 const WILDARTFARBEN = ['#c0392b', '#1f6fb2', '#1e8449', '#b9770e', '#8e44ad', '#16a085', '#d35400', '#5d6d7e', '#cb4335', '#2e4053'];
 
 type Ebenen = {
+  felder: boolean;
   luftbild: boolean;
   grenze: boolean;
   zonen: boolean;
@@ -199,6 +210,7 @@ export default function Karte({
   const [bereit, setBereit] = useState(false);
   const [daten, setDaten] = useState<KartenDaten | null>(null);
   const [ebenen, setEbenen] = useState<Ebenen>({
+    felder: false,
     luftbild: false,
     grenze: true,
     zonen: true,
@@ -327,6 +339,24 @@ export default function Karte({
     }
   }, [einst]);
   const [gewaehlteZone, setGewaehlteZone] = useState<GewaehlteZone | null>(null);
+  const [feldSheet, setFeldSheet] = useState<FeldProps | null>(null);
+  const [feldJahr, setFeldJahr] = useState<string | null>(null);
+  // Fruchtgruppen einzeln ausblenden (je Gerät gemerkt)
+  const [gruppenAus, setGruppenAus] = useState<string[]>(() => {
+    try {
+      const r = JSON.parse(localStorage.getItem('hegewerk.karte.felderGruppenAus') ?? '[]') as unknown;
+      return Array.isArray(r) ? r.map(String) : [];
+    } catch {
+      return [];
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem('hegewerk.karte.felderGruppenAus', JSON.stringify(gruppenAus));
+    } catch {
+      /* nur für diese Sitzung */
+    }
+  }, [gruppenAus]);
 
   const setModus = (m: Modus) => {
     modusRef.current = m;
@@ -355,6 +385,7 @@ export default function Karte({
     setWteZone(null);
   };
   const [wteMenue, setWteMenue] = useState(false);
+  const felder = useFelder(k.revierId, ebenen.felder && !wte, feldJahr);
   const [wteZone, setWteZone] = useState<WteZone | null>(null);
   const [wteSitzung, setWteSitzung] = useState<WteSitzung | null>(null);
   // Summe der Sichtungen je Zone in der laufenden Zählung (sofort sichtbar, auch offline)
@@ -491,9 +522,23 @@ export default function Karte({
       } catch {
         /* ohne Fokus weiter */
       }
-      for (const id of ['grenze', 'zonen', 'einrichtungen', 'pirschwege', 'beobachtungen', 'abschuesse', 'heatquelle', 'zeichnung']) {
+      for (const id of ['grenze', 'zonen', 'felder', 'einrichtungen', 'pirschwege', 'beobachtungen', 'abschuesse', 'heatquelle', 'zeichnung']) {
         m.addSource(id, { type: 'geojson', data: LEER });
       }
+      m.addLayer({
+        id: 'felder-flaeche',
+        type: 'fill',
+        source: 'felder',
+        layout: { visibility: 'none' },
+        paint: { 'fill-color': ['get', 'farbe'], 'fill-opacity': 0.45 },
+      });
+      m.addLayer({
+        id: 'felder-linie',
+        type: 'line',
+        source: 'felder',
+        layout: { visibility: 'none' },
+        paint: { 'line-color': ['get', 'farbe'], 'line-width': 1, 'line-opacity': 0.7 },
+      });
       m.addLayer({
         id: 'zonen-flaeche',
         type: 'fill',
@@ -731,6 +776,20 @@ export default function Karte({
       );
   }, [daten]);
 
+  // Felder: Daten in die Quelle, Gruppen ausblenden
+  useEffect(() => {
+    const m = karte.current;
+    if (!m || !bereit) return;
+    (m.getSource('felder') as GeoJSONSource | undefined)?.setData(felder.fc as unknown as FeatureCollection);
+  }, [felder.fc, bereit]);
+  useEffect(() => {
+    const m = karte.current;
+    if (!m || !bereit || !m.getLayer('felder-flaeche')) return;
+    const filter = (gruppenAus.length ? ['!', ['in', ['get', 'fruchtgruppe'], ['literal', gruppenAus]]] : null) as unknown as Parameters<typeof m.setFilter>[1];
+    m.setFilter('felder-flaeche', filter);
+    m.setFilter('felder-linie', filter);
+  }, [gruppenAus, bereit]);
+
   // Ebenen ein-/ausblenden
   useEffect(() => {
     const m = karte.current;
@@ -740,6 +799,8 @@ export default function Karte({
     // Im WTE-Modus nur Grenze, Hintergrund und Zonen der WTE-Ebenen
     if (m.getLayer('luftbild')) sichtbar('luftbild', ebenen.luftbild);
     sichtbar('grenze-linie', wte ? true : ebenen.grenze);
+    sichtbar('felder-flaeche', !wte && ebenen.felder);
+    sichtbar('felder-linie', !wte && ebenen.felder);
     sichtbar('zonen-flaeche', wte ? true : ebenen.zonen);
     sichtbar('zonen-linie', wte ? true : ebenen.zonen);
     sichtbar('einrichtungen-punkt', !wte && ebenen.einrichtungen);
@@ -781,6 +842,8 @@ export default function Karte({
       if (m.getLayer(schicht)) (m.setPaintProperty as (s: string, e: string, w: number) => void)(schicht, eigenschaft, wert);
     };
     setze('luftbild', 'raster-opacity', d.luftbild);
+    setze('felder-flaeche', 'fill-opacity', d.felder);
+    setze('felder-linie', 'line-opacity', Math.min(1, d.felder * 1.5));
     setze('zonen-flaeche', 'fill-opacity', d.zonen * 0.4);
     setze('zonen-linie', 'line-opacity', Math.min(1, d.zonen * 1.8));
     setze('grenze-linie', 'line-opacity', d.grenze);
@@ -866,7 +929,7 @@ export default function Karte({
         return;
       }
       if (aktiv) return;
-      const treffer = m.queryRenderedFeatures(e.point, { layers: ['einrichtungen-punkt', 'abschuesse-punkt', 'pirschwege-linie', 'treiberrouten-linie', 'wte-routen-linie', 'zonen-flaeche'] });
+      const treffer = m.queryRenderedFeatures(e.point, { layers: ['einrichtungen-punkt', 'abschuesse-punkt', 'pirschwege-linie', 'treiberrouten-linie', 'wte-routen-linie', 'zonen-flaeche', 'felder-flaeche'] });
       // Einrichtungen haben Vorrang vor allem, was darunter liegt (z. B. Zonen)
       const f = treffer.find((x) => x.layer.id === 'einrichtungen-punkt') ?? treffer[0];
       if (!f) {
@@ -881,8 +944,15 @@ export default function Karte({
         setEinrSheet({ id: String(p.id), name: (p.name as string | null) || null, typ: p.typ as Enums<'einrichtung_typ'>, bemerkung: (p.bemerkung as string | null) || null, lng, lat });
         return;
       }
+      if (f.layer.id === 'felder-flaeche') {
+        setEinrSheet(null);
+        setGewaehlteZone(null);
+        setFeldSheet(f.properties as unknown as FeldProps);
+        return;
+      }
       if (f.layer.id === 'zonen-flaeche') {
         setEinrSheet(null);
+        setFeldSheet(null);
         const p = f.properties ?? {};
         setGewaehlteZone({
           id: String(p.id),
@@ -1347,7 +1417,7 @@ export default function Karte({
   // ---------- Darstellung ----------
 
   // Offenes Sheet oder Dialog am unteren Rand: die Statusleiste schrumpft zum kleinen Chip oben und bleibt so immer sichtbar
-  const sheetOffen = !!sheetArt || !!neueEinrichtung || !!einrSheet || !!gewaehlteZone || (wte && !!wteZone) || gpsImport;
+  const sheetOffen = !!feldSheet || !!sheetArt || !!neueEinrichtung || !!einrSheet || !!gewaehlteZone || (wte && !!wteZone) || gpsImport;
   const zeichnet = modus && modus.art !== 'einrichtung';
   const einrichtungsNamen = (daten?.einrichtungen ?? []).map((e) => (e.properties?.name as string | null) ?? null);
   const kartenEbenen = daten?.ebenen ?? [];
@@ -1373,6 +1443,7 @@ export default function Karte({
       gesperrt: ISTHANDY && !daten?.grenze,
       setAn: (an) => setEbenen({ ...ebenen, luftbild: an }),
     },
+    felder: { name: 'Felder', label: 'Felder', an: ebenen.felder, setAn: (an) => setEbenen({ ...ebenen, felder: an }) },
     zonen: { name: 'Zonen', label: 'Zonen', an: ebenen.zonen, setAn: (an) => setEbenen({ ...ebenen, zonen: an }) },
     grenze: { name: 'Reviergrenze', label: 'Reviergrenze', an: ebenen.grenze, setAn: (an) => setEbenen({ ...ebenen, grenze: an }) },
     heatmap: { name: 'Heatmap', label: `Heatmap ${HEATNAMEN[heatQuelle]} (${gefiltert[heatQuelle].length})`, an: ebenen.heatmap, setAn: (an) => setEbenen({ ...ebenen, heatmap: an }) },
@@ -1542,6 +1613,42 @@ export default function Karte({
                           </div>
                         ))}
                       </div>
+                    );
+                  })()}
+                  {id === 'felder' && ebenen.felder && (() => {
+                    const aktuelle = felder.ebenen.find((e) => e.id === felder.ebeneId);
+                    const summen = new Map<string, number>();
+                    for (const f of felder.fc.features) summen.set(f.properties.fruchtgruppe, (summen.get(f.properties.fruchtgruppe) ?? 0) + f.properties.flaeche_im_revier_ha);
+                    const gesamt = [...summen.values()].reduce((a, b) => a + b, 0);
+                    if (!felder.ebenen.length) return <p className="leer" style={{ margin: 0 }}>{felder.fehler ? 'Felder konnten nicht geladen werden.' : 'Noch keine Feldgrenzen – Import unter „Datenimport“.'}</p>;
+                    return (
+                      <>
+                        {felder.ebenen.length > 1 && (
+                          <label className="transparenz">
+                            <span>Anbaujahr</span>
+                            <select value={felder.ebeneId ?? ''} onChange={(e) => setFeldJahr(e.target.value)} aria-label="Ebene der Felder wählen">
+                              {felder.ebenen.map((e) => (
+                                <option key={e.id} value={e.id}>{e.name}{e.anbaujahr ? ` (${e.anbaujahr})` : ''}</option>
+                              ))}
+                            </select>
+                          </label>
+                        )}
+                        <div className="legende legende-schalter">
+                          {FRUCHTGRUPPEN.filter((g) => summen.has(g.schluessel)).map((g) => (
+                            <button
+                              key={g.schluessel}
+                              type="button"
+                              className={`legende-typ ${gruppenAus.includes(g.schluessel) ? 'aus' : ''}`}
+                              aria-pressed={!gruppenAus.includes(g.schluessel)}
+                              title={gruppenAus.includes(g.schluessel) ? `${g.name} einblenden` : `${g.name} ausblenden`}
+                              onClick={() => setGruppenAus((a) => (a.includes(g.schluessel) ? a.filter((x) => x !== g.schluessel) : [...a, g.schluessel]))}
+                            >
+                              <i className="farbpunkt" style={{ background: gruppenFarbe(aktuelle?.farben, g.schluessel) }} /> {g.name} · {summen.get(g.schluessel)!.toLocaleString('de-DE', { maximumFractionDigits: 1 })} ha
+                            </button>
+                          ))}
+                        </div>
+                        <p className="leer" style={{ margin: 0 }}>Summe: {felder.fc.features.length.toLocaleString('de-DE')} Schläge · {gesamt.toLocaleString('de-DE', { maximumFractionDigits: 1 })} ha im Revier</p>
+                      </>
                     );
                   })()}
                   {id === 'einrichtungen' && ebenen.einrichtungen && (
@@ -1823,6 +1930,20 @@ export default function Karte({
           geaendert={verschiebe.lng !== verschiebe.einr.lng || verschiebe.lat !== verschiebe.einr.lat}
           onOk={() => void verschiebenBestaetigen()}
           onAbbrechen={() => setVerschiebe(null)}
+        />
+      )}
+      {feldSheet && !modus && !einrSheet && (
+        <FeldSheet
+          key={feldSheet.id}
+          feld={feldSheet}
+          ebene={felder.ebenen.find((e) => e.id === felder.ebeneId)}
+          gleicheWerte={felder.fc.features.filter((f) => normalisieren(f.properties.frucht_roh) === normalisieren(feldSheet.frucht_roh)).length}
+          istInhaber={k.istInhaber}
+          onSchliessen={() => setFeldSheet(null)}
+          onGeaendert={() => {
+            setFeldSheet(null);
+            void felder.laden();
+          }}
         />
       )}
       {gewaehlteZone && !modus && !einrSheet && <ZonenInfo zone={gewaehlteZone} onSchliessen={() => setGewaehlteZone(null)} onBearbeiten={k.istInhaber ? () => zoneBearbeiten(gewaehlteZone.id, gewaehlteZone.name) : undefined} />}

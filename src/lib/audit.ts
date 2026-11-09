@@ -38,13 +38,15 @@ export function personText(id: string | null | undefined, am: string | null | un
   return '–';
 }
 
-export type AuditTabelle = 'einrichtungen' | 'zonen' | 'zonen_ebenen' | 'routen_ebenen' | 'pirschwege' | 'revier_grenzen' | 'zaehlsitzungen' | 'beobachtungen' | 'abschuesse' | 'wildschaeden' | 'aufgaben' | 'aufgabenlisten' | 'begehungsscheine' | 'bewegungsjagden';
+export type AuditTabelle = 'einrichtungen' | 'zonen' | 'zonen_ebenen' | 'routen_ebenen' | 'pirschwege' | 'revier_grenzen' | 'zaehlsitzungen' | 'beobachtungen' | 'abschuesse' | 'wildschaeden' | 'aufgaben' | 'aufgabenlisten' | 'begehungsscheine' | 'bewegungsjagden' | 'flaechen' | 'flaechen_ebenen';
 
 // Spaltennamen je Tabelle: Ersteller und ggf. Abschluss
 export const AUDIT_FELDER: Record<AuditTabelle, { von: string; label: string; abschluss?: { von: string; am: string; label: string } }> = {
   einrichtungen: { von: 'erstellt_von', label: 'Erstellt' },
   zonen: { von: 'erstellt_von', label: 'Erstellt' },
   zonen_ebenen: { von: 'erstellt_von', label: 'Erstellt' },
+  flaechen: { von: 'erstellt_von', label: 'Importiert' },
+  flaechen_ebenen: { von: 'erstellt_von', label: 'Importiert' },
   routen_ebenen: { von: 'erstellt_von', label: 'Erstellt' },
   pirschwege: { von: 'erstellt_von', label: 'Erstellt' },
   revier_grenzen: { von: 'erstellt_von', label: 'Erstellt' },
