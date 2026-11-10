@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Hegewerk Arbeitsfläche</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+<style>
+body{margin:0}
+button{font-family:inherit;cursor:pointer}
+a{color:#1E5C3A}a:hover{color:#0F2A1D}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: flex; flex-wrap: wrap; background: #EEF1EE; font-family: Inter, system-ui, sans-serif; color: #1B2120; font-size: 14px">
+
+<nav style="flex: 0 0 96px; background: #0F2A1D; display: flex; flex-direction: column; align-items: stretch; padding: 16px 8px; gap: 6px; box-sizing: border-box">
+<span style="color: #FFFFFF; font-size: 13px; font-weight: 600; text-align: center; padding: 4px 0 14px">Hegewerk</span>
+<sc-for list="{{ bereiche }}" as="b" hint-placeholder-count="5">
+<button onClick="{{ b.waehlen }}" style="height: 56px; border: 0; border-radius: 6px; background: {{b.bg}}; color: {{b.fg}}; font-size: 13px; font-weight: 600; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px">
+<span style="width: 24px; height: 3px; border-radius: 2px; background: {{b.strich}}"></span>
+<span>{{ b.name }}</span>
+</button>
+</sc-for>
+<span style="flex: 1 1 auto"></span>
+<div style="border: 1px solid #2F8F5B; border-radius: 6px; padding: 8px 6px; display: flex; flex-direction: column; align-items: center; gap: 2px; color: #FFFFFF">
+<span style="font-size: 12px; font-weight: 600">Aktuell</span>
+<span style="font-size: 11px; color: #B9C7BF">Sync 21:04</span>
+</div>
+</nav>
+
+<section style="flex: 1 1 360px; max-width: 440px; min-width: 0; background: #FFFFFF; border-right: 1px solid #DDE3DF; padding: 20px; box-sizing: border-box; display: flex; flex-direction: column; gap: 18px">
+<div style="display: flex; flex-direction: column; gap: 2px">
+<span style="font-size: 12px; color: #5B6662">Hachmühlen I · Hegering 8</span>
+<h1 style="margin: 0; font-size: 22px; font-weight: 600">{{ titel }}</h1>
+</div>
+
+<sc-if value="{{ p.revier }}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; flex-direction: column; gap: 18px">
+<div style="display: flex; flex-direction: column; gap: 8px">
+<span style="font-size: 12px; font-weight: 600; color: #5B6662">Kartenansicht</span>
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<sc-for list="{{ ansichten }}" as="a" hint-placeholder-count="3">
+<button onClick="{{ a.waehlen }}" style="height: 40px; padding: 0 12px; border-radius: 4px; border: 1px solid {{a.rand}}; background: {{a.bg}}; color: {{a.fg}}; font-size: 14px; font-weight: 500">{{ a.name }}</button>
+</sc-for>
+</div>
+</div>
+<div style="display: flex; flex-direction: column">
+<span style="font-size: 12px; font-weight: 600; color: #5B6662; padding-bottom: 6px">Ebenen</span>
+<sc-for list="{{ ebenen }}" as="e" hint-placeholder-count="5">
+<button onClick="{{ e.schalten }}" aria-pressed="{{ e.an }}" style="height: 46px; border: 0; border-top: 1px solid #DDE3DF; background: none; display: flex; align-items: center; justify-content: space-between; padding: 0; color: #1B2120; text-align: left">
+<span style="display: flex; align-items: center; gap: 10px"><span style="width: 12px; height: 12px; border-radius: 2px; background: {{e.farbe}}"></span><span style="display: flex; flex-direction: column"><span style="font-size: 14px; font-weight: 500">{{ e.name }}</span><span style="font-size: 12px; color: #5B6662">{{ e.gruppe }}</span></span></span>
+<span style="width: 40px; height: 24px; border-radius: 12px; background: {{e.bg}}; display: flex; align-items: center; padding: 3px; box-sizing: border-box"><span style="width: 18px; height: 18px; border-radius: 50%; background: #FFFFFF; margin-left: {{e.knopf}}px"></span></span>
+</button>
+</sc-for>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<span style="font-size: 12px; font-weight: 600; color: #5B6662">Katalog</span>
+<sc-for list="{{ katalog }}" as="k" hint-placeholder-count="2">
+<div style="border: 1px solid #DDE3DF; border-radius: 6px; padding: 12px; display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px">
+<span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 14px; font-weight: 600">{{ k.name }}</span><span style="font-size: 12px; color: #5B6662">{{ k.quelle }}</span></span>
+<button onClick="{{ k.holen }}" style="height: 40px; padding: 0 12px; border-radius: 4px; border: 1px solid #1E5C3A; background: {{k.bg}}; color: {{k.fg}}; font-size: 13px; font-weight: 600; white-space: nowrap">{{ k.knopf }}</button>
+</div>
+<sc-if value="{{ k.da }}" hint-placeholder-val="{{ false }}">
+<span style="font-size: 12px; background: #E3F1E8; color: #0F2A1D; border-radius: 2px; padding: 4px 6px">{{ k.ergebnis }}</span>
+</sc-if>
+</div>
+</sc-for>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ p.erfassen }}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-direction: column; gap: 14px">
+<button onClick="{{ zaehlungStarten }}" style="height: 48px; border-radius: 4px; border: 0; background: #F26A1B; color: #1B2120; font-size: 15px; font-weight: 600">{{ zaehlKnopf }}</button>
+<span style="font-size: 12px; font-weight: 600; color: #5B6662">Letzte Einträge</span>
+<div style="display: flex; flex-direction: column">
+<sc-for list="{{ eintraege }}" as="e" hint-placeholder-count="4">
+<div style="border-top: 1px solid #DDE3DF; padding: 10px 0; display: flex; justify-content: space-between; align-items: center; gap: 12px">
+<span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 14px; font-weight: 500">{{ e.titel }}</span><span style="font-size: 12px; color: #5B6662">{{ e.ort }}</span></span>
+<span style="font-size: 12px; color: #5B6662; white-space: nowrap">{{ e.zeit }}</span>
+</div>
+</sc-for>
+</div>
+<span style="font-size: 12px; color: #5B6662">Zone, Schlag und nächste Einrichtung werden beim Speichern automatisch zugeordnet.</span>
+</div>
+</sc-if>
+
+<sc-if value="{{ p.jagd }}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-direction: column; gap: 14px">
+<div style="border: 1px solid #DDE3DF; border-top: 3px solid #1E5C3A; border-radius: 6px; padding: 12px; display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 15px; font-weight: 600">Drückjagd Hachmühlen · Sa 14.11.</span>
+<span style="font-size: 13px; color: #5B6662">08:30–13:00 Uhr · 18 Zusagen · 3 ohne Antwort</span>
+</div>
+<div style="background: #FDEBDD; color: #8A3707; border-radius: 4px; padding: 10px 12px; font-size: 13px; font-weight: 500">Stand 4 und Stand 5: Schusssektoren überschneiden sich. Planungshilfe, ersetzt nicht die Prüfung vor Ort.</div>
+<span style="font-size: 12px; font-weight: 600; color: #5B6662">Stände</span>
+<div style="display: flex; flex-direction: column">
+<sc-for list="{{ staende }}" as="st" hint-placeholder-count="5">
+<div style="border-top: 1px solid #DDE3DF; padding: 9px 0; display: flex; justify-content: space-between; align-items: center; gap: 12px">
+<span style="font-size: 14px; font-weight: 500">{{ st.name }}</span>
+<span style="font-size: 13px; color: #5B6662">{{ st.wer }}</span>
+<span style="font-size: 12px; font-weight: 600; border-radius: 2px; padding: 3px 6px; background: {{st.bg}}; color: {{st.fg}}">{{ st.status }}</span>
+</div>
+</sc-for>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ p.auswerten }}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; flex-direction: column; gap: 8px">
+<span style="font-size: 12px; font-weight: 600; color: #5B6662">Zeitachse · Jagdjahr</span>
+<div style="display: flex; gap: 8px">
+<sc-for list="{{ jahre }}" as="j" hint-placeholder-count="3">
+<button onClick="{{ j.waehlen }}" style="flex: 1; height: 40px; border-radius: 4px; border: 1px solid {{j.rand}}; background: {{j.bg}}; color: {{j.fg}}; font-size: 14px; font-weight: 500; font-variant-numeric: tabular-nums">{{ j.name }}</button>
+</sc-for>
+</div>
+</div>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+<sc-for list="{{ kpis }}" as="k" hint-placeholder-count="3">
+<div style="border: 1px solid #DDE3DF; border-top: 3px solid #1E5C3A; border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 2px">
+<span style="font-size: 12px; color: #5B6662">{{ k.name }}</span>
+<span style="font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums">{{ k.wert }}</span>
+</div>
+</sc-for>
+</div>
+<div style="display: flex; flex-direction: column; gap: 10px">
+<span style="font-size: 12px; font-weight: 600; color: #5B6662">Sichtungen je Zone (Rehwild)</span>
+<sc-for list="{{ balken }}" as="b" hint-placeholder-count="3">
+<div style="display: flex; align-items: center; gap: 10px">
+<span style="flex: 0 0 52px; font-size: 13px">{{ b.name }}</span>
+<span style="flex: 1; height: 14px; background: #ECEFED; border-radius: 2px; display: flex"><span style="width: {{b.breite}}%; background: #1E5C3A; border-radius: 2px"></span></span>
+<span style="flex: 0 0 28px; text-align: right; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums">{{ b.wert }}</span>
+</div>
+</sc-for>
+</div>
+<span style="font-size: 12px; color: #5B6662">Karte, Kennzahlen und Balken zeigen denselben Zeitraum. Quervergleich im Hegering bleibt ohne Koordinaten.</span>
+</div>
+</sc-if>
+
+<sc-if value="{{ p.verwalten }}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-direction: column">
+<sc-for list="{{ verwaltung }}" as="v" hint-placeholder-count="5">
+<div style="border-top: 1px solid #DDE3DF; padding: 12px 0; display: flex; flex-direction: column; gap: 2px">
+<span style="font-size: 14px; font-weight: 600">{{ v.titel }}</span>
+<span style="font-size: 13px; color: #5B6662">{{ v.text }}</span>
+</div>
+</sc-for>
+</div>
+</sc-if>
+</section>
+
+<main style="flex: 999 1 560px; min-width: 0; min-height: 600px; position: relative; overflow: hidden; background: #E6EBE3">
+<svg aria-hidden="true" viewBox="0 0 900 700" preserveAspectRatio="xMidYMid slice" style="position: absolute; left: 0; top: 0; width: 100%; height: 100%">
+<rect width="900" height="700" fill="#E6EBE3"></rect>
+<path d="M0 0H430L400 90L250 170L0 200Z" fill="#C9DCC6"></path>
+<path d="M620 560L900 500V700H560Z" fill="#C9DCC6"></path>
+<path d="M430 0H900V150L720 130L400 90Z" fill="#EFEBDD"></path>
+<path d="M250 170L400 90L720 130L740 300L330 330Z" fill="#E9EEDC"></path>
+<path d="M720 130L900 150V400L740 300Z" fill="#EFEBDD"></path>
+<path d="M0 200L250 170L330 330L360 500L0 470Z" fill="#EFEBDD"></path>
+<path d="M330 330L740 300L900 400V500L620 560L360 500Z" fill="#E9EEDC"></path>
+<path d="M0 470L360 500L620 560L560 700H0Z" fill="#EFEBDD"></path>
+<path d="M-10 600C140 580 280 560 360 500C440 440 520 420 600 330C660 260 780 220 910 200" fill="none" stroke="#A9CBE0" stroke-width="6"></path>
+<path d="M-10 320L330 330L740 300L910 330" fill="none" stroke="#D4D9D2" stroke-width="10"></path>
+<path d="M-10 320L330 330L740 300L910 330" fill="none" stroke="#FFFFFF" stroke-width="7"></path>
+<path d="M400 -10L400 90L330 330L360 500L420 710" fill="none" stroke="#D4D9D2" stroke-width="8"></path>
+<path d="M400 -10L400 90L330 330L360 500L420 710" fill="none" stroke="#FFFFFF" stroke-width="5"></path>
+<rect x="40" y="610" width="34" height="22" fill="#C9CEC8"></rect>
+<rect x="84" y="624" width="26" height="28" fill="#C9CEC8"></rect>
+<rect x="50" y="650" width="40" height="20" fill="#C9CEC8"></rect>
+<rect x="124" y="640" width="30" height="24" fill="#C9CEC8"></rect>
+<text x="96" y="690" font-size="13" fill="#5B6662" text-anchor="middle">Hachmühlen</text>
+</svg>
+
+<svg aria-hidden="true" viewBox="0 0 900 700" preserveAspectRatio="xMidYMid slice" style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: {{d.luft}}">
+<rect width="900" height="700" fill="#55633F"></rect>
+<path d="M0 0H430L400 90L250 170L0 200Z" fill="#33442B"></path>
+<path d="M620 560L900 500V700H560Z" fill="#33442B"></path>
+<path d="M430 0H900V150L720 130L400 90Z" fill="#8A8250"></path>
+<path d="M250 170L400 90L720 130L740 300L330 330Z" fill="#6E7B48"></path>
+<path d="M720 130L900 150V400L740 300Z" fill="#7C7446"></path>
+<path d="M0 200L250 170L330 330L360 500L0 470Z" fill="#657345"></path>
+<path d="M330 330L740 300L900 400V500L620 560L360 500Z" fill="#8C8455"></path>
+<path d="M0 470L360 500L620 560L560 700H0Z" fill="#5D6B40"></path>
+<path d="M-10 600C140 580 280 560 360 500C440 440 520 420 600 330C660 260 780 220 910 200" fill="none" stroke="#2C3A33" stroke-width="6"></path>
+<path d="M-10 320L330 330L740 300L910 330" fill="none" stroke="#A39F8C" stroke-width="6"></path>
+<path d="M400 -10L400 90L330 330L360 500L420 710" fill="none" stroke="#A39F8C" stroke-width="4"></path>
+</svg>
+
+<svg aria-hidden="true" viewBox="0 0 900 700" preserveAspectRatio="xMidYMid slice" style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: {{d.felder}}">
+<path d="M250 170L400 90L720 130L740 300L330 330Z" fill="#E8C94A" fill-opacity="0.6" stroke="#FFFFFF" stroke-width="2"></path>
+<path d="M720 130L900 150V400L740 300Z" fill="#3E7A3A" fill-opacity="0.6" stroke="#FFFFFF" stroke-width="2"></path>
+<path d="M0 200L250 170L330 330L360 500L0 470Z" fill="#9CCB7A" fill-opacity="0.6" stroke="#FFFFFF" stroke-width="2"></path>
+<path d="M330 330L740 300L900 400V500L620 560L360 500Z" fill="#C9D64A" fill-opacity="0.6" stroke="#FFFFFF" stroke-width="2"></path>
+<text x="500" y="215" font-size="14" font-weight="600" fill="#1B2120" text-anchor="middle">Schlag 12 · Weizen</text>
+<text x="810" y="270" font-size="14" font-weight="600" fill="#1B2120" text-anchor="middle">7 · Mais</text>
+<text x="170" y="350" font-size="14" font-weight="600" fill="#1B2120" text-anchor="middle">Schlag 3 · Grünland</text>
+<text x="640" y="440" font-size="14" font-weight="600" fill="#1B2120" text-anchor="middle">Schlag 9 · Raps</text>
+</svg>
+
+<svg aria-hidden="true" viewBox="0 0 900 700" preserveAspectRatio="xMidYMid slice" style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: {{d.flur}}">
+<path d="M250 170L290 250L330 330M400 90L470 320M560 110L600 310M720 130L740 300M290 250L600 215M0 330L330 330M150 185L190 485M330 330L360 500M500 317L530 540M740 300L770 450M360 500L900 440M620 560L650 400" fill="none" stroke="#5B6662" stroke-width="1"></path>
+<text x="370" y="205" font-size="11" fill="#3C4542" text-anchor="middle">Flur 3 · 41/2</text>
+<text x="530" y="270" font-size="11" fill="#3C4542" text-anchor="middle">Flur 3 · 42</text>
+<text x="440" y="430" font-size="11" fill="#3C4542" text-anchor="middle">Flur 5 · 17/1</text>
+</svg>
+
+<svg aria-hidden="true" viewBox="0 0 900 700" preserveAspectRatio="xMidYMid slice" style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: {{d.schutz}}">
+<path d="M380 470L470 400L560 330L650 280L700 330L620 420L500 480L420 520Z" fill="#2F8F5B" fill-opacity="0.22" stroke="#1E5C3A" stroke-width="2" stroke-dasharray="3 4"></path>
+<text x="545" y="395" font-size="13" font-weight="600" fill="#0F2A1D" text-anchor="middle">FFH-Gebiet Bachaue</text>
+</svg>
+
+<svg aria-hidden="true" viewBox="0 0 900 700" preserveAspectRatio="xMidYMid slice" style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: {{d.zonen}}">
+<path d="M120 110L420 60L720 130L740 300L330 330L100 300Z" fill="#1E5C3A" fill-opacity="0.14" stroke="#1E5C3A" stroke-width="1.5"></path>
+<path d="M100 300L330 330L360 500L90 430Z" fill="#2F6FB2" fill-opacity="0.14" stroke="#2F6FB2" stroke-width="1.5"></path>
+<path d="M330 330L740 300L790 380L660 590L300 640L90 430L360 500Z" fill="#8E44AD" fill-opacity="0.12" stroke="#8E44AD" stroke-width="1.5"></path>
+<text x="200" y="140" font-size="13" font-weight="600" fill="#0F2A1D">WTE 1</text>
+<text x="130" y="330" font-size="13" font-weight="600" fill="#1F4F8A">WTE 2</text>
+<text x="690" y="560" font-size="13" font-weight="600" fill="#5E2D73">WTE 3</text>
+</svg>
+
+<svg aria-hidden="true" viewBox="0 0 900 700" preserveAspectRatio="xMidYMid slice" style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: {{d.heatA}}">
+<circle cx="300" cy="230" r="46" fill="#F26A1B" fill-opacity="0.3"></circle><circle cx="300" cy="230" r="22" fill="#F26A1B" fill-opacity="0.45"></circle>
+<circle cx="540" cy="380" r="60" fill="#F26A1B" fill-opacity="0.3"></circle><circle cx="540" cy="380" r="30" fill="#F26A1B" fill-opacity="0.45"></circle>
+<circle cx="440" cy="540" r="34" fill="#F26A1B" fill-opacity="0.3"></circle>
+</svg>
+<svg aria-hidden="true" viewBox="0 0 900 700" preserveAspectRatio="xMidYMid slice" style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: {{d.heatB}}">
+<circle cx="260" cy="250" r="64" fill="#F26A1B" fill-opacity="0.3"></circle><circle cx="260" cy="250" r="34" fill="#F26A1B" fill-opacity="0.45"></circle>
+<circle cx="620" cy="250" r="40" fill="#F26A1B" fill-opacity="0.3"></circle>
+<circle cx="220" cy="400" r="38" fill="#F26A1B" fill-opacity="0.3"></circle>
+</svg>
+<svg aria-hidden="true" viewBox="0 0 900 700" preserveAspectRatio="xMidYMid slice" style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: {{d.heatC}}">
+<circle cx="600" cy="460" r="58" fill="#F26A1B" fill-opacity="0.3"></circle><circle cx="600" cy="460" r="26" fill="#F26A1B" fill-opacity="0.45"></circle>
+<circle cx="330" cy="200" r="32" fill="#F26A1B" fill-opacity="0.3"></circle>
+</svg>
+
+<svg aria-hidden="true" viewBox="0 0 900 700" preserveAspectRatio="xMidYMid slice" style="position: absolute; left: 0; top: 0; width: 100%; height: 100%">
+<path d="M120 110L420 60L720 130L790 380L660 590L300 640L90 430Z" fill="none" stroke="#FFFFFF" stroke-width="6"></path>
+<path d="M120 110L420 60L720 130L790 380L660 590L300 640L90 430Z" fill="none" stroke="#0F2A1D" stroke-width="3" stroke-dasharray="12 6"></path>
+</svg>
+
+<svg aria-hidden="true" viewBox="0 0 900 700" preserveAspectRatio="xMidYMid slice" style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: {{d.einr}}">
+<g stroke="#FFFFFF" stroke-width="2.5">
+<circle cx="250" cy="220" r="11" fill="#1E5C3A"></circle><circle cx="520" cy="360" r="11" fill="#1E5C3A"></circle>
+<circle cx="430" cy="520" r="11" fill="#8A5A1E"></circle><circle cx="200" cy="380" r="11" fill="#8A5A1E"></circle>
+<circle cx="600" cy="480" r="11" fill="#1E5C3A"></circle>
+</g>
+<g font-size="12" font-weight="600" fill="#1B2120" stroke="#FFFFFF" stroke-width="3" paint-order="stroke">
+<text x="266" y="224">Kanzel Eiche</text><text x="536" y="364">Hochsitz Bachlauf</text><text x="446" y="524">Kirrung Süd</text>
+</g>
+</svg>
+
+<svg aria-hidden="true" viewBox="0 0 900 700" preserveAspectRatio="xMidYMid slice" style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: {{d.jagdtag}}">
+<g fill="#1E5C3A" fill-opacity="0.22" stroke="#1E5C3A" stroke-width="1.5">
+<path d="M300 170L262 262A100 100 0 0 0 362 248Z"></path>
+<path d="M430 140L402 236A100 100 0 0 0 494 217Z"></path>
+<path d="M560 160L512 248A100 100 0 0 0 606 249Z"></path>
+</g>
+<g fill="#C9520C" fill-opacity="0.28" stroke="#C9520C" stroke-width="1.5">
+<path d="M660 240L566 274A100 100 0 0 0 624 333Z"></path>
+<path d="M700 350L604 322A100 100 0 0 0 614 401Z"></path>
+</g>
+<path d="M200 560C320 520 420 470 520 440C600 416 660 400 720 380" fill="none" stroke="#1F4F8A" stroke-width="3" stroke-dasharray="8 6"></path>
+<path d="M708 372L724 379L712 392" fill="none" stroke="#1F4F8A" stroke-width="3"></path>
+<g stroke="#FFFFFF" stroke-width="2.5" fill="#2F6FB2">
+<circle cx="300" cy="170" r="12"></circle><circle cx="430" cy="140" r="12"></circle><circle cx="560" cy="160" r="12"></circle><circle cx="660" cy="240" r="12"></circle><circle cx="700" cy="350" r="12"></circle>
+</g>
+<g font-size="12" font-weight="600" fill="#FFFFFF" text-anchor="middle">
+<text x="300" y="174">1</text><text x="430" y="144">2</text><text x="560" y="164">3</text><text x="660" y="244">4</text><text x="700" y="354">5</text>
+</g>
+<rect x="158" y="596" width="26" height="26" fill="#FFFFFF" stroke="#C9520C" stroke-width="2"></rect>
+<path d="M171 601v16M163 609h16" stroke="#C9520C" stroke-width="3"></path>
+<text x="192" y="614" font-size="12" font-weight="600" fill="#1B2120" stroke="#FFFFFF" stroke-width="3" paint-order="stroke">Rettungspunkt HM-2</text>
+<text x="330" y="500" font-size="12" font-weight="600" fill="#1F4F8A" stroke="#FFFFFF" stroke-width="3" paint-order="stroke">Treiberroute A</text>
+</svg>
+
+<svg aria-hidden="true" viewBox="0 0 900 700" preserveAspectRatio="xMidYMid slice" style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: {{d.bearbeiten}}">
+<path d="M100 300L330 330L360 500L90 430Z" fill="#F26A1B" fill-opacity="0.12" stroke="#C9520C" stroke-width="2.5"></path>
+<g fill="#FFFFFF" stroke="#C9520C" stroke-width="2">
+<rect x="94" y="294" width="12" height="12"></rect><rect x="324" y="324" width="12" height="12"></rect><rect x="354" y="494" width="12" height="12"></rect><rect x="84" y="424" width="12" height="12"></rect>
+</g>
+<g fill="#C9520C"><circle cx="215" cy="315" r="4"></circle><circle cx="345" cy="415" r="4"></circle><circle cx="225" cy="465" r="4"></circle><circle cx="95" cy="365" r="4"></circle></g>
+<text x="225" y="405" font-size="13" font-weight="600" fill="#8A3707" text-anchor="middle">WTE 2 · 41,8 ha</text>
+</svg>
+
+<sc-if value="{{ istDruck }}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; pointer-events: none">
+<div style="width: {{druckBreite}}%; aspect-ratio: 297 / 210; border: 2px dashed #0F2A1D; background: rgba(255,255,255,0.18); box-sizing: border-box; display: flex; align-items: flex-end; justify-content: space-between; padding: 8px">
+<span style="background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 2px; padding: 3px 6px; font-size: 12px; font-weight: 600">{{ druckText }}</span>
+<span style="background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 2px; padding: 3px 6px; font-size: 11px; color: #3C4542">Quellen: basemap.de, GeoBasis-DE/LGLN</span>
+</div>
+</div>
+</sc-if>
+
+<div style="position: absolute; left: 16px; top: 16px; right: 16px; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap">
+<div style="display: flex; flex-wrap: wrap; background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 6px; padding: 2px; gap: 2px">
+<sc-for list="{{ modi }}" as="mo" hint-placeholder-count="5">
+<button onClick="{{ mo.waehlen }}" style="height: 40px; padding: 0 14px; border: 0; border-radius: 4px; font-size: 14px; font-weight: 500; background: {{mo.bg}}; color: {{mo.fg}}">{{ mo.name }}</button>
+</sc-for>
+</div>
+<div style="background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 6px; padding: 8px 12px; display: flex; flex-direction: column; gap: 2px">
+<span style="font-size: 12px; color: #5B6662">Suche und Befehle</span>
+<span style="font-size: 13px; font-weight: 500">Strg + K</span>
+</div>
+</div>
+
+<div style="position: absolute; left: 16px; right: 16px; bottom: 16px; display: flex; justify-content: center">
+<sc-if value="{{ istBearbeiten }}" hint-placeholder-val="{{ false }}">
+<div style="background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 6px; padding: 6px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px">
+<sc-for list="{{ werkzeuge }}" as="w" hint-placeholder-count="7">
+<button onClick="{{ w.waehlen }}" style="height: 40px; padding: 0 12px; border: 0; border-radius: 4px; font-size: 13px; font-weight: 500; background: {{w.bg}}; color: {{w.fg}}">{{ w.name }}</button>
+</sc-for>
+<span style="font-size: 12px; color: #5B6662; padding: 0 10px">Einrasten: Reviergrenze, Schläge</span>
+</div>
+</sc-if>
+<sc-if value="{{ istZaehlen }}" hint-placeholder-val="{{ false }}">
+<div style="background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 6px; padding: 10px 14px; display: flex; align-items: center; gap: 16px">
+<span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 12px; color: #5B6662">Zählung läuft · nur WTE-Zonen sichtbar</span><span style="font-size: 16px; font-weight: 600">8 Stück in 3 Zonen</span></span>
+<button onClick="{{ zaehlungEnde }}" style="height: 40px; padding: 0 14px; border-radius: 4px; border: 0; background: #1E5C3A; color: #FFFFFF; font-size: 14px; font-weight: 600">Abschließen</button>
+</div>
+</sc-if>
+<sc-if value="{{ istDruck }}" hint-placeholder-val="{{ false }}">
+<div style="background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 6px; padding: 6px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px">
+<sc-for list="{{ massstaebe }}" as="ma" hint-placeholder-count="3">
+<button onClick="{{ ma.waehlen }}" style="height: 40px; padding: 0 12px; border: 0; border-radius: 4px; font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; background: {{ma.bg}}; color: {{ma.fg}}">{{ ma.name }}</button>
+</sc-for>
+<span style="font-size: 12px; color: #5B6662; padding: 0 10px">A4 quer · Legende, Nordpfeil, UTM-Gitter</span>
+<button style="height: 40px; padding: 0 14px; border-radius: 4px; border: 0; background: #F26A1B; color: #1B2120; font-size: 14px; font-weight: 600">PDF erzeugen</button>
+</div>
+</sc-if>
+<sc-if value="{{ istJagdtag }}" hint-placeholder-val="{{ false }}">
+<div style="background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 6px; padding: 10px 14px; display: flex; flex-wrap: wrap; align-items: center; gap: 16px; font-size: 13px">
+<span style="display: flex; align-items: center; gap: 6px"><span style="width: 12px; height: 12px; border-radius: 50%; background: #2F6FB2"></span>Stand</span>
+<span style="display: flex; align-items: center; gap: 6px"><span style="width: 12px; height: 12px; background: #1E5C3A; opacity: 0.5"></span>Sektor frei</span>
+<span style="display: flex; align-items: center; gap: 6px"><span style="width: 12px; height: 12px; background: #C9520C; opacity: 0.6"></span>Sektoren überschneiden sich</span>
+<span style="display: flex; align-items: center; gap: 6px"><span style="width: 16px; height: 0; border-top: 3px dashed #1F4F8A"></span>Treiberroute</span>
+</div>
+</sc-if>
+</div>
+</main>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1360,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = {
+      bereich: 'revier', modus: 'ansehen', ansicht: 'feld',
+      eb: { einr: true, zonen: true, felder: false, luft: false, schutz: false, flur: false },
+      kat: { schutz: false, flur: false },
+      jahr: '2026/27', werkzeug: 'Auswählen', massstab: '1:10.000'
+    };
+  }
+  renderVals() {
+    const s = this.state;
+    const set = (x) => this.setState(x);
+    const gruen = '#1E5C3A', weiss = '#FFFFFF', text = '#1B2120', rand = '#C7CEC9';
+    const pille = (an) => ({ bg: an ? gruen : weiss, fg: an ? weiss : text, rand: an ? gruen : rand });
+    const zeig = (b) => (b ? 'block' : 'none');
+    const m = s.modus;
+    const auswerten = s.bereich === 'auswerten';
+    const ruhig = m === 'zaehlen';
+    const titel = { revier: 'Revier', erfassen: 'Erfassen', jagd: 'Jagd', auswerten: 'Auswerten', verwalten: 'Verwalten' };
+    const startModus = { revier: 'ansehen', erfassen: 'ansehen', jagd: 'jagdtag', auswerten: 'ansehen', verwalten: 'ansehen' };
+    const ansichtenDef = {
+      feld: { einr: true, zonen: true, felder: false, luft: false },
+      landwirtschaft: { einr: true, zonen: false, felder: true, luft: false },
+      schutz: { einr: false, zonen: false, felder: false, luft: true }
+    };
+    const ebenenDef = [
+      { id: 'einr', name: 'Einrichtungen', gruppe: 'Revierstruktur', farbe: '#1E5C3A' },
+      { id: 'zonen', name: 'Zonen', gruppe: 'Revierstruktur', farbe: '#8E44AD' },
+      { id: 'felder', name: 'Schläge mit Fruchtart', gruppe: 'Landwirtschaft', farbe: '#E8C94A' }
+    ];
+    if (s.kat.schutz) ebenenDef.push({ id: 'schutz', name: 'Schutzgebiete', gruppe: 'Recht & Schutz · NLWKN', farbe: '#2F8F5B' });
+    if (s.kat.flur) ebenenDef.push({ id: 'flur', name: 'Flurstücke', gruppe: 'Recht & Schutz · ALKIS', farbe: '#5B6662' });
+    ebenenDef.push({ id: 'luft', name: 'Luftbild', gruppe: 'Basiskarte', farbe: '#55633F' });
+    const holen = (id) => () => {
+      const kat = Object.assign({}, s.kat); kat[id] = true;
+      const eb = Object.assign({}, s.eb); eb[id] = true;
+      set({ kat: kat, eb: eb, ansicht: 'eigene' });
+    };
+    const daten = {
+      '2024/25': { kpi: ['96', '11', '3,1'], z: [38, 22, 36], heat: 'heatC' },
+      '2025/26': { kpi: ['121', '14', '3,9'], z: [61, 27, 33], heat: 'heatB' },
+      '2026/27': { kpi: ['88', '9', '2,5'], z: [34, 12, 42], heat: 'heatA' }
+    };
+    const dj = daten[s.jahr];
+    const maxZ = Math.max.apply(null, dj.z);
+    const breiten = { '1:5.000': 38, '1:10.000': 58, '1:25.000': 82 };
+    return {
+      titel: titel[s.bereich],
+      p: { revier: s.bereich === 'revier', erfassen: s.bereich === 'erfassen', jagd: s.bereich === 'jagd', auswerten: auswerten, verwalten: s.bereich === 'verwalten' },
+      d: {
+        luft: zeig(s.eb.luft), felder: zeig(s.eb.felder && !ruhig), flur: zeig(s.eb.flur && !ruhig), schutz: zeig(s.eb.schutz && !ruhig),
+        zonen: zeig(s.eb.zonen || ruhig), einr: zeig(s.eb.einr && !ruhig && m !== 'jagdtag'),
+        heatA: zeig(auswerten && dj.heat === 'heatA'), heatB: zeig(auswerten && dj.heat === 'heatB'), heatC: zeig(auswerten && dj.heat === 'heatC'),
+        jagdtag: zeig(m === 'jagdtag'), bearbeiten: zeig(m === 'bearbeiten')
+      },
+      istBearbeiten: m === 'bearbeiten', istZaehlen: m === 'zaehlen', istDruck: m === 'druck', istJagdtag: m === 'jagdtag',
+      bereiche: ['revier', 'erfassen', 'jagd', 'auswerten', 'verwalten'].map((id) => ({
+        name: titel[id], bg: s.bereich === id ? '#1E5C3A' : 'transparent', fg: s.bereich === id ? weiss : '#B9C7BF',
+        strich: s.bereich === id ? '#F26A1B' : 'transparent',
+        waehlen: () => set({ bereich: id, modus: startModus[id] })
+      })),
+      modi: [
+        { id: 'ansehen', name: 'Ansehen' }, { id: 'bearbeiten', name: 'Bearbeiten' }, { id: 'zaehlen', name: 'Zählen' },
+        { id: 'jagdtag', name: 'Jagdtag' }, { id: 'druck', name: 'Druck' }
+      ].map((x) => Object.assign(x, { bg: m === x.id ? gruen : weiss, fg: m === x.id ? weiss : text, waehlen: () => set({ modus: x.id }) })),
+      ansichten: [
+        { id: 'feld', name: 'Feld' }, { id: 'landwirtschaft', name: 'Landwirtschaft' }, { id: 'schutz', name: 'Schutz & Recht' }
+      ].map((a) => Object.assign(a, pille(s.ansicht === a.id), {
+        waehlen: () => set({ ansicht: a.id, eb: Object.assign({}, ansichtenDef[a.id], { schutz: a.id === 'schutz' && s.kat.schutz, flur: a.id === 'schutz' && s.kat.flur }) })
+      })),
+      ebenen: ebenenDef.map((e) => Object.assign(e, {
+        an: s.eb[e.id], bg: s.eb[e.id] ? gruen : '#8B9590', knopf: s.eb[e.id] ? 16 : 0,
+        schalten: () => { const eb = Object.assign({}, s.eb); eb[e.id] = !eb[e.id]; set({ eb: eb, ansicht: 'eigene' }); }
+      })),
+      katalog: [
+        { id: 'schutz', name: 'Naturschutz-, FFH- und Vogelschutzgebiete', quelle: 'NLWKN · INSPIRE-Dienst', ergebnis: 'Auf die Reviergrenze zugeschnitten: 1 Gebiet, 38,4 ha im Revier · Stand 09.11.2026' },
+        { id: 'flur', name: 'Flurstücke (ALKIS)', quelle: 'LGLN · CC BY 4.0 · ohne Eigentümerdaten', ergebnis: 'Auf die Reviergrenze zugeschnitten: 64 Flurstücke · Stand 09.11.2026' }
+      ].map((k) => Object.assign(k, {
+        da: s.kat[k.id], knopf: s.kat[k.id] ? 'Übernommen' : 'Ins Revier übernehmen',
+        bg: s.kat[k.id] ? '#E3F1E8' : gruen, fg: s.kat[k.id] ? '#0F2A1D' : weiss, holen: holen(k.id)
+      })),
+      zaehlKnopf: m === 'zaehlen' ? 'Zählung läuft' : 'Zählung starten',
+      zaehlungStarten: () => set({ modus: 'zaehlen' }),
+      zaehlungEnde: () => set({ modus: 'ansehen' }),
+      eintraege: [
+        { titel: 'Sichtung · 2 Rehwild', ort: 'WTE 1 · Schlag 12 · Kanzel Eiche', zeit: 'heute 07:42' },
+        { titel: 'Strecke · 1 Fuchs', ort: 'WTE 3 · Schlag 9', zeit: 'gestern 18:10' },
+        { titel: 'Wildschaden · Mais', ort: 'Schlag 7 · Frist bis 13.11.', zeit: '06.11.' },
+        { titel: 'Zählung abgeschlossen · 14 Feldhasen', ort: '3 Zonen · 3,4 je 100 ha', zeit: '04.11.' }
+      ],
+      staende: [
+        { name: 'Stand 1', wer: 'Jäger A', status: 'belegt' }, { name: 'Stand 2', wer: 'Jäger B', status: 'belegt' },
+        { name: 'Stand 3', wer: 'frei', status: 'frei' }, { name: 'Stand 4', wer: 'Jäger C', status: 'Konflikt' },
+        { name: 'Stand 5', wer: 'Jäger D', status: 'Konflikt' }
+      ].map((x) => Object.assign(x, x.status === 'Konflikt' ? { bg: '#FDEBDD', fg: '#8A3707' } : x.status === 'frei' ? { bg: '#ECEFED', fg: '#3C4542' } : { bg: '#E3F1E8', fg: '#0F2A1D' })),
+      jahre: ['2024/25', '2025/26', '2026/27'].map((n) => Object.assign({ name: n, waehlen: () => set({ jahr: n }) }, pille(s.jahr === n))),
+      kpis: [{ name: 'Sichtungen', wert: dj.kpi[0] }, { name: 'Strecke', wert: dj.kpi[1] }, { name: 'je 100 ha', wert: dj.kpi[2] }],
+      balken: ['WTE 1', 'WTE 2', 'WTE 3'].map((n, i) => ({ name: n, wert: dj.z[i], breite: Math.round((dj.z[i] / maxZ) * 100) })),
+      verwaltung: [
+        { titel: 'Mitglieder & Einladungen', text: '1 Inhaber, 4 Mitjäger' },
+        { titel: 'Offline-Pakete', text: 'Revierpaket Stand 08.11.2026 · 212 MB' },
+        { titel: 'Datenimport', text: 'CSV für Zählungen und Abschüsse' },
+        { titel: 'Freigaben', text: 'Rehwild und Feldhase im Hegering freigegeben' },
+        { titel: 'Einstellungen', text: 'Konto, Darstellung, Benachrichtigungen' }
+      ],
+      werkzeuge: ['Auswählen', 'Fläche', 'Linie', 'Punkt', 'Teilen', 'Vereinigen', 'Messen', 'Rückgängig'].map((n) => ({
+        name: n, bg: s.werkzeug === n ? '#E3F1E8' : weiss, fg: s.werkzeug === n ? '#0F2A1D' : text, waehlen: () => set({ werkzeug: n })
+      })),
+      massstaebe: ['1:5.000', '1:10.000', '1:25.000'].map((n) => ({
+        name: n, bg: s.massstab === n ? '#E3F1E8' : weiss, fg: s.massstab === n ? '#0F2A1D' : text, waehlen: () => set({ massstab: n })
+      })),
+      druckBreite: breiten[s.massstab],
+      druckText: 'A4 quer · ' + s.massstab
+    };
+  }
+}
+</script>
+</body>
+</html>

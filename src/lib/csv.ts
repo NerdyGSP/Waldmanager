@@ -67,7 +67,7 @@ export type Zeitangabe = { datum: string; stunde: number | null; minute: number 
 export function datumLesen(roh: string): Zeitangabe | null {
   const s = roh.trim();
   let j: number, m: number, t: number, h: string | undefined, min: string | undefined;
-  let treffer = /^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})(?:[ T,]+(\d{1,2})[:.](\d{2}))?/.exec(s);
+  let treffer = /^(\d{1,2})\.(\d{1,2})\.(\d{4}|\d{2})(?!\d)(?:[ T,]+(\d{1,2})[:.](\d{2}))?/.exec(s);
   if (treffer) {
     t = Number(treffer[1]);
     m = Number(treffer[2]);

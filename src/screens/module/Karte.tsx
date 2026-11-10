@@ -42,6 +42,9 @@ import { useFelder, gruppenFarbe, type FeldProps } from '../../lib/felder';
 import { FRUCHTGRUPPEN, normalisieren } from '../../lib/fruchtgruppen';
 import { useRoutenEbenen, ROUTENFOKUS, routenTypFarbe } from '../../lib/routen';
 import { ZeichnenSheet, type SheetArt, type SheetWerte } from './ZeichnenSheet';
+import { EBENEN_SCHICHTEN, standardSichtbarkeit, type EbenenId } from '../../karte/ebenen/registry';
+import { EBENEN_SPEICHER, ebenenEinstellungenLesen } from '../../karte/ebenen/einstellungen';
+import { abstandM, koordinaten, mittelpunkt, naechsterRandpunkt, punktInFlaeche } from '../../karte/kern/geometrie';
 
 // ---------- Kartengrundlagen ----------
 
@@ -69,56 +72,7 @@ const STIL: StyleSpecification = {
 const STANDARD_ZENTRUM: [number, number] = [9.47, 52.2]; // Raum Bad Münder
 
 
-// Logische Kartenebenen: jede besteht aus einer oder mehreren MapLibre-Schichten
-type EbenenId = 'einrichtungen' | 'abschuesse' | 'pirschwege' | 'treiberrouten' | 'wteRouten' | 'heatmap' | 'grenze' | 'zonen' | 'felder' | 'luftbild';
-const EBENEN_SCHICHTEN: Record<EbenenId, string[]> = {
-  luftbild: ['luftbild'],
-  zonen: ['zonen-flaeche', 'zonen-linie', 'zonen-auswahl'],
-  felder: ['felder-flaeche', 'felder-linie'],
-  grenze: ['grenze-linie'],
-  heatmap: ['heatmap'],
-  pirschwege: ['pirschwege-linie'],
-  treiberrouten: ['treiberrouten-linie', 'treiberrouten-pfeile'],
-  wteRouten: ['wte-routen-linie', 'wte-routen-pfeile'],
-  abschuesse: ['abschuesse-punkt'],
-  einrichtungen: ['einrichtungen-punkt'],
-};
-// oben → unten
-const STANDARD_REIHENFOLGE: EbenenId[] = ['einrichtungen', 'abschuesse', 'pirschwege', 'treiberrouten', 'wteRouten', 'heatmap', 'grenze', 'zonen', 'felder', 'luftbild'];
-const STANDARD_DECKKRAFT: Record<EbenenId, number> = {
-  einrichtungen: 1,
-  abschuesse: 1,
-  pirschwege: 1,
-  treiberrouten: 1,
-  wteRouten: 1,
-  heatmap: 0.75,
-  grenze: 1,
-  zonen: 0.55,
-  felder: 0.45,
-  luftbild: 1,
-};
-const EBENEN_SPEICHER = 'hegewerk.karte.ebenen';
-
-function ebenenEinstellungenLesen(): { reihenfolge: EbenenId[]; deckkraft: Record<EbenenId, number> } {
-  try {
-    const roh = JSON.parse(localStorage.getItem(EBENEN_SPEICHER) ?? 'null') as { reihenfolge?: string[]; deckkraft?: Record<string, number> } | null;
-    const reihenfolge = roh?.reihenfolge;
-    // Ältere Speicherstände ohne „Felder“: Ebene über dem Luftbild einfügen
-    if (Array.isArray(reihenfolge) && !reihenfolge.includes('felder')) {
-      const i = reihenfolge.indexOf('luftbild');
-      reihenfolge.splice(i < 0 ? reihenfolge.length : i, 0, 'felder');
-    }
-    const gueltig = Array.isArray(reihenfolge) && reihenfolge.length === STANDARD_REIHENFOLGE.length && STANDARD_REIHENFOLGE.every((id) => reihenfolge.includes(id));
-    const deckkraft = { ...STANDARD_DECKKRAFT };
-    for (const id of STANDARD_REIHENFOLGE) {
-      const w = roh?.deckkraft?.[id];
-      if (typeof w === 'number' && w >= 0 && w <= 1) deckkraft[id] = w;
-    }
-    return { reihenfolge: gueltig ? (reihenfolge as EbenenId[]) : STANDARD_REIHENFOLGE, deckkraft };
-  } catch {
-    return { reihenfolge: STANDARD_REIHENFOLGE, deckkraft: { ...STANDARD_DECKKRAFT } };
-  }
-}
+// Ebenen (Schichten, Reihenfolge, Deckkraft) sind in der Registry deklariert: src/karte/ebenen/registry.ts
 
 // Richtungspfeil (zeigt nach rechts = Linienrichtung) für Treiber- und WTE-Routen
 function pfeilBild(): ImageData {
@@ -162,18 +116,7 @@ const HEATNAMEN = { zaehlungen: 'Zählungen', beobachtungen: 'Beobachtungen', ab
 type HeatQuelle = 'zaehlungen' | 'beobachtungen' | 'abschuesse';
 const WILDARTFARBEN = ['#c0392b', '#1f6fb2', '#1e8449', '#b9770e', '#8e44ad', '#16a085', '#d35400', '#5d6d7e', '#cb4335', '#2e4053'];
 
-type Ebenen = {
-  felder: boolean;
-  luftbild: boolean;
-  grenze: boolean;
-  zonen: boolean;
-  einrichtungen: boolean;
-  pirschwege: boolean;
-  treiberrouten: boolean;
-  wteRouten: boolean;
-  heatmap: boolean;
-  abschuesse: boolean;
-};
+type Ebenen = Record<EbenenId, boolean>;
 
 type RouteTyp = 'pirschweg' | 'treiberroute' | 'wte_route';
 const ROUTENNAME: Record<RouteTyp, string> = { pirschweg: 'Pirschweg', treiberroute: 'Treiberroute', wte_route: 'WTE-Route' };
@@ -209,18 +152,7 @@ export default function Karte({
   const zonenMarker = useRef<Marker[]>([]);
   const [bereit, setBereit] = useState(false);
   const [daten, setDaten] = useState<KartenDaten | null>(null);
-  const [ebenen, setEbenen] = useState<Ebenen>({
-    felder: false,
-    luftbild: false,
-    grenze: true,
-    zonen: true,
-    einrichtungen: true,
-    pirschwege: true,
-    treiberrouten: true,
-    wteRouten: true,
-    heatmap: false,
-    abschuesse: false,
-  });
+  const [ebenen, setEbenen] = useState<Ebenen>(standardSichtbarkeit);
   const [modus, setModusState] = useState<Modus>(null);
   const [gpsImport, setGpsImport] = useState(false);
   const [einrSheet, setEinrSheet] = useState<EinrichtungInfo | null>(null);
@@ -2039,25 +1971,7 @@ function EinrichtungFormular({
   );
 }
 
-// ---------- Geometrie-Helfer ----------
-
-function koordinaten(g: Geometry | null | undefined): Position[] {
-  if (!g) return [];
-  switch (g.type) {
-    case 'Point':
-      return [g.coordinates];
-    case 'LineString':
-    case 'MultiPoint':
-      return g.coordinates;
-    case 'Polygon':
-    case 'MultiLineString':
-      return g.coordinates.flat();
-    case 'MultiPolygon':
-      return g.coordinates.flat(2);
-    case 'GeometryCollection':
-      return g.geometries.flatMap(koordinaten);
-  }
-}
+// ---------- Geometrie-Helfer (weitere in src/karte/kern/geometrie.ts) ----------
 
 function grenzen(geometrien: Geometry[]): LngLatBounds | null {
   const alle = geometrien.flatMap(koordinaten);
@@ -2065,58 +1979,6 @@ function grenzen(geometrien: Geometry[]): LngLatBounds | null {
   const b = new LngLatBounds();
   for (const p of alle) b.extend([p[0]!, p[1]!]);
   return b;
-}
-
-function mittelpunkt(g: Geometry): [number, number] {
-  const k = koordinaten(g);
-  const x = k.reduce((a, p) => a + p[0]!, 0) / (k.length || 1);
-  const y = k.reduce((a, p) => a + p[1]!, 0) / (k.length || 1);
-  return [x, y];
-}
-
-function inRing(p: Position, ring: Position[]): boolean {
-  let innen = false;
-  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-    const [xi, yi] = [ring[i]![0]!, ring[i]![1]!];
-    const [xj, yj] = [ring[j]![0]!, ring[j]![1]!];
-    if (yi > p[1]! !== yj > p[1]! && p[0]! < ((xj - xi) * (p[1]! - yi)) / (yj - yi) + xi) innen = !innen;
-  }
-  return innen;
-}
-
-function punktInFlaeche(p: Position, g: MultiPolygon): boolean {
-  return g.coordinates.some((poly) => inRing(p, poly[0] ?? []) && !poly.slice(1).some((loch) => inRing(p, loch)));
-}
-
-/** Nächster Punkt auf dem Rand (lokal metrisch genähert), minimal nach innen versetzt */
-function naechsterRandpunkt(p: Position, g: MultiPolygon): Position {
-  const kx = Math.cos((p[1]! * Math.PI) / 180);
-  let bester: Position = p;
-  let bestD = Infinity;
-  for (const poly of g.coordinates)
-    for (const ring of poly)
-      for (let i = 0; i < ring.length - 1; i++) {
-        const a = ring[i]!;
-        const b = ring[i + 1]!;
-        const ax = a[0]! * kx, ay = a[1]!, bx = b[0]! * kx, by = b[1]!, px = p[0]! * kx, py = p[1]!;
-        const dx = bx - ax, dy = by - ay;
-        const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy || 1)));
-        const qx = ax + t * dx, qy = ay + t * dy;
-        const d = (qx - px) ** 2 + (qy - py) ** 2;
-        if (d < bestD) {
-          bestD = d;
-          bester = [qx / kx, qy];
-        }
-      }
-  return bester;
-}
-
-function abstandM(a: Position, b: Position): number {
-  const r = 6371000;
-  const dLat = ((b[1]! - a[1]!) * Math.PI) / 180;
-  const dLon = ((b[0]! - a[0]!) * Math.PI) / 180;
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos((a[1]! * Math.PI) / 180) * Math.cos((b[1]! * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
-  return 2 * r * Math.asin(Math.sqrt(h));
 }
 
 function haeufigste(features: Feature[]): string {

@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Hegewerk Feldansicht</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+<style>
+body{margin:0}
+button{font-family:inherit;cursor:pointer}
+a{color:#1E5C3A}a:hover{color:#0F2A1D}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #E6EBE3; font-family: Inter, system-ui, sans-serif; color: #1B2120; font-size: 14px">
+
+<div style="position: absolute; left: 0; top: 0; width: 390px; height: 780px">
+<svg aria-hidden="true" width="390" height="780" viewBox="0 0 390 780" style="position: absolute; left: 0; top: 0">
+<rect width="390" height="780" fill="#E6EBE3"></rect>
+<path d="M0 0H215L192 118L118 212L0 232Z" fill="#C9DCC6"></path>
+<path d="M248 566L390 522V780H226Z" fill="#C9DCC6"></path>
+<path d="M215 0H390V150L300 130L192 118Z" fill="#EFEBDD"></path>
+<path d="M118 212L192 118L300 130L290 300L150 322Z" fill="#E9EEDC"></path>
+<path d="M300 130L390 150V330L290 300Z" fill="#EFEBDD"></path>
+<path d="M0 232L118 212L150 322L170 482L0 470Z" fill="#EFEBDD"></path>
+<path d="M150 322L290 300L390 330V522L248 566L170 482Z" fill="#E9EEDC"></path>
+<path d="M0 470L170 482L248 566L226 780H0Z" fill="#EFEBDD"></path>
+<path d="M-10 610C60 590 110 560 170 482C210 430 260 420 300 300C320 240 360 200 400 180" fill="none" stroke="#A9CBE0" stroke-width="5"></path>
+<path d="M-10 340L150 322L290 300L400 318" fill="none" stroke="#D4D9D2" stroke-width="9"></path>
+<path d="M-10 340L150 322L290 300L400 318" fill="none" stroke="#FFFFFF" stroke-width="6"></path>
+<path d="M192 -10L192 118L150 322L170 482L226 790" fill="none" stroke="#D4D9D2" stroke-width="7"></path>
+<path d="M192 -10L192 118L150 322L170 482L226 790" fill="none" stroke="#FFFFFF" stroke-width="4"></path>
+<rect x="22" y="690" width="26" height="18" fill="#C9CEC8"></rect>
+<rect x="56" y="700" width="20" height="22" fill="#C9CEC8"></rect>
+<rect x="30" y="724" width="30" height="16" fill="#C9CEC8"></rect>
+<rect x="84" y="722" width="22" height="18" fill="#C9CEC8"></rect>
+</svg>
+
+<svg aria-hidden="true" width="390" height="780" viewBox="0 0 390 780" style="position: absolute; left: 0; top: 0; display: {{d.luft}}">
+<rect width="390" height="780" fill="#55633F"></rect>
+<path d="M0 0H215L192 118L118 212L0 232Z" fill="#33442B"></path>
+<path d="M248 566L390 522V780H226Z" fill="#33442B"></path>
+<path d="M215 0H390V150L300 130L192 118Z" fill="#8A8250"></path>
+<path d="M118 212L192 118L300 130L290 300L150 322Z" fill="#6E7B48"></path>
+<path d="M300 130L390 150V330L290 300Z" fill="#7C7446"></path>
+<path d="M0 232L118 212L150 322L170 482L0 470Z" fill="#657345"></path>
+<path d="M150 322L290 300L390 330V522L248 566L170 482Z" fill="#8C8455"></path>
+<path d="M0 470L170 482L248 566L226 780H0Z" fill="#5D6B40"></path>
+<path d="M-10 610C60 590 110 560 170 482C210 430 260 420 300 300C320 240 360 200 400 180" fill="none" stroke="#2C3A33" stroke-width="5"></path>
+<path d="M-10 340L150 322L290 300L400 318" fill="none" stroke="#A39F8C" stroke-width="5"></path>
+<path d="M192 -10L192 118L150 322L170 482L226 790" fill="none" stroke="#A39F8C" stroke-width="3"></path>
+</svg>
+
+<svg aria-hidden="true" width="390" height="780" viewBox="0 0 390 780" style="position: absolute; left: 0; top: 0; display: {{d.felder}}">
+<path d="M118 212L192 118L300 130L290 300L150 322Z" fill="#E8C94A" fill-opacity="0.6" stroke="#FFFFFF" stroke-width="1.5"></path>
+<path d="M300 130L390 150V330L290 300Z" fill="#3E7A3A" fill-opacity="0.6" stroke="#FFFFFF" stroke-width="1.5"></path>
+<path d="M0 232L118 212L150 322L170 482L0 470Z" fill="#9CCB7A" fill-opacity="0.6" stroke="#FFFFFF" stroke-width="1.5"></path>
+<path d="M150 322L290 300L390 330V522L248 566L170 482Z" fill="#C9D64A" fill-opacity="0.6" stroke="#FFFFFF" stroke-width="1.5"></path>
+<text x="212" y="226" font-size="11" font-weight="600" fill="#1B2120" text-anchor="middle">Schlag 12 · Weizen</text>
+<text x="338" y="246" font-size="11" font-weight="600" fill="#1B2120" text-anchor="middle">7 · Mais</text>
+<text x="72" y="356" font-size="11" font-weight="600" fill="#1B2120" text-anchor="middle">3 · Grünland</text>
+<text x="280" y="436" font-size="11" font-weight="600" fill="#1B2120" text-anchor="middle">Schlag 9 · Raps</text>
+</svg>
+
+<svg aria-hidden="true" width="390" height="780" viewBox="0 0 390 780" style="position: absolute; left: 0; top: 0; display: {{d.zonen}}">
+<path d="M40 150L200 110L345 170L350 300L150 320L35 300Z" fill="#1E5C3A" fill-opacity="0.16" stroke="#1E5C3A" stroke-width="1.5"></path>
+<path d="M35 300L150 320L170 480L30 470Z" fill="#2F6FB2" fill-opacity="0.16" stroke="#2F6FB2" stroke-width="1.5"></path>
+<path d="M150 320L350 300L360 420L300 600L120 640L30 470L170 480Z" fill="#8E44AD" fill-opacity="0.14" stroke="#8E44AD" stroke-width="1.5"></path>
+</svg>
+
+<svg aria-hidden="true" width="390" height="780" viewBox="0 0 390 780" style="position: absolute; left: 0; top: 0">
+<path d="M40 150L200 110L345 170L360 420L300 600L120 640L30 470Z" fill="none" stroke="#FFFFFF" stroke-width="5"></path>
+<path d="M40 150L200 110L345 170L360 420L300 600L120 640L30 470Z" fill="none" stroke="#0F2A1D" stroke-width="2.5" stroke-dasharray="10 5"></path>
+<circle cx="200" cy="410" r="16" fill="#2F6FB2" fill-opacity="0.2"></circle>
+<circle cx="200" cy="410" r="6" fill="#2F6FB2" stroke="#FFFFFF" stroke-width="2"></circle>
+</svg>
+
+<sc-if value="{{ zeigtMarker }}" hint-placeholder-val="{{ true }}">
+<sc-for list="{{ einrichtungen }}" as="e" hint-placeholder-count="4">
+<button aria-label="{{ e.name }}" onClick="{{ e.oeffnen }}" style="position: absolute; left: {{e.l}}px; top: {{e.t}}px; width: 44px; height: 44px; padding: 0; border: 0; background: none; display: flex; align-items: center; justify-content: center">
+<span style="width: 30px; height: 30px; border-radius: 50%; background: {{e.farbe}}; border: 2px solid #FFFFFF; display: flex; align-items: center; justify-content: center">
+<svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h8V3H4zM5 7l-1.5 7M11 7l1.5 7M5 10.5h6"></path></svg>
+</span>
+</button>
+</sc-for>
+</sc-if>
+
+<sc-if value="{{ zeigtNeu }}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; left: 204px; top: 380px; display: flex; align-items: center; gap: 6px">
+<span style="width: 18px; height: 18px; border-radius: 50%; background: #F26A1B; border: 2px solid #FFFFFF; box-sizing: border-box"></span>
+<span style="background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 4px; padding: 2px 6px; font-size: 12px; font-weight: 500">{{ neuText }}</span>
+</div>
+</sc-if>
+
+<sc-if value="{{ istZaehlen }}" hint-placeholder-val="{{ false }}">
+<sc-for list="{{ zonen }}" as="z" hint-placeholder-count="3">
+<button onClick="{{ z.oeffnen }}" style="position: absolute; left: {{z.l}}px; top: {{z.t}}px; height: 44px; padding: 0 12px; border-radius: 6px; border: 2px solid #1E5C3A; background: #FFFFFF; color: #1B2120; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px">
+<span>{{ z.name }}</span>
+<span style="min-width: 24px; height: 24px; border-radius: 4px; background: #E3F1E8; color: #0F2A1D; display: flex; align-items: center; justify-content: center; font-variant-numeric: tabular-nums">{{ z.anzahl }}</span>
+</button>
+</sc-for>
+</sc-if>
+</div>
+
+<div style="position: absolute; left: 12px; right: 12px; top: 12px; display: flex; justify-content: space-between; align-items: flex-start; gap: 8px">
+<div style="display: flex; flex-direction: column; gap: 8px">
+<div style="background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 6px; padding: 8px 12px; display: flex; flex-direction: column; gap: 2px">
+<span style="font-size: 15px; font-weight: 600">Hachmühlen I</span>
+<span style="font-size: 12px; color: #5B6662">Wind SW 3 Bft · Büchsenlicht bis 17:12</span>
+</div>
+<div style="display: flex; background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 6px; padding: 2px; gap: 2px; align-self: flex-start">
+<button onClick="{{ modusAnsehen }}" style="height: 40px; padding: 0 14px; border: 0; border-radius: 4px; font-size: 14px; font-weight: 500; background: {{m.ansehenBg}}; color: {{m.ansehenFg}}">Ansehen</button>
+<button onClick="{{ modusZaehlen }}" style="height: 40px; padding: 0 14px; border: 0; border-radius: 4px; font-size: 14px; font-weight: 500; background: {{m.zaehlenBg}}; color: {{m.zaehlenFg}}">Zählen</button>
+</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px; align-items: flex-end">
+<button onClick="{{ outboxOeffnen }}" style="height: 44px; padding: 0 12px; border-radius: 6px; border: 1px solid {{sync.rand}}; background: {{sync.bg}}; color: {{sync.fg}}; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px">
+<svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 8a5.5 5.5 0 0 1 9.6-3.6M13.5 8a5.5 5.5 0 0 1-9.6 3.6M12.5 1.8v2.8H9.7M3.5 14.2v-2.8h2.8"></path></svg>
+<span>{{ sync.text }}</span>
+</button>
+<button onClick="{{ ebenenOeffnen }}" aria-label="Ebenen" style="width: 44px; height: 44px; border-radius: 6px; border: 1px solid #DDE3DF; background: #FFFFFF; color: #1B2120; display: flex; align-items: center; justify-content: center; padding: 0">
+<svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3l7 4-7 4-7-4zM3 10.5l7 4 7-4M3 14l7 4 7-4"></path></svg>
+</button>
+</div>
+</div>
+
+<sc-if value="{{ toast }}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; left: 12px; right: 12px; top: 128px; background: #0F2A1D; color: #FFFFFF; border-radius: 6px; padding: 10px 12px; font-size: 13px; font-weight: 500">Gespeichert · wartet auf Übertragung</div>
+</sc-if>
+
+<sc-if value="{{ zeigtFab }}" hint-placeholder-val="{{ true }}">
+<button onClick="{{ erfassenOeffnen }}" style="position: absolute; right: 16px; bottom: 80px; height: 56px; padding: 0 20px; border-radius: 8px; border: 0; background: #F26A1B; color: #1B2120; font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px">
+<svg aria-hidden="true" width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 3v12M3 9h12"></path></svg>
+<span>Erfassen</span>
+</button>
+</sc-if>
+
+<sc-if value="{{ zeigtZaehlLeiste }}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; left: 12px; right: 12px; bottom: 76px; background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 6px; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px">
+<div style="display: flex; flex-direction: column; gap: 2px">
+<span style="font-size: 12px; color: #5B6662">Zählung läuft · Zone antippen</span>
+<span style="font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums">{{ zaehlSumme }} Stück</span>
+</div>
+<button onClick="{{ modusAnsehen }}" style="height: 44px; padding: 0 16px; border-radius: 4px; border: 0; background: #1E5C3A; color: #FFFFFF; font-size: 14px; font-weight: 600">Abschließen</button>
+</div>
+</sc-if>
+
+<sc-if value="{{ s.wahl }}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; left: 0; right: 0; bottom: 64px; background: #FFFFFF; border-top: 1px solid #DDE3DF; border-radius: 8px 8px 0 0; padding: 12px 16px 20px; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; justify-content: space-between; align-items: center">
+<h2 style="margin: 0; font-size: 18px; font-weight: 600">Was erfassen?</h2>
+<button onClick="{{ sheetZu }}" style="height: 44px; padding: 0 12px; border: 0; background: none; color: #5B6662; font-size: 14px">Schließen</button>
+</div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+<sc-for list="{{ arten }}" as="a" hint-placeholder-count="4">
+<button onClick="{{ a.waehlen }}" style="height: 76px; border-radius: 6px; border: 1px solid #C7CEC9; background: #F7F8F6; color: #1B2120; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 4px; padding: 0 14px; text-align: left">
+<span style="font-size: 15px; font-weight: 600">{{ a.name }}</span>
+<span style="font-size: 12px; color: #5B6662">{{ a.text }}</span>
+</button>
+</sc-for>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ s.formular }}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; left: 0; right: 0; bottom: 64px; background: #FFFFFF; border-top: 1px solid #DDE3DF; border-radius: 8px 8px 0 0; padding: 12px 16px 20px; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; justify-content: space-between; align-items: center">
+<h2 style="margin: 0; font-size: 18px; font-weight: 600">{{ art }} erfassen</h2>
+<button onClick="{{ sheetZu }}" style="height: 44px; padding: 0 12px; border: 0; background: none; color: #5B6662; font-size: 14px">Abbrechen</button>
+</div>
+<div style="background: #F7F8F6; border: 1px solid #DDE3DF; border-radius: 6px; padding: 10px 12px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px">
+<div style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 12px; color: #5B6662">Position</span><span style="font-weight: 500">GPS, ±6 m</span></div>
+<div style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 12px; color: #5B6662">Zone</span><span style="font-weight: 500">WTE 3</span></div>
+<div style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 12px; color: #5B6662">Schlag</span><span style="font-weight: 500">9 · Raps</span></div>
+<div style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 12px; color: #5B6662">Nächste Einrichtung</span><span style="font-weight: 500">Hochsitz Bachlauf</span></div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<span style="font-size: 12px; color: #5B6662">Wildart</span>
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<sc-for list="{{ wildarten }}" as="w" hint-placeholder-count="4">
+<button onClick="{{ w.waehlen }}" style="height: 44px; padding: 0 14px; border-radius: 4px; border: 1px solid {{w.rand}}; background: {{w.bg}}; color: {{w.fg}}; font-size: 14px; font-weight: 500">{{ w.name }}</button>
+</sc-for>
+</div>
+</div>
+<div style="display: flex; align-items: center; justify-content: space-between">
+<span style="font-size: 12px; color: #5B6662">Anzahl</span>
+<div style="display: flex; align-items: center; gap: 12px">
+<button onClick="{{ weniger }}" aria-label="Weniger" style="width: 44px; height: 44px; border-radius: 4px; border: 1px solid #C7CEC9; background: #FFFFFF; font-size: 20px; color: #1B2120">−</button>
+<span style="min-width: 28px; text-align: center; font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums">{{ anzahl }}</span>
+<button onClick="{{ mehr }}" aria-label="Mehr" style="width: 44px; height: 44px; border-radius: 4px; border: 1px solid #C7CEC9; background: #FFFFFF; font-size: 20px; color: #1B2120">+</button>
+</div>
+</div>
+<button onClick="{{ speichern }}" style="height: 48px; border-radius: 4px; border: 0; background: #1E5C3A; color: #FFFFFF; font-size: 16px; font-weight: 600">Speichern</button>
+</div>
+</sc-if>
+
+<sc-if value="{{ s.ebenen }}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; left: 0; right: 0; bottom: 64px; background: #FFFFFF; border-top: 1px solid #DDE3DF; border-radius: 8px 8px 0 0; padding: 12px 16px 20px; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; justify-content: space-between; align-items: center">
+<h2 style="margin: 0; font-size: 18px; font-weight: 600">Kartenansicht</h2>
+<button onClick="{{ sheetZu }}" style="height: 44px; padding: 0 12px; border: 0; background: none; color: #5B6662; font-size: 14px">Schließen</button>
+</div>
+<div style="display: flex; gap: 8px">
+<sc-for list="{{ ansichten }}" as="a" hint-placeholder-count="3">
+<button onClick="{{ a.waehlen }}" style="height: 44px; padding: 0 14px; border-radius: 4px; border: 1px solid {{a.rand}}; background: {{a.bg}}; color: {{a.fg}}; font-size: 14px; font-weight: 500">{{ a.name }}</button>
+</sc-for>
+</div>
+<div style="display: flex; flex-direction: column">
+<sc-for list="{{ ebenen }}" as="e" hint-placeholder-count="4">
+<button onClick="{{ e.schalten }}" aria-pressed="{{ e.an }}" style="height: 52px; border: 0; border-top: 1px solid #DDE3DF; background: none; display: flex; align-items: center; justify-content: space-between; padding: 0; color: #1B2120; text-align: left">
+<span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 500">{{ e.name }}</span><span style="font-size: 12px; color: #5B6662">{{ e.gruppe }}</span></span>
+<span style="width: 44px; height: 26px; border-radius: 13px; background: {{e.bg}}; display: flex; align-items: center; padding: 3px; box-sizing: border-box"><span style="width: 20px; height: 20px; border-radius: 50%; background: #FFFFFF; margin-left: {{e.knopf}}px"></span></span>
+</button>
+</sc-for>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ s.detail }}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; left: 0; right: 0; bottom: 64px; background: #FFFFFF; border-top: 1px solid #DDE3DF; border-radius: 8px 8px 0 0; padding: 12px 16px 20px; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; justify-content: space-between; align-items: flex-start">
+<div style="display: flex; flex-direction: column; gap: 2px">
+<h2 style="margin: 0; font-size: 18px; font-weight: 600">{{ gew.name }}</h2>
+<span style="font-size: 13px; color: #5B6662">{{ gew.typ }} · Zone {{ gew.zone }}</span>
+</div>
+<button onClick="{{ sheetZu }}" style="height: 44px; padding: 0 12px; border: 0; background: none; color: #5B6662; font-size: 14px">Schließen</button>
+</div>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+<div style="background: #F7F8F6; border: 1px solid #DDE3DF; border-radius: 6px; padding: 8px 10px; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 12px; color: #5B6662">Wind heute</span><span style="font-weight: 600; color: {{gew.windFarbe}}">{{ gew.wind }}</span></div>
+<div style="background: #F7F8F6; border: 1px solid #DDE3DF; border-radius: 6px; padding: 8px 10px; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 12px; color: #5B6662">Sichtungen</span><span style="font-weight: 600; font-variant-numeric: tabular-nums">{{ gew.sichtungen }} im Jagdjahr</span></div>
+<div style="background: #F7F8F6; border: 1px solid #DDE3DF; border-radius: 6px; padding: 8px 10px; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 12px; color: #5B6662">Kontrolle</span><span style="font-weight: 600">{{ gew.kontrolle }}</span></div>
+</div>
+<div style="display: flex; gap: 10px">
+<button onClick="{{ sichtungHier }}" style="flex: 1; height: 48px; border-radius: 4px; border: 0; background: #1E5C3A; color: #FFFFFF; font-size: 15px; font-weight: 600">Sichtung hier erfassen</button>
+<button style="height: 48px; padding: 0 16px; border-radius: 4px; border: 1px solid #1E5C3A; background: #FFFFFF; color: #1E5C3A; font-size: 15px; font-weight: 600">Ansitz starten</button>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ s.outbox }}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; left: 0; right: 0; bottom: 64px; background: #FFFFFF; border-top: 1px solid #DDE3DF; border-radius: 8px 8px 0 0; padding: 12px 16px 20px; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; justify-content: space-between; align-items: center">
+<h2 style="margin: 0; font-size: 18px; font-weight: 600">Übertragung</h2>
+<button onClick="{{ sheetZu }}" style="height: 44px; padding: 0 12px; border: 0; background: none; color: #5B6662; font-size: 14px">Schließen</button>
+</div>
+<div style="display: flex; flex-direction: column">
+<sc-for list="{{ outbox }}" as="o" hint-placeholder-count="2">
+<div style="border-top: 1px solid #DDE3DF; padding: 10px 0; display: flex; justify-content: space-between; align-items: center; gap: 12px">
+<span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 500">{{ o.titel }}</span><span style="font-size: 12px; color: #5B6662">{{ o.zeit }}</span></span>
+<span style="font-size: 12px; font-weight: 600; border-radius: 2px; padding: 3px 6px; background: {{o.bg}}; color: {{o.fg}}">{{ o.status }}</span>
+</div>
+</sc-for>
+</div>
+<span style="font-size: 13px; color: #5B6662">{{ outboxText }}</span>
+<button onClick="{{ uebertragen }}" style="height: 48px; border-radius: 4px; border: 0; background: #1E5C3A; color: #FFFFFF; font-size: 15px; font-weight: 600">Jetzt übertragen</button>
+</div>
+</sc-if>
+
+<sc-if value="{{ s.zone }}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; left: 0; right: 0; bottom: 64px; background: #FFFFFF; border-top: 1px solid #DDE3DF; border-radius: 8px 8px 0 0; padding: 12px 16px 20px; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; justify-content: space-between; align-items: center">
+<h2 style="margin: 0; font-size: 18px; font-weight: 600">Sichtung in {{ zoneName }}</h2>
+<button onClick="{{ sheetZu }}" style="height: 44px; padding: 0 12px; border: 0; background: none; color: #5B6662; font-size: 14px">Fertig</button>
+</div>
+<div style="display: flex; align-items: center; justify-content: space-between">
+<span style="font-size: 15px; font-weight: 500">Feldhase</span>
+<div style="display: flex; align-items: center; gap: 12px">
+<button onClick="{{ zoneWeniger }}" aria-label="Weniger" style="width: 52px; height: 52px; border-radius: 4px; border: 1px solid #C7CEC9; background: #FFFFFF; font-size: 22px; color: #1B2120">−</button>
+<span style="min-width: 32px; text-align: center; font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums">{{ zoneAnzahl }}</span>
+<button onClick="{{ zoneMehr }}" aria-label="Mehr" style="width: 52px; height: 52px; border-radius: 4px; border: 0; background: #1E5C3A; color: #FFFFFF; font-size: 22px">+</button>
+</div>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ istJagd }}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; left: 0; top: 0; width: 390px; height: 780px; box-sizing: border-box; background: #EEF1EE; padding: 20px 16px; display: flex; flex-direction: column; gap: 12px; overflow: auto">
+<h1 style="margin: 0 0 4px; font-size: 22px; font-weight: 600">Jagd</h1>
+<div style="background: #FFFFFF; border: 1px solid #DDE3DF; border-top: 3px solid #1E5C3A; border-radius: 6px; padding: 14px; display: flex; flex-direction: column; gap: 6px">
+<span style="font-size: 12px; color: #5B6662">Bewegungsjagd</span>
+<span style="font-size: 16px; font-weight: 600">Drückjagd Hachmühlen · Sa 14.11.</span>
+<span style="font-size: 13px; color: #5B6662">18 Zusagen · 3 ohne Antwort · 12 Stände belegt</span>
+<button style="align-self: flex-start; height: 44px; padding: 0 14px; margin-top: 6px; border-radius: 4px; border: 1px solid #1E5C3A; background: #FFFFFF; color: #1E5C3A; font-size: 14px; font-weight: 600">Lagekarte öffnen</button>
+</div>
+<sc-for list="{{ jagdZeilen }}" as="j" hint-placeholder-count="3">
+<button style="min-height: 60px; background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 6px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; text-align: left; color: #1B2120">
+<span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 600">{{ j.titel }}</span><span style="font-size: 13px; color: #5B6662">{{ j.text }}</span></span>
+<svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#5B6662" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3l5 5-5 5"></path></svg>
+</button>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{ istMehr }}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; left: 0; top: 0; width: 390px; height: 780px; box-sizing: border-box; background: #EEF1EE; padding: 20px 16px; display: flex; flex-direction: column; gap: 12px; overflow: auto">
+<h1 style="margin: 0 0 4px; font-size: 22px; font-weight: 600">Mehr</h1>
+<div style="background: #FFFFFF; border: 1px solid #DDE3DF; border-top: 3px solid #1E5C3A; border-radius: 6px; padding: 14px; display: flex; flex-direction: column; gap: 6px">
+<span style="font-size: 12px; color: #5B6662">Offline-Paket</span>
+<span style="font-size: 16px; font-weight: 600">Revier ist offline geladen</span>
+<span style="font-size: 13px; color: #5B6662">Karte, Luftbild und Daten · Stand 08.11.2026 · 212 MB</span>
+</div>
+<sc-for list="{{ mehrZeilen }}" as="j" hint-placeholder-count="4">
+<button style="min-height: 60px; background: #FFFFFF; border: 1px solid #DDE3DF; border-radius: 6px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; text-align: left; color: #1B2120">
+<span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 600">{{ j.titel }}</span><span style="font-size: 13px; color: #5B6662">{{ j.text }}</span></span>
+<svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#5B6662" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3l5 5-5 5"></path></svg>
+</button>
+</sc-for>
+</div>
+</sc-if>
+
+<nav style="position: absolute; left: 0; right: 0; bottom: 0; height: 64px; background: #0F2A1D; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr))">
+<sc-for list="{{ tabs }}" as="t" hint-placeholder-count="4">
+<button onClick="{{ t.waehlen }}" style="border: 0; background: none; color: {{t.fg}}; font-size: 13px; font-weight: 600; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px">
+<span style="width: 28px; height: 3px; border-radius: 2px; background: {{t.strich}}"></span>
+<span>{{ t.name }}</span>
+</button>
+</sc-for>
+</nav>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = {
+      tab: 'karte', modus: 'ansehen', sheet: null, ansicht: 'feld',
+      eb: { zonen: true, einr: true, felder: false, luft: false },
+      wartend: 2, neu: null, art: 'Sichtung', wildart: 'Rehwild', anzahl: 1, toast: false,
+      zaehl: { z1: 3, z2: 0, z3: 5 }, zone: 'z1', gew: 'e1'
+    };
+  }
+  renderVals() {
+    const s = this.state;
+    const set = (x) => this.setState(Object.assign({ toast: false }, x));
+    const gruen = '#1E5C3A', weiss = '#FFFFFF', text = '#1B2120', rand = '#C7CEC9';
+    const pille = (an) => ({ bg: an ? gruen : weiss, fg: an ? weiss : text, rand: an ? gruen : rand });
+    const aufKarte = s.tab === 'karte';
+    const zaehlen = s.modus === 'zaehlen';
+    const einr = [
+      { id: 'e1', name: 'Kanzel Eiche', typ: 'Kanzel', zone: 'WTE 1', l: 98, t: 228, farbe: '#1E5C3A', wind: 'passend', windFarbe: '#1E5C3A', sichtungen: 14, kontrolle: '02.11.' },
+      { id: 'e2', name: 'Hochsitz Bachlauf', typ: 'Hochsitz', zone: 'WTE 3', l: 248, t: 338, farbe: '#1E5C3A', wind: 'ungünstig', windFarbe: '#8A3707', sichtungen: 9, kontrolle: '19.10.' },
+      { id: 'e3', name: 'Kirrung Süd', typ: 'Kirrung', zone: 'WTE 3', l: 188, t: 498, farbe: '#8A5A1E', wind: 'passend', windFarbe: '#1E5C3A', sichtungen: 6, kontrolle: '07.11.' },
+      { id: 'e4', name: 'Drückjagdbock 7', typ: 'Drückjagdbock', zone: 'WTE 1', l: 288, t: 208, farbe: '#2F6FB2', wind: 'neutral', windFarbe: '#3C4542', sichtungen: 2, kontrolle: '25.10.' }
+    ].map((e) => Object.assign(e, { oeffnen: () => set({ gew: e.id, sheet: 'detail' }) }));
+    const zonenDef = [
+      { id: 'z1', name: 'WTE 1', l: 150, t: 178 },
+      { id: 'z2', name: 'WTE 2', l: 48, t: 372 },
+      { id: 'z3', name: 'WTE 3', l: 214, t: 452 }
+    ];
+    const zaehlSumme = s.zaehl.z1 + s.zaehl.z2 + s.zaehl.z3;
+    const zoneAendern = (d) => {
+      const z = Object.assign({}, s.zaehl);
+      z[s.zone] = Math.max(0, z[s.zone] + d);
+      set({ zaehl: z });
+    };
+    const ansichtenDef = {
+      feld: { zonen: true, einr: true, felder: false, luft: false },
+      zaehlung: { zonen: true, einr: false, felder: false, luft: true },
+      landwirtschaft: { zonen: false, einr: true, felder: true, luft: false }
+    };
+    const ebenenDef = [
+      { id: 'einr', name: 'Einrichtungen', gruppe: 'Revierstruktur' },
+      { id: 'zonen', name: 'Zonen', gruppe: 'Revierstruktur' },
+      { id: 'felder', name: 'Schläge mit Fruchtart', gruppe: 'Landwirtschaft' },
+      { id: 'luft', name: 'Luftbild', gruppe: 'Basiskarte' }
+    ];
+    const outbox = [];
+    if (s.neu) outbox.push({ titel: s.neu, zeit: 'gerade eben · Zone WTE 3' });
+    outbox.push({ titel: 'Sichtung · 2 Rehwild', zeit: 'heute 07:42 · Zone WTE 1' });
+    outbox.push({ titel: 'Einrichtung verschoben · Kirrung Süd', zeit: 'heute 07:15' });
+    const liste = (s.wartend === 0 ? outbox.slice(0, 2) : outbox.slice(0, s.wartend)).map((o) =>
+      Object.assign(o, s.wartend === 0
+        ? { status: 'übertragen', bg: '#E3F1E8', fg: '#0F2A1D' }
+        : { status: 'wartet', bg: '#FDEBDD', fg: '#8A3707' }));
+    return {
+      d: {
+        zonen: s.eb.zonen || zaehlen ? 'block' : 'none',
+        felder: s.eb.felder && !zaehlen ? 'block' : 'none',
+        luft: s.eb.luft ? 'block' : 'none'
+      },
+      m: {
+        ansehenBg: zaehlen ? weiss : gruen, ansehenFg: zaehlen ? text : weiss,
+        zaehlenBg: zaehlen ? gruen : weiss, zaehlenFg: zaehlen ? weiss : text
+      },
+      sync: s.wartend > 0
+        ? { text: s.wartend + ' warten', bg: '#FDEBDD', fg: '#8A3707', rand: '#F26A1B' }
+        : { text: 'Aktuell', bg: weiss, fg: '#0F2A1D', rand: '#DDE3DF' },
+      s: {
+        wahl: aufKarte && s.sheet === 'wahl', formular: aufKarte && s.sheet === 'formular',
+        ebenen: aufKarte && s.sheet === 'ebenen', detail: aufKarte && s.sheet === 'detail',
+        outbox: aufKarte && s.sheet === 'outbox', zone: aufKarte && s.sheet === 'zone'
+      },
+      istJagd: s.tab === 'jagd', istMehr: s.tab === 'mehr', istZaehlen: aufKarte && zaehlen,
+      zeigtMarker: s.eb.einr && !zaehlen,
+      zeigtNeu: !!s.neu && !zaehlen,
+      neuText: s.neu || '',
+      zeigtFab: aufKarte && !s.sheet && !zaehlen,
+      zeigtZaehlLeiste: aufKarte && zaehlen && !s.sheet,
+      toast: s.toast && aufKarte,
+      einrichtungen: einr,
+      gew: einr.find((e) => e.id === s.gew) || einr[0],
+      zonen: zonenDef.map((z) => Object.assign(z, { anzahl: s.zaehl[z.id], oeffnen: () => set({ zone: z.id, sheet: 'zone' }) })),
+      zaehlSumme: zaehlSumme,
+      zoneName: (zonenDef.find((z) => z.id === s.zone) || zonenDef[0]).name,
+      zoneAnzahl: s.zaehl[s.zone],
+      zoneMehr: () => zoneAendern(1), zoneWeniger: () => zoneAendern(-1),
+      arten: [
+        { name: 'Sichtung', text: 'Wild beobachtet' },
+        { name: 'Strecke', text: 'Abschuss, Fang, Fallwild' },
+        { name: 'Wildschaden', text: 'Frist im Blick' },
+        { name: 'Einrichtung', text: 'Sitz, Kirrung, Falle' }
+      ].map((a) => Object.assign(a, { waehlen: () => set({ art: a.name, sheet: 'formular', anzahl: 1 }) })),
+      art: s.art,
+      wildarten: ['Rehwild', 'Schwarzwild', 'Feldhase', 'Fuchs'].map((n) => Object.assign({ name: n, waehlen: () => set({ wildart: n }) }, pille(s.wildart === n))),
+      anzahl: s.anzahl,
+      mehr: () => set({ anzahl: s.anzahl + 1 }),
+      weniger: () => set({ anzahl: Math.max(1, s.anzahl - 1) }),
+      speichern: () => this.setState({ sheet: null, toast: true, wartend: s.wartend + 1, neu: s.art + ' · ' + s.anzahl + ' ' + s.wildart }),
+      sichtungHier: () => set({ art: 'Sichtung', sheet: 'formular', anzahl: 1 }),
+      ansichten: [
+        { id: 'feld', name: 'Feld' }, { id: 'zaehlung', name: 'Zählung' }, { id: 'landwirtschaft', name: 'Landwirtschaft' }
+      ].map((a) => Object.assign(a, pille(s.ansicht === a.id), { waehlen: () => set({ ansicht: a.id, eb: Object.assign({}, ansichtenDef[a.id]) }) })),
+      ebenen: ebenenDef.map((e) => Object.assign(e, {
+        an: s.eb[e.id], bg: s.eb[e.id] ? gruen : '#8B9590', knopf: s.eb[e.id] ? 18 : 0,
+        schalten: () => { const eb = Object.assign({}, s.eb); eb[e.id] = !eb[e.id]; set({ eb: eb, ansicht: 'eigene' }); }
+      })),
+      outbox: liste,
+      outboxText: s.wartend > 0 ? s.wartend + ' Einträge warten auf Netz. Nichts geht verloren.' : 'Alles übertragen.',
+      uebertragen: () => set({ wartend: 0 }),
+      tabs: [
+        { id: 'karte', name: 'Karte' }, { id: 'erfassen', name: 'Erfassen' }, { id: 'jagd', name: 'Jagd' }, { id: 'mehr', name: 'Mehr' }
+      ].map((t) => Object.assign(t, {
+        fg: s.tab === t.id ? weiss : '#B9C7BF', strich: s.tab === t.id ? '#F26A1B' : 'transparent',
+        waehlen: () => (t.id === 'erfassen' ? set({ tab: 'karte', modus: 'ansehen', sheet: 'wahl' }) : set({ tab: t.id, sheet: null }))
+      })),
+      jagdZeilen: [
+        { titel: 'Jagdzeiten', text: 'Was ist heute jagdbar?' },
+        { titel: 'Aufgaben', text: '3 offen · 1 fällig diese Woche' },
+        { titel: 'Begehungsscheine', text: '2 gültig' }
+      ],
+      mehrZeilen: [
+        { titel: 'Auswerten', text: 'Monitoring, Jagdjahre, Quervergleich' },
+        { titel: 'Revier', text: 'Zonen, Routen, Einrichtungen (nur lesen)' },
+        { titel: 'Verwalten', text: 'Mitglieder, Einstellungen' },
+        { titel: 'Konto', text: 'Darstellung, Benachrichtigungen, Abmelden' }
+      ],
+      modusAnsehen: () => set({ modus: 'ansehen', sheet: null }),
+      modusZaehlen: () => set({ modus: 'zaehlen', sheet: null }),
+      ebenenOeffnen: () => set({ sheet: s.sheet === 'ebenen' ? null : 'ebenen' }),
+      outboxOeffnen: () => set({ sheet: s.sheet === 'outbox' ? null : 'outbox' }),
+      erfassenOeffnen: () => set({ sheet: 'wahl' }),
+      sheetZu: () => set({ sheet: null })
+    };
+  }
+}
+</script>
+</body>
+</html>
