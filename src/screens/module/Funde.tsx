@@ -8,6 +8,8 @@ import { speichernOderMerken, useWarteschlange, wartendeFunde, warteschlangeAbar
 import { fotoLink, fotoMerken, fotosHochladen, verkleinern } from '../../lib/fotos';
 import { FUND_TYPEN, MERKMALE, mengeText, merkmalLabel, typFarbe, typLabel, type FundTyp } from '../../lib/funde';
 import { punktInFlaeche } from '../../karte/kern/geometrie';
+import { fundeGeaendert, positionWahlBeenden, positionWahlStarten, usePositionWahl } from '../../karte/kern/positionWahl';
+import { useBreit } from '../../lib/useBreit';
 import { Feld, Gruppe, Hinweis, Knopf, Leer, Seite, Segmente, Zeile } from '../../components/ui';
 import type { BetriebKontext } from './kontext';
 
@@ -199,7 +201,7 @@ function FundListe({ k }: { k: BetriebKontext }) {
   );
 }
 
-type Position = { lon: number; lat: number; genauigkeit: number };
+type Position = { lon: number; lat: number; genauigkeit: number | null };
 
 function FundMelden({ k }: { k: BetriebKontext }) {
   const bestaende = useBestandFlaechen(k.betriebId);
@@ -216,9 +218,25 @@ function FundMelden({ k }: { k: BetriebKontext }) {
   const [speichert, setSpeichert] = useState(false);
   const [erfolg, setErfolg] = useState<string | null>(null);
   const fotoEingabe = useRef<HTMLInputElement>(null);
+  // Browseransicht mit dauerhafter Karte: Position per Klick in die Karte; iPhone: GPS
+  const breit = useBreit();
+  const [quelle, setQuelle] = useState<'gps' | 'karte'>(breit ? 'karte' : 'gps');
+  const wahl = usePositionWahl();
 
-  // Position laufend verbessern, solange das Formular offen ist
   useEffect(() => {
+    if (quelle !== 'karte') return;
+    setPos(null);
+    positionWahlStarten();
+    return () => positionWahlBeenden();
+  }, [quelle]);
+  useEffect(() => {
+    if (quelle === 'karte') setPos(wahl.punkt ? { lon: wahl.punkt.lon, lat: wahl.punkt.lat, genauigkeit: null } : null);
+  }, [quelle, wahl.punkt]);
+
+  // GPS-Position laufend verbessern, solange das Formular offen ist
+  useEffect(() => {
+    if (quelle !== 'gps') return;
+    setPos(null);
     if (!navigator.geolocation) {
       setGpsFehler('Dieses Gerät liefert keine Position.');
       return;
@@ -226,13 +244,13 @@ function FundMelden({ k }: { k: BetriebKontext }) {
     const id = navigator.geolocation.watchPosition(
       (p) => {
         setGpsFehler(null);
-        setPos((alt) => (!alt || p.coords.accuracy <= alt.genauigkeit + 5 ? { lon: p.coords.longitude, lat: p.coords.latitude, genauigkeit: p.coords.accuracy } : alt));
+        setPos((alt) => (!alt || p.coords.accuracy <= (alt.genauigkeit ?? Infinity) + 5 ? { lon: p.coords.longitude, lat: p.coords.latitude, genauigkeit: p.coords.accuracy } : alt));
       },
       () => setGpsFehler('Keine Position – bitte die Ortungsfreigabe für den Browser prüfen.'),
       { enableHighAccuracy: true, maximumAge: 10000, timeout: 30000 },
     );
     return () => navigator.geolocation.clearWatch(id);
-  }, []);
+  }, [quelle]);
 
   useEffect(() => () => {
     if (foto) URL.revokeObjectURL(foto.url);
@@ -275,12 +293,18 @@ function FundMelden({ k }: { k: BetriebKontext }) {
           anzahl: typ === 'kaeferbaum' ? anzahl : 1,
           menge_fm: typ === 'windwurf' ? fm : null,
           geom: `SRID=4326;POINT(${pos.lon} ${pos.lat})`,
-          genauigkeit_m: Math.round(pos.genauigkeit),
+          genauigkeit_m: pos.genauigkeit != null ? Math.round(pos.genauigkeit) : null,
           beobachtet_am: new Date().toISOString(),
           notiz: notiz.trim() || null,
         },
       });
       if (r === 'gespeichert' && foto) void fotosHochladen();
+      fundeGeaendert();
+      // In der Karte direkt den nächsten Fund setzen können
+      if (quelle === 'karte') {
+        positionWahlBeenden();
+        positionWahlStarten();
+      }
       setErfolg(
         `${typLabel(typ)}${bestand ? ` in Bestand ${bestand.name}` : ''} ${r === 'gespeichert' ? 'gespeichert' : 'auf dem Gerät gespeichert – wird übertragen, sobald Netz da ist'}.`,
       );
@@ -295,7 +319,11 @@ function FundMelden({ k }: { k: BetriebKontext }) {
   }
 
   return (
-    <Seite titel="Fund melden" untertitel="Position wird automatisch übernommen" zurueck={() => navigieren('/funde')}>
+    <Seite
+      titel="Fund melden"
+      untertitel={quelle === 'karte' ? 'Position per Klick in die Karte setzen' : 'Position wird automatisch übernommen'}
+      zurueck={() => navigieren('/funde')}
+    >
       {erfolg && <Hinweis art="erfolg">{erfolg}</Hinweis>}
       <Segmente<FundTyp> label="Fundtyp" wert={typ} onAendern={typWaehlen} optionen={FUND_TYPEN.map((t) => ({ wert: t.wert, label: t.label }))} />
 
@@ -316,7 +344,25 @@ function FundMelden({ k }: { k: BetriebKontext }) {
 
       <Gruppe titel="Ort">
         <Zeile label="Bestand" wert={!pos ? '–' : bestand ? `${bestand.name} (automatisch)` : 'außerhalb der Bestände'} />
-        <Zeile label="GPS" wert={pos ? `±${Math.round(pos.genauigkeit)} m` : gpsFehler ?? 'Position wird ermittelt …'} />
+        {quelle === 'karte' ? (
+          <Zeile label="Position" wert={pos ? `${pos.lat.toFixed(5)}, ${pos.lon.toFixed(5)}` : 'In die Karte klicken'} />
+        ) : (
+          <Zeile label="GPS" wert={pos?.genauigkeit != null ? `±${Math.round(pos.genauigkeit)} m` : gpsFehler ?? 'Position wird ermittelt …'} />
+        )}
+        {quelle === 'karte' && !wahl.aktiv && (
+          <div style={{ padding: '8px var(--abstand) 0' }}>
+            <button type="button" className="link" onClick={() => positionWahlStarten()}>
+              Position in der Karte setzen
+            </button>
+          </div>
+        )}
+        {breit && (
+          <div style={{ padding: '8px var(--abstand)' }}>
+            <button type="button" className="link" onClick={() => setQuelle(quelle === 'karte' ? 'gps' : 'karte')}>
+              {quelle === 'karte' ? 'Stattdessen meine GPS-Position verwenden' : 'Position auf der Karte wählen'}
+            </button>
+          </div>
+        )}
       </Gruppe>
 
       {MERKMALE[typ].length > 0 && (
@@ -368,7 +414,7 @@ function FundMelden({ k }: { k: BetriebKontext }) {
 
       {fehler && <Hinweis art="fehler">{fehler}</Hinweis>}
       <Knopf variante="primaer" disabled={!pos || speichert} onClick={() => void speichern()}>
-        {pos ? 'Speichern' : 'Warte auf Position …'}
+        {pos ? 'Speichern' : quelle === 'karte' ? 'Erst Position in der Karte setzen' : 'Warte auf Position …'}
       </Knopf>
     </Seite>
   );

@@ -27,6 +27,7 @@ import { Symbol } from '../../components/symbole';
 import { EBENEN_SCHICHTEN, standardSichtbarkeit, type EbenenId } from '../../karte/ebenen/registry';
 import { EBENEN_SPEICHER, ebenenEinstellungenLesen } from '../../karte/ebenen/einstellungen';
 import { koordinaten, mittelpunkt, naechsterRandpunkt, punktInFlaeche } from '../../karte/kern/geometrie';
+import { beiFundeGeaendert, positionMelden, positionWahlAktiv, positionWahlBeenden, usePositionWahl } from '../../karte/kern/positionWahl';
 import { flurstueckText } from '../../lib/flurstuecke';
 import { FUND_TYPEN, ZEITRAEUME, gewicht, imZeitraum, jeBestand, mengeText, merkmalLabel, typFarbe, typLabel, zeitraumBeginn, type FundTyp, type Zeitraum } from '../../lib/funde';
 import { useWarteschlange, wartendeFunde } from '../../lib/offline';
@@ -130,6 +131,8 @@ export default function Karte({
   const [zeitraum, setZeitraum] = useState<Zeitraum>('saison');
   const [fund, setFund] = useState<Record<string, unknown> | null>(null);
   const wartend = useWarteschlange();
+  // Positionswahl für die Fundmeldung in der Seitenleiste (Browseransicht)
+  const wahl = usePositionWahl();
 
   const setModus = (m: Modus) => {
     modusRef.current = m;
@@ -370,6 +373,21 @@ export default function Karte({
     (m.getSource('funde') as GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features: sichtbareFunde });
   }, [sichtbareFunde, bereit]);
 
+  // Neuer Fund aus dem Formular: sofort nachladen
+  useEffect(() => beiFundeGeaendert(() => void fundeLaden()), [fundeLaden]);
+
+  // Gewählte Position als Marker zeigen, Fadenkreuz während der Wahl
+  useEffect(() => {
+    const m = karte.current;
+    if (!m || !bereit) return;
+    m.getCanvas().style.cursor = wahl.aktiv ? 'crosshair' : '';
+    if (!wahl.aktiv || !wahl.punkt) return;
+    const mk = new Marker({ color: typFarbe('kaeferbaum') }).setLngLat([wahl.punkt.lon, wahl.punkt.lat]).addTo(m);
+    return () => {
+      mk.remove();
+    };
+  }, [wahl.aktiv, wahl.punkt, bereit]);
+
   // Nach dem Übertragen wartender Meldungen neu laden
   useEffect(() => {
     if (bereit) void fundeLaden();
@@ -460,6 +478,11 @@ export default function Karte({
       const aktiv = modusRef.current;
       const pos: Position = [e.lngLat.lng, e.lngLat.lat];
       if (aktiv?.art === 'bestand' && aktiv.bearbeiten) return; // eigener Handler (Punkte ziehen/einfügen)
+      // Fundmeldung in der Seitenleiste wartet auf eine Position
+      if (!aktiv && positionWahlAktiv()) {
+        positionMelden({ lon: pos[0]!, lat: pos[1]! });
+        return;
+      }
       if (aktiv && !zuordnen) {
         const grenze = grenzeRef.current;
         if (aktiv.art === 'bestand' && grenze && !punktInFlaeche(pos, grenze)) {
@@ -878,7 +901,14 @@ export default function Karte({
       {menueOffen && !zeichnet && (
         <div className="wte-menue" role="menu" aria-label="Neu">
           <p className="menue-gruppe">Erfassen</p>
-          <button type="button" role="menuitem" onClick={() => navigieren('/funde/neu')}>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setMenueOffen(false);
+              navigieren('/funde/neu');
+            }}
+          >
             Fund melden
           </button>
           {k.istInhaber && <p className="menue-gruppe">Zeichnen</p>}
@@ -902,6 +932,16 @@ export default function Karte({
           >
             Bestand zeichnen
           </button>}
+        </div>
+      )}
+
+      {wahl.aktiv && !zeichnet && (
+        <div className="wte-leiste" role="status">
+          <strong>Fund melden</strong>
+          <span>{wahl.punkt ? 'Position gesetzt – zum Ändern erneut klicken' : 'Position in die Karte klicken'}</span>
+          <button type="button" className="link" onClick={() => positionWahlBeenden()}>
+            Beenden
+          </button>
         </div>
       )}
 
