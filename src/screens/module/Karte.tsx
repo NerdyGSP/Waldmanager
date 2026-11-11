@@ -63,6 +63,7 @@ const STANDARD_ZENTRUM: [number, number] = [9.47, 52.2]; // Raum Bad Münder
 const ISTHANDY = typeof screen !== 'undefined' && Math.min(screen.width, screen.height) < 600;
 
 const LEER: FeatureCollection = { type: 'FeatureCollection', features: [] };
+const SICHTBAR_SPEICHER = 'waldmanager.karte.sichtbar';
 
 type KartenDaten = {
   grenze: MultiPolygon | null;
@@ -97,7 +98,24 @@ export default function Karte({
   const beschriftungen = useRef<Marker[]>([]);
   const [bereit, setBereit] = useState(false);
   const [daten, setDaten] = useState<KartenDaten | null>(null);
-  const [ebenen, setEbenen] = useState<Ebenen>(standardSichtbarkeit);
+  // Sichtbarkeit der Ebenen je Gerät merken; neue Ebenen bekommen ihren Standard
+  const [ebenen, setEbenen] = useState<Ebenen>(() => {
+    const standard = standardSichtbarkeit();
+    try {
+      const roh = JSON.parse(localStorage.getItem(SICHTBAR_SPEICHER) ?? '{}') as Record<string, unknown>;
+      for (const id of Object.keys(standard) as EbenenId[]) if (typeof roh[id] === 'boolean') standard[id] = roh[id] as boolean;
+    } catch {
+      /* Standard verwenden */
+    }
+    return standard;
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(SICHTBAR_SPEICHER, JSON.stringify(ebenen));
+    } catch {
+      /* nur für diese Sitzung */
+    }
+  }, [ebenen]);
   const [modus, setModusState] = useState<Modus>(null);
   const modusRef = useRef<Modus>(null);
   const [punkte, setPunkte] = useState<Position[]>([]);
@@ -333,7 +351,10 @@ export default function Karte({
 
     // Handy: Luftbild nur für die Betriebsgrenze (+ ca. 150 m Rand); Tablet/PC: für den gesamten Kartenausschnitt
     // Nur neu aufbauen, wenn sich die Ausdehnung wirklich geändert hat – sonst lädt der Browser alle Kacheln erneut
-    const bb = daten.grenze ? grenzen([daten.grenze]) : null;
+    // Ausdehnung des Betriebs: Grenze, sonst Flurstücke, sonst Bestände
+    const bb = daten.grenze
+      ? grenzen([daten.grenze])
+      : grenzen([...daten.flurstuecke.map((f) => f.geometry), ...daten.bestaende.map((f) => f.geometry)]);
     const schluessel = ISTHANDY ? (bb ? 'handy:' + [bb.getWest(), bb.getSouth(), bb.getEast(), bb.getNorth()].map((v) => v.toFixed(5)).join(',') : '') : 'voll';
     if (schluessel !== luftbildSchluessel.current || ((bb || !ISTHANDY) && !m.getLayer('luftbild'))) {
       luftbildSchluessel.current = schluessel;
@@ -744,12 +765,13 @@ export default function Karte({
       [liste[i], liste[j]] = [liste[j]!, liste[i]!];
       return { ...alt, reihenfolge: liste };
     });
+  const betriebsflaeche = !!daten && (!!daten.grenze || daten.flurstuecke.length > 0 || daten.bestaende.length > 0);
   const ebenenInfo: Record<EbenenId, { name: string; label: string; an: boolean; gesperrt?: boolean }> = {
     luftbild: {
       name: 'Luftbild',
-      label: ISTHANDY ? (daten?.grenze ? 'Luftbild (LGLN, nur Betriebsbereich)' : 'Luftbild – erst Betriebsgrenze zeichnen') : 'Luftbild (LGLN)',
-      an: ebenen.luftbild && (!ISTHANDY || !!daten?.grenze),
-      gesperrt: ISTHANDY && !daten?.grenze,
+      label: ISTHANDY ? (betriebsflaeche ? 'Luftbild (LGLN, nur Betriebsbereich)' : 'Luftbild – erst Grenze, Flurstücke oder Bestand anlegen') : 'Luftbild (LGLN)',
+      an: ebenen.luftbild && (!ISTHANDY || betriebsflaeche),
+      gesperrt: ISTHANDY && !betriebsflaeche,
     },
     bestaende: { name: 'Bestände', label: `Bestände (${daten?.bestaende.length ?? 0})`, an: ebenen.bestaende },
     flurstuecke: { name: 'Flurstücke', label: `Flurstücke (${daten?.flurstuecke.length ?? 0})`, an: ebenen.flurstuecke, gesperrt: !daten?.flurstuecke.length },

@@ -24,7 +24,7 @@ describe('Ebenen-Registry', () => {
     expect(STANDARD_REIHENFOLGE).toEqual(['funde', 'heatmap', 'grenze', 'bestaende', 'flurstuecke', 'luftbild']);
     expect(STANDARD_DECKKRAFT).toMatchObject({ bestaende: 0.55, luftbild: 1 });
     expect(EBENEN_SCHICHTEN.bestaende).toEqual(['bestaende-flaeche', 'bestaende-linie', 'bestaende-auswahl']);
-    expect(standardSichtbarkeit()).toEqual({ funde: true, heatmap: false, grenze: true, bestaende: true, flurstuecke: false, luftbild: false });
+    expect(standardSichtbarkeit()).toEqual({ funde: true, heatmap: false, grenze: true, bestaende: true, flurstuecke: false, luftbild: true });
   });
 
   it('zeigt die Grenze in jedem Modus', () => {
