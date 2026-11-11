@@ -1,6 +1,6 @@
-# Hegewerk
+# Waldmanager
 
-Plattform für Wildtiererfassung und Reviermanagement im Hegering. Frontend als Vite/React-App auf Cloudflare Workers (Static Assets), Backend in Supabase (Auth, Postgres mit Row Level Security, PostGIS).
+Waldmanagement für Privatwaldbesitzer: Betriebsgrenze, Bestände, Maßnahmen und Fundmeldungen (Käferbaum, Windwurf, Wildschaden) auf Karte und Luftbild. Hobbyprojekt, abgeleitet aus Hegewerk (Stand 11.11.2026). Frontend als Vite/React-App auf Cloudflare Workers (Static Assets), Backend in Supabase (Auth, Postgres mit Row Level Security, PostGIS).
 
 ## Lokal starten
 
@@ -19,14 +19,13 @@ npm run build          # Typprüfung und Produktions-Build
 
 Die CI (GitHub Actions) führt beides für jeden Branch und Pull Request aus.
 
-## Rework
+## Umbau
 
-Die Plattform wird schrittweise umgebaut. Einstieg: [docs/rework/README.md](docs/rework/README.md),
-Stand: [docs/rework/STATUS.md](docs/rework/STATUS.md). Arbeitsregeln für Claude stehen in [CLAUDE.md](CLAUDE.md).
+Der Umbau aus Hegewerk läuft in drei Paketen. Stand: [docs/umbau/STATUS.md](docs/umbau/STATUS.md). Arbeitsregeln für Claude stehen in [CLAUDE.md](CLAUDE.md).
 
 ## Deployment
 
-Automatisch über Cloudflare Workers Builds bei jedem Push auf `main`. Deshalb wird nur über Pull Requests nach `main` gemergt.
+Über Cloudflare Workers Builds bei jedem Push auf `main`. Deshalb wird nur über Pull Requests nach `main` gemergt.
 
 | Einstellung | Wert |
 | --- | --- |
@@ -34,15 +33,17 @@ Automatisch über Cloudflare Workers Builds bei jedem Push auf `main`. Deshalb w
 | Deploy command | `npx wrangler deploy` |
 | Build-Variablen | `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` |
 
-Der Worker-Name im Cloudflare-Dashboard muss `hegewerk` lauten (siehe `wrangler.jsonc`).
+Der Worker-Name im Cloudflare-Dashboard muss `waldmanager` lauten (siehe `wrangler.jsonc`).
 
 ## Aufbau
 
 | Pfad | Inhalt |
 | --- | --- |
 | `src/auth/` | Session-Verwaltung |
-| `src/screens/` | Anmeldung, Registrierung mit Einladungscode, Startseite, Mitglieder, Masteradmin |
-| `src/karte/` | Kartenkern: Ebenen-Registry, Modi, Werkzeuge |
+| `src/screens/` | Anmeldung, Registrierung mit Einladungscode, Startseite, Forstbetrieb, Masteradmin |
+| `src/screens/module/` | Fachmodule: Karte, Bestände |
+| `src/karte/` | Kartenkern: Ebenen-Registry, Modi, Geometrie |
+| `src/lib/` | Fachlogik (`forst.ts`), Supabase-Client, Offline-Cache und Warteschlange |
 | `src/lib/database.types.ts` | Aus Supabase generierte Typen |
 | `supabase/migrations/` | Schema-Historie |
 | `public/_headers` | Sicherheits-Header für Cloudflare |
@@ -50,8 +51,8 @@ Der Worker-Name im Cloudflare-Dashboard muss `hegewerk` lauten (siehe `wrangler.
 
 ## Rollen
 
-- **Masteradmin:** legt Hegeringe und Reviere an, lädt Inhaber ein, löscht Reviere – kein Zugriff auf Fachdaten.
-- **Revierinhaber/-pächter:** verwaltet sein Revier und dessen Mitglieder.
-- **Mitjäger:** erfasst Zählungen, Beobachtungen und Abschüsse.
+- **Masteradmin:** legt Forstbetriebe an, lädt Inhaber ein, löscht Betriebe – kein Zugriff auf Fachdaten fremder Betriebe.
+- **Inhaber:** verwaltet seinen Forstbetrieb, Grenze, Bestände und Mitglieder.
+- **Mitarbeiter:** sieht den Betrieb, legt Maßnahmen an und meldet Funde.
 
-Registrierung nur mit Einladungscode (`XXXX-XXXX`, einmalig, mit Ablaufdatum). Danach Login mit E-Mail und Passwort auf allen Geräten.
+Registrierung nur mit Einladungscode (`XXXX-XXXX`, einmalig, mit Ablaufdatum). Es gibt keinen Mailversand; Codes werden persönlich weitergegeben.

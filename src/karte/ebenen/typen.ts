@@ -1,21 +1,19 @@
 // Typen des Kartenkerns. Eine Ebene wird deklariert, nicht in einer Komponente verdrahtet.
-// Hintergrund und Zielbild: docs/rework/ARCHITEKTUR.md
 
 /** Gruppen im Ebenen-Panel, von oben nach unten */
-export const EBENEN_GRUPPEN = ['geschehen', 'analyse', 'revier', 'landwirtschaft', 'recht', 'basis'] as const;
+export const EBENEN_GRUPPEN = ['geschehen', 'analyse', 'betrieb', 'recht', 'basis'] as const;
 export type EbenenGruppe = (typeof EBENEN_GRUPPEN)[number];
 
 export const GRUPPEN_TITEL: Record<EbenenGruppe, string> = {
   geschehen: 'Geschehen',
   analyse: 'Analyse',
-  revier: 'Revierstruktur',
-  landwirtschaft: 'Landwirtschaft',
+  betrieb: 'Forstbetrieb',
   recht: 'Recht & Schutz',
   basis: 'Basiskarte',
 };
 
 /** Kartenmodi: genau einer ist aktiv und legt Ebenen, Klickverhalten und Werkzeuge fest */
-export const KARTEN_MODI = ['ansehen', 'erfassen', 'zaehlen', 'bearbeiten', 'jagdtag', 'druck'] as const;
+export const KARTEN_MODI = ['ansehen', 'erfassen', 'bearbeiten', 'druck'] as const;
 export type KartenModus = (typeof KARTEN_MODI)[number];
 
 export type EbenenDeklaration<Id extends string = string> = {

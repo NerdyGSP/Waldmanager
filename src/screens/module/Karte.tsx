@@ -1,8 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Einklappbar } from '../../components/ui';
-import { ZonenInfo, type GewaehlteZone } from './ZonenInfo';
-import { WetterPanel } from './WetterPanel';
-import { WteSichtung, type WteSitzung, type WteZone } from './WteSichtung';
+import { BestandInfo, type GewaehlterBestand } from './BestandInfo';
 import { createPortal } from 'react-dom';
 import {
   GeolocateControl,
@@ -10,10 +8,8 @@ import {
   Map as KarteMap,
   Marker,
   NavigationControl,
-  Popup,
   ScaleControl,
   setWorkerUrl,
-  type FilterSpecification,
   type GeoJSONSource,
   type MapMouseEvent,
   type MapTouchEvent,
@@ -24,27 +20,13 @@ import kartenWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import type { Feature, FeatureCollection, Geometry, MultiPolygon, Position } from 'geojson';
 import { supabase } from '../../lib/supabase';
 import { fehlertext } from '../../lib/fehler';
-import { EINRICHTUNGSTYPEN, GESCHLECHTER, nameVergeben, useWildarten, useZonen, wildartName, ZONENFARBEN } from '../../lib/stammdaten';
-import { datumDE, datumZeitDE } from '../../lib/zeit';
-import { aktuellesWetter, himmelsrichtung, linieEWKT, punktEWKT, type Wetter } from '../../lib/geo';
-import { navigieren } from '../../lib/router';
-import { EinrichtungsIcon, einrichtungsBild } from '../../lib/einrichtungsIcons';
-import type { Enums, Json } from '../../lib/database.types';
-import type { RevierKontext } from './kontext';
+import { BESTANDSFARBEN, baumartenLesen, nameVergeben, useBestaende } from '../../lib/stammdaten';
+import type { Json } from '../../lib/database.types';
+import type { BetriebKontext } from './kontext';
 import { Symbol } from '../../components/symbole';
-import { EinrichtungsOptionen } from '../../components/EinrichtungsOptionen';
-import { EinrichtungSheet, VerschiebeLeiste, type EinrichtungInfo } from './EinrichtungSheet';
-import { speichernOderMerken, wartendeZaehlungen } from '../../lib/offline';
-import { useZaehlungGeaendert, useZonenSummen } from '../../lib/zaehlEreignis';
-import { GpsImport } from './GpsImport';
-import { FeldSheet } from './FeldSheet';
-import { useFelder, gruppenFarbe, type FeldProps } from '../../lib/felder';
-import { FRUCHTGRUPPEN, normalisieren } from '../../lib/fruchtgruppen';
-import { useRoutenEbenen, ROUTENFOKUS, routenTypFarbe } from '../../lib/routen';
-import { ZeichnenSheet, type SheetArt, type SheetWerte } from './ZeichnenSheet';
 import { EBENEN_SCHICHTEN, standardSichtbarkeit, type EbenenId } from '../../karte/ebenen/registry';
 import { EBENEN_SPEICHER, ebenenEinstellungenLesen } from '../../karte/ebenen/einstellungen';
-import { abstandM, koordinaten, mittelpunkt, naechsterRandpunkt, punktInFlaeche } from '../../karte/kern/geometrie';
+import { koordinaten, mittelpunkt, naechsterRandpunkt, punktInFlaeche } from '../../karte/kern/geometrie';
 
 // ---------- Kartengrundlagen ----------
 
@@ -71,63 +53,20 @@ const STIL: StyleSpecification = {
 
 const STANDARD_ZENTRUM: [number, number] = [9.47, 52.2]; // Raum Bad Münder
 
-
-// Ebenen (Schichten, Reihenfolge, Deckkraft) sind in der Registry deklariert: src/karte/ebenen/registry.ts
-
-// Richtungspfeil (zeigt nach rechts = Linienrichtung) für Treiber- und WTE-Routen
-function pfeilBild(): ImageData {
-  const c = document.createElement('canvas');
-  c.width = c.height = 24;
-  const g = c.getContext('2d')!;
-  g.fillStyle = '#fff';
-  g.strokeStyle = '#111';
-  g.lineWidth = 2;
-  g.beginPath();
-  g.moveTo(4, 5);
-  g.lineTo(20, 12);
-  g.lineTo(4, 19);
-  g.lineTo(8, 12);
-  g.closePath();
-  g.fill();
-  g.stroke();
-  return g.getImageData(0, 0, 24, 24);
-}
-
-// Handys laden das Luftbild nur für den Revierbereich, Tablets/PCs für den ganzen Kartenausschnitt
+// Handys laden das Luftbild nur für den Betriebsbereich, Tablets/PCs für den ganzen Kartenausschnitt
 const ISTHANDY = typeof screen !== 'undefined' && Math.min(screen.width, screen.height) < 600;
 
 const LEER: FeatureCollection = { type: 'FeatureCollection', features: [] };
 
-type KartenEbene = { id: string; name: string; farbe: string | null; wte_aktiv?: boolean };
-
 type KartenDaten = {
   grenze: MultiPolygon | null;
-  ebenen: KartenEbene[];
-  zonen: Feature[];
-  einrichtungen: Feature[];
-  pirschwege: Feature[];
-  beobachtungen: Feature[];
-  abschuesse: Feature[];
-  zaehlungen: Feature[];
+  bestaende: Feature[];
   mitte: [number, number] | null;
 };
 
-const HEATNAMEN = { zaehlungen: 'Zählungen', beobachtungen: 'Beobachtungen', abschuesse: 'Abschüsse' } as const;
-type HeatQuelle = 'zaehlungen' | 'beobachtungen' | 'abschuesse';
-const WILDARTFARBEN = ['#c0392b', '#1f6fb2', '#1e8449', '#b9770e', '#8e44ad', '#16a085', '#d35400', '#5d6d7e', '#cb4335', '#2e4053'];
-
 type Ebenen = Record<EbenenId, boolean>;
 
-type RouteTyp = 'pirschweg' | 'treiberroute' | 'wte_route';
-const ROUTENNAME: Record<RouteTyp, string> = { pirschweg: 'Pirschweg', treiberroute: 'Treiberroute', wte_route: 'WTE-Route' };
-
-type Modus =
-  | { art: 'grenze' }
-  | { art: 'zone'; zoneId: string | null; name: string; bearbeiten?: boolean }
-  | { art: 'route'; typ: RouteTyp }
-  | { art: 'aufzeichnung'; typ: RouteTyp }
-  | { art: 'einrichtung' }
-  | null;
+type Modus = { art: 'grenze' } | { art: 'bestand'; bestandId: string | null; name: string; bearbeiten?: boolean } | null;
 
 // ---------- Komponente ----------
 
@@ -137,7 +76,7 @@ export default function Karte({
   panelZiel = null,
   aktualisierung,
 }: {
-  k: RevierKontext;
+  k: BetriebKontext;
   /** Desktop: Karte dauerhaft rechts, Werkzeuge in der Seitenleiste */
   eingebettet?: boolean;
   /** Element in der Seitenleiste, in das die Werkzeuge gerendert werden (nur wenn das Kartenmodul aktiv ist) */
@@ -145,121 +84,28 @@ export default function Karte({
   /** Ändert sich der Wert, werden die Kartendaten neu geladen */
   aktualisierung?: unknown;
 }) {
-  const wildarten = useWildarten();
-  const { zonen, laden: zonenLaden } = useZonen(k.revierId);
+  const { bestaende, laden: bestaendeLaden } = useBestaende(k.betriebId);
   const container = useRef<HTMLDivElement>(null);
   const karte = useRef<KarteMap | null>(null);
-  const zonenMarker = useRef<Marker[]>([]);
+  const beschriftungen = useRef<Marker[]>([]);
   const [bereit, setBereit] = useState(false);
   const [daten, setDaten] = useState<KartenDaten | null>(null);
   const [ebenen, setEbenen] = useState<Ebenen>(standardSichtbarkeit);
   const [modus, setModusState] = useState<Modus>(null);
-  const [gpsImport, setGpsImport] = useState(false);
-  const [einrSheet, setEinrSheet] = useState<EinrichtungInfo | null>(null);
-  // Deep Link aus der Glocke, während die Karte schon offen ist
-  useEffect(() => {
-    const fokus = (ev: Event) => {
-      const x = (ev as CustomEvent<EinrichtungInfo>).detail;
-      karte.current?.jumpTo({ center: [x.lng, x.lat], zoom: 18 });
-      setEinrSheet(x);
-    };
-    window.addEventListener('hegewerk:kartenfokus', fokus);
-    return () => window.removeEventListener('hegewerk:kartenfokus', fokus);
-  }, []);
-  const [verschiebe, setVerschiebe] = useState<{ einr: EinrichtungInfo; lng: number; lat: number } | null>(null);
-  const [verschiebeLaeuft, setVerschiebeLaeuft] = useState(false);
-  const verschiebeAktiv = useRef(false);
-  const [sheetArt, setSheetArt] = useState<SheetArt | null>(null);
-  const [sheetFehler, setSheetFehler] = useState<string | null>(null);
-  const [sheetSpeichert, setSheetSpeichert] = useState(false);
   const modusRef = useRef<Modus>(null);
   const [punkte, setPunkte] = useState<Position[]>([]);
   const punkteRef = useRef<Position[]>([]);
   punkteRef.current = punkte;
-  // Zonenbearbeitung: markierter Eckpunkt sowie unveränderte Teilflächen/Löcher der Zone
+  // Bearbeiten: markierter Eckpunkt sowie unveränderte Teilflächen/Löcher des Bestands
   const [gewaehlterPunkt, setGewaehlterPunkt] = useState<number | null>(null);
-  const zonenRest = useRef<{ teile: Position[][][]; loecher: Position[][] }>({ teile: [], loecher: [] });
-  const [neueEinrichtung, setNeueEinrichtung] = useState<Position | null>(null);
-  const [wind, setWind] = useState<Wetter | null>(null);
-  const [wetterOffen, setWetterOffen] = useState(false);
-  // Animierte Windpfeile vom eigenen Standort (je Gerät gemerkt)
-  const [windpfeile, setWindpfeileState] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem('hegewerk.karte.windpfeile') === '1';
-    } catch {
-      return false;
-    }
-  });
-  const setWindpfeile = (an: boolean) => {
-    setWindpfeileState(an);
-    try {
-      localStorage.setItem('hegewerk.karte.windpfeile', an ? '1' : '0');
-    } catch {
-      /* nur für diese Sitzung */
-    }
-  };
-  const [eigenePos, setEigenePos] = useState<[number, number] | null>(null);
-  const windMarker = useRef<Marker | null>(null);
-  const [wetterOrt, setWetterOrt] = useState<[number, number]>([0, 0]);
+  const flaechenRest = useRef<{ teile: Position[][][]; loecher: Position[][] }>({ teile: [], loecher: [] });
+  const [zuordnen, setZuordnen] = useState(false);
+  const [speichert, setSpeichert] = useState(false);
+  const [menueOffen, setMenueOffen] = useState(false);
   const [panelOffen, setPanelOffen] = useState(false);
   const [kartenFehler, setKartenFehler] = useState<string | null>(null);
   const [meldung, setMeldung] = useState<{ art: 'fehler' | 'erfolg' | 'info'; text: string } | null>(null);
-  const aufzeichnung = useRef<number | null>(null);
-  const [ausgeblendet, setAusgeblendet] = useState<Set<string>>(new Set());
-  // Transparenzregler je Ebene erst nach Klick auf den Einstellungsbutton zeigen
   const [reglerOffen, setReglerOffen] = useState<string[]>([]);
-  const reglerUmschalten = (id: string) => setReglerOffen((a) => (a.includes(id) ? a.filter((x) => x !== id) : [...a, id]));
-  const reglerKnopf = (id: string, name: string) => (
-    <button
-      type="button"
-      className="regler-knopf"
-      aria-label={`Transparenz-Einstellung ${name}`}
-      aria-expanded={reglerOffen.includes(id)}
-      title="Transparenz einstellen"
-      onClick={() => reglerUmschalten(id)}
-    >
-      <Symbol name="einstellungen" className="symbol klein" />
-    </button>
-  );
-  // Routenebenen: einzeln ausblenden und mit eigener Transparenz (je Gerät gemerkt)
-  const { ebenen: routenEbenen, laden: routenEbenenLaden } = useRoutenEbenen(k.revierId);
-  const [routenEinst, setRoutenEinst] = useState<{ aus: string[]; transparenz: Record<string, number> }>(() => {
-    try {
-      const r = JSON.parse(localStorage.getItem('hegewerk.karte.routen') ?? 'null') as { aus?: string[]; transparenz?: Record<string, number> } | null;
-      return { aus: r?.aus ?? [], transparenz: r?.transparenz ?? {} };
-    } catch {
-      return { aus: [], transparenz: {} };
-    }
-  });
-  useEffect(() => {
-    try {
-      localStorage.setItem('hegewerk.karte.routen', JSON.stringify(routenEinst));
-    } catch {
-      /* nur für diese Sitzung */
-    }
-  }, [routenEinst]);
-  // Einrichtungsarten einzeln ausblenden (je Gerät gemerkt)
-  const [typenAus, setTypenAus] = useState<string[]>(() => {
-    try {
-      const r = JSON.parse(localStorage.getItem('hegewerk.karte.einrichtungsTypenAus') ?? '[]') as unknown;
-      return Array.isArray(r) ? r.map(String) : [];
-    } catch {
-      return [];
-    }
-  });
-  useEffect(() => {
-    try {
-      localStorage.setItem('hegewerk.karte.einrichtungsTypenAus', JSON.stringify(typenAus));
-    } catch {
-      /* nur für diese Sitzung */
-    }
-  }, [typenAus]);
-  const einrFilter = (verschiebeId?: string): FilterSpecification | null => {
-    const teile: unknown[] = [];
-    if (typenAus.length) teile.push(['!', ['in', ['get', 'typ'], ['literal', typenAus]]]);
-    if (verschiebeId) teile.push(['!=', ['get', 'id'], verschiebeId]);
-    return teile.length === 0 ? null : (teile.length === 1 ? teile[0] : ['all', ...teile]) as FilterSpecification;
-  };
   const grenzeRef = useRef<MultiPolygon | null>(null);
   const luftbildSchluessel = useRef('');
   const [einst, setEinst] = useState(ebenenEinstellungenLesen);
@@ -270,132 +116,37 @@ export default function Karte({
       /* ohne Speicher gilt die Einstellung nur für diese Sitzung */
     }
   }, [einst]);
-  const [gewaehlteZone, setGewaehlteZone] = useState<GewaehlteZone | null>(null);
-  const [feldSheet, setFeldSheet] = useState<FeldProps | null>(null);
-  const [feldJahr, setFeldJahr] = useState<string | null>(null);
-  // Fruchtgruppen einzeln ausblenden (je Gerät gemerkt)
-  const [gruppenAus, setGruppenAus] = useState<string[]>(() => {
-    try {
-      const r = JSON.parse(localStorage.getItem('hegewerk.karte.felderGruppenAus') ?? '[]') as unknown;
-      return Array.isArray(r) ? r.map(String) : [];
-    } catch {
-      return [];
-    }
-  });
-  useEffect(() => {
-    try {
-      localStorage.setItem('hegewerk.karte.felderGruppenAus', JSON.stringify(gruppenAus));
-    } catch {
-      /* nur für diese Sitzung */
-    }
-  }, [gruppenAus]);
+  const [gewaehlt, setGewaehlt] = useState<GewaehlterBestand | null>(null);
 
   const setModus = (m: Modus) => {
     modusRef.current = m;
     setModusState(m);
     setPunkte([]);
     setGewaehlterPunkt(null);
-    setNeueEinrichtung(null);
+    setZuordnen(false);
   };
-
-  // WTE-Modus (Wildtiererfassung): je Gerät gemerkt
-  const [wte, setWteState] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem('hegewerk.karte.wte') === '1';
-    } catch {
-      return false;
-    }
-  });
-  const setWte = (an: boolean) => {
-    setWteState(an);
-    try {
-      localStorage.setItem('hegewerk.karte.wte', an ? '1' : '0');
-    } catch {
-      /* ohne Speicher gilt der Modus nur für diese Sitzung */
-    }
-    setWteMenue(false);
-    setWteZone(null);
-  };
-  const [wteMenue, setWteMenue] = useState(false);
-  const felder = useFelder(k.revierId, ebenen.felder && !wte, feldJahr);
-  const [wteZone, setWteZone] = useState<WteZone | null>(null);
-  const [wteSitzung, setWteSitzung] = useState<WteSitzung | null>(null);
-  // Summe der Sichtungen je Zone in der laufenden Zählung (sofort sichtbar, auch offline)
-  const wteSummen = useZonenSummen(wte ? (wteSitzung?.id ?? null) : null, wartendeZaehlungen);
-  const sitzungLaden = useCallback(async (): Promise<WteSitzung | null> => {
-    const { data } = await supabase.from('zaehlsitzungen').select('id, datum, ebene_id').eq('revier_id', k.revierId).eq('status', 'offen').is('geloescht_am', null).maybeSingle();
-    setWteSitzung(data ?? null);
-    return data ?? null;
-  }, [k.revierId]);
-  useEffect(() => {
-    if (wte && navigator.onLine) void sitzungLaden();
-  }, [wte, sitzungLaden]);
-  const wteRoutenEbenenIds = useMemo(() => routenEbenen.filter((e) => e.typ === 'wte_route' && e.wte_aktiv).map((e) => e.id), [routenEbenen]);
-  const wteEbenenIds = useMemo(() => (daten?.ebenen ?? []).filter((e) => e.wte_aktiv).map((e) => e.id), [daten]);
-
-  // Filter für Heatmap und Abschüsse (gelten für alle drei Quellen)
-  const [wildartFilter, setWildartFilter] = useState('');
-  const [tageFilter, setTageFilter] = useState<30 | 90 | 365>(365);
-  const [heatQuelle, setHeatQuelle] = useState<HeatQuelle>('beobachtungen');
-  const gefiltert = useMemo(() => {
-    const grenzeZeit = Date.now() - tageFilter * 86400000;
-    const filtern = (l: Feature[] | undefined, farben = false): Feature[] =>
-      (l ?? [])
-        .filter((f) => (!wildartFilter || f.properties?.wildart_id === wildartFilter) && new Date(String(f.properties?.zeitpunkt ?? 0)).getTime() >= grenzeZeit)
-        .map((f) => {
-          if (!farben) return f;
-          const i = wildarten.findIndex((w) => w.id === f.properties?.wildart_id);
-          return { ...f, properties: { ...f.properties, farbe: WILDARTFARBEN[(i < 0 ? 0 : i) % WILDARTFARBEN.length] } };
-        });
-    return {
-      beobachtungen: filtern(daten?.beobachtungen),
-      abschuesse: filtern(daten?.abschuesse, true),
-      zaehlungen: filtern(daten?.zaehlungen),
-    };
-  }, [daten, wildartFilter, tageFilter, wildarten]);
 
   // Daten laden
   const laden = useCallback(async () => {
-    const { data, error } = await supabase.rpc('karte_daten', { p_revier_id: k.revierId, p_tage: 365 });
+    const { data, error } = await supabase.rpc('karte_daten', { p_betrieb_id: k.betriebId });
     if (error) {
       setMeldung({ art: 'fehler', text: fehlertext(error) });
       return;
     }
-    void routenEbenenLaden();
-    const d = (data ?? {}) as unknown as Partial<KartenDaten>;
+    const d = (data ?? {}) as { grenze?: MultiPolygon | null; bestaende?: Feature[]; mitte?: { coordinates?: number[] } | null };
     setDaten({
       grenze: d.grenze ?? null,
-      ebenen: d.ebenen ?? [],
-      zonen: d.zonen ?? [],
-      einrichtungen: d.einrichtungen ?? [],
-      pirschwege: d.pirschwege ?? [],
-      beobachtungen: d.beobachtungen ?? [],
-      abschuesse: d.abschuesse ?? [],
-      zaehlungen: d.zaehlungen ?? [],
-      mitte: ((d as { mitte?: { coordinates?: number[] } | null }).mitte?.coordinates as [number, number] | undefined) ?? null,
+      bestaende: d.bestaende ?? [],
+      mitte: (d.mitte?.coordinates as [number, number] | undefined) ?? null,
     });
-  }, [k.revierId, routenEbenenLaden]);
-
-  // Heatmap/Zählwerte nach einer übertragenen Sichtung auffrischen (gebündelt)
-  const heatTimer = useRef<number | null>(null);
-  useZaehlungGeaendert((e) => {
-    if (e.quelle !== 'server') return;
-    if (heatTimer.current) window.clearTimeout(heatTimer.current);
-    heatTimer.current = window.setTimeout(() => void laden(), 1500);
-  });
+  }, [k.betriebId]);
 
   // Karte initialisieren
   useEffect(() => {
     if (!container.current) return;
     let m: KarteMap;
     try {
-      m = new KarteMap({
-        container: container.current,
-        style: STIL,
-        center: STANDARD_ZENTRUM,
-        zoom: 12,
-        attributionControl: { compact: true },
-      });
+      m = new KarteMap({ container: container.current, style: STIL, center: STANDARD_ZENTRUM, zoom: 12, attributionControl: { compact: true } });
     } catch (err) {
       // Typisch: WebGL im Browser deaktiviert oder vom Grafiktreiber gesperrt
       setKartenFehler(String((err as Error)?.message ?? err));
@@ -415,144 +166,31 @@ export default function Karte({
     const beobachter = new ResizeObserver(() => m.resize());
     beobachter.observe(container.current);
     m.addControl(new NavigationControl({ visualizePitch: false }), 'top-right');
-    m.addControl(
-      new GeolocateControl({ positionOptions: { enableHighAccuracy: true }, trackUserLocation: true }),
-      'top-right',
-    );
+    m.addControl(new GeolocateControl({ positionOptions: { enableHighAccuracy: true }, trackUserLocation: true }), 'top-right');
     m.addControl(new ScaleControl({ unit: 'metric' }), 'bottom-right');
 
-    m.on('styleimagemissing', (e) => {
-      // Unbekannte Einrichtungsart: neutrales Symbol
-      if (!m.hasImage(e.id)) m.addImage(e.id, einrichtungsBild('sonstiges', '#5d6d7e'), { pixelRatio: 2 });
-    });
     m.on('load', () => {
-      // „Auf Karte zeigen“ für eine Route (aus „Zonen & Routen“)
-      try {
-        const r = sessionStorage.getItem(ROUTENFOKUS);
-        if (r) {
-          sessionStorage.removeItem(ROUTENFOKUS);
-          const x = JSON.parse(r) as { geometry: { coordinates: number[][] } };
-          const pts = x.geometry.coordinates;
-          if (pts.length) {
-            const b = new LngLatBounds(pts[0] as [number, number], pts[0] as [number, number]);
-            for (const c of pts) b.extend(c as [number, number]);
-            m.fitBounds(b, { padding: 60, duration: 0, maxZoom: 18 });
-          }
-        }
-      } catch {
-        /* ohne Fokus weiter */
-      }
-      // „Auf Karte zeigen“ aus der Einrichtungstabelle
-      try {
-        const f = sessionStorage.getItem('hegewerk:kartenfokus');
-        if (f) {
-          sessionStorage.removeItem('hegewerk:kartenfokus');
-          const x = JSON.parse(f) as EinrichtungInfo;
-          m.jumpTo({ center: [x.lng, x.lat], zoom: 18 });
-          setEinrSheet(x);
-        }
-      } catch {
-        /* ohne Fokus weiter */
-      }
-      for (const id of ['grenze', 'zonen', 'felder', 'einrichtungen', 'pirschwege', 'beobachtungen', 'abschuesse', 'heatquelle', 'zeichnung']) {
-        m.addSource(id, { type: 'geojson', data: LEER });
-      }
+      for (const id of ['grenze', 'bestaende', 'zeichnung']) m.addSource(id, { type: 'geojson', data: LEER });
       m.addLayer({
-        id: 'felder-flaeche',
+        id: 'bestaende-flaeche',
         type: 'fill',
-        source: 'felder',
-        layout: { visibility: 'none' },
-        paint: { 'fill-color': ['get', 'farbe'], 'fill-opacity': 0.45 },
+        source: 'bestaende',
+        paint: { 'fill-color': ['coalesce', ['get', 'farbe'], '#2f6b4a'], 'fill-opacity': 0.22 },
       });
       m.addLayer({
-        id: 'felder-linie',
+        id: 'bestaende-linie',
         type: 'line',
-        source: 'felder',
-        layout: { visibility: 'none' },
-        paint: { 'line-color': ['get', 'farbe'], 'line-width': 1, 'line-opacity': 0.7 },
+        source: 'bestaende',
+        paint: { 'line-color': ['coalesce', ['get', 'farbe'], '#2f6b4a'], 'line-width': 1.5 },
       });
       m.addLayer({
-        id: 'zonen-flaeche',
-        type: 'fill',
-        source: 'zonen',
-        paint: { 'fill-color': ['coalesce', ['get', 'farbe'], '#1e5c3a'], 'fill-opacity': 0.22 },
-      });
-      m.addLayer({
-        id: 'zonen-linie',
+        id: 'bestaende-auswahl',
         type: 'line',
-        source: 'zonen',
-        paint: { 'line-color': ['coalesce', ['get', 'farbe'], '#1e5c3a'], 'line-width': 1.5 },
-      });
-      m.addLayer({
-        id: 'zonen-auswahl',
-        type: 'line',
-        source: 'zonen',
+        source: 'bestaende',
         filter: ['==', ['get', 'id'], ''],
         paint: { 'line-color': '#f26a1b', 'line-width': 4 },
       });
-      m.addLayer({
-        id: 'grenze-linie',
-        type: 'line',
-        source: 'grenze',
-        paint: { 'line-color': '#e4572e', 'line-width': 3 },
-      });
-      m.addLayer({
-        id: 'heatmap',
-        type: 'heatmap',
-        source: 'heatquelle',
-        layout: { visibility: 'none' },
-        paint: {
-          'heatmap-weight': 1,
-          'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 10, 12, 16, 40],
-          'heatmap-opacity': 0.75,
-        },
-      });
-      m.addLayer({
-        id: 'pirschwege-linie',
-        type: 'line',
-        source: 'pirschwege',
-        layout: { 'line-cap': 'round', 'line-join': 'round' },
-        filter: ['==', ['get', 'typ'], 'pirschweg'],
-        paint: { 'line-color': ['coalesce', ['get', 'farbe'], '#7b4a12'], 'line-width': 3, 'line-dasharray': [2, 1.5] },
-      });
-      // Treiberrouten und WTE-Routen: eigene Farben, Richtungspfeile entlang der Linie
-      m.addImage('route-pfeil', pfeilBild(), { pixelRatio: 2 });
-      for (const [id, typ, farbe] of [['treiberrouten', 'treiberroute', '#c2185b'], ['wte-routen', 'wte_route', '#00796b']] as const) {
-        m.addLayer({
-          id: `${id}-linie`,
-          type: 'line',
-          source: 'pirschwege',
-          layout: { 'line-cap': 'round', 'line-join': 'round' },
-          filter: ['==', ['get', 'typ'], typ],
-          paint: { 'line-color': ['coalesce', ['get', 'farbe'], farbe], 'line-width': 3.5 },
-        });
-        m.addLayer({
-          id: `${id}-pfeile`,
-          type: 'symbol',
-          source: 'pirschwege',
-          filter: ['==', ['get', 'typ'], typ],
-          layout: { 'symbol-placement': 'line', 'symbol-spacing': 70, 'icon-image': 'route-pfeil', 'icon-size': 0.8, 'icon-allow-overlap': true, 'icon-ignore-placement': true, 'icon-rotation-alignment': 'map' },
-        });
-      }
-      m.addLayer({
-        id: 'abschuesse-punkt',
-        type: 'circle',
-        source: 'abschuesse',
-        layout: { visibility: 'none' },
-        paint: { 'circle-radius': 7, 'circle-color': ['coalesce', ['get', 'farbe'], '#c0392b'], 'circle-stroke-color': '#fff', 'circle-stroke-width': 1.5 },
-      });
-      for (const t of EINRICHTUNGSTYPEN) m.addImage(`einr-${t.wert}`, einrichtungsBild(t.wert, t.farbe), { pixelRatio: 2 });
-      m.addLayer({
-        id: 'einrichtungen-punkt',
-        type: 'symbol',
-        source: 'einrichtungen',
-        layout: {
-          'icon-image': ['concat', 'einr-', ['get', 'typ']],
-          'icon-size': ['interpolate', ['linear'], ['zoom'], 10, 0.8, 16, 1.3],
-          'icon-allow-overlap': true,
-          'icon-ignore-placement': true,
-        },
-      });
+      m.addLayer({ id: 'grenze-linie', type: 'line', source: 'grenze', paint: { 'line-color': '#e4572e', 'line-width': 3 } });
       m.addLayer({
         id: 'zeichnung-flaeche',
         type: 'fill',
@@ -572,17 +210,19 @@ export default function Karte({
         type: 'circle',
         source: 'zeichnung',
         filter: ['==', ['geometry-type'], 'Point'],
-        paint: { 'circle-radius': ['case', ['==', ['get', 'sel'], 1], 9, 6], 'circle-color': ['case', ['==', ['get', 'sel'], 1], '#1f6fb2', '#fff'], 'circle-stroke-color': '#1f6fb2', 'circle-stroke-width': 2 },
+        paint: {
+          'circle-radius': ['case', ['==', ['get', 'sel'], 1], 9, 6],
+          'circle-color': ['case', ['==', ['get', 'sel'], 1], '#1f6fb2', '#fff'],
+          'circle-stroke-color': '#1f6fb2',
+          'circle-stroke-width': 2,
+        },
       });
-
-      for (const ebene of ['einrichtungen-punkt', 'pirschwege-linie', 'treiberrouten-linie', 'wte-routen-linie', 'zonen-flaeche']) {
-        m.on('mouseenter', ebene, () => {
-          if (!modusRef.current) m.getCanvas().style.cursor = 'pointer';
-        });
-        m.on('mouseleave', ebene, () => {
-          m.getCanvas().style.cursor = '';
-        });
-      }
+      m.on('mouseenter', 'bestaende-flaeche', () => {
+        if (!modusRef.current) m.getCanvas().style.cursor = 'pointer';
+      });
+      m.on('mouseleave', 'bestaende-flaeche', () => {
+        m.getCanvas().style.cursor = '';
+      });
       geladen = true;
       window.clearTimeout(zeitlimit);
       setKartenFehler(null);
@@ -607,22 +247,13 @@ export default function Karte({
     if (!m || !bereit || !daten) return;
     const setzen = (id: string, fc: FeatureCollection) => (m.getSource(id) as GeoJSONSource | undefined)?.setData(fc);
     setzen('grenze', { type: 'FeatureCollection', features: daten.grenze ? [{ type: 'Feature', geometry: daten.grenze, properties: {} }] : [] });
-    setzen('zonen', { type: 'FeatureCollection', features: daten.zonen });
-    setzen('einrichtungen', { type: 'FeatureCollection', features: daten.einrichtungen });
-    setzen('pirschwege', { type: 'FeatureCollection', features: daten.pirschwege });
-    setzen('beobachtungen', { type: 'FeatureCollection', features: gefiltert.beobachtungen });
-    setzen('abschuesse', { type: 'FeatureCollection', features: gefiltert.abschuesse });
-    setzen('heatquelle', { type: 'FeatureCollection', features: gefiltert[heatQuelle] });
+    setzen('bestaende', { type: 'FeatureCollection', features: daten.bestaende });
     grenzeRef.current = daten.grenze;
 
-    // Handy: Luftbild nur für die Reviergrenze (+ ca. 150 m Rand); Tablet/PC: für den gesamten Kartenausschnitt
+    // Handy: Luftbild nur für die Betriebsgrenze (+ ca. 150 m Rand); Tablet/PC: für den gesamten Kartenausschnitt
     // Nur neu aufbauen, wenn sich die Ausdehnung wirklich geändert hat – sonst lädt der Browser alle Kacheln erneut
     const bb = daten.grenze ? grenzen([daten.grenze]) : null;
-    const schluessel = ISTHANDY
-      ? bb
-        ? 'handy:' + [bb.getWest(), bb.getSouth(), bb.getEast(), bb.getNorth()].map((v) => v.toFixed(5)).join(',')
-        : ''
-      : 'voll';
+    const schluessel = ISTHANDY ? (bb ? 'handy:' + [bb.getWest(), bb.getSouth(), bb.getEast(), bb.getNorth()].map((v) => v.toFixed(5)).join(',') : '') : 'voll';
     if (schluessel !== luftbildSchluessel.current || ((bb || !ISTHANDY) && !m.getLayer('luftbild'))) {
       luftbildSchluessel.current = schluessel;
       if (m.getLayer('luftbild')) m.removeLayer('luftbild');
@@ -638,68 +269,30 @@ export default function Karte({
           ...(ISTHANDY && bb ? { bounds: [bb.getWest() - rand, bb.getSouth() - rand, bb.getEast() + rand, bb.getNorth() + rand] as [number, number, number, number] } : {}),
           attribution: `Luftbild © GeoBasis-DE/LGLN ${new Date().getFullYear()}, Daten geändert`,
         });
-        m.addLayer(
-          { id: 'luftbild', type: 'raster', source: 'luftbild', layout: { visibility: ebenen.luftbild ? 'visible' : 'none' } },
-          'zonen-flaeche',
-        );
+        m.addLayer({ id: 'luftbild', type: 'raster', source: 'luftbild', layout: { visibility: ebenen.luftbild ? 'visible' : 'none' } }, 'bestaende-flaeche');
       }
     }
 
-    // Zonennamen als HTML-Beschriftung (kommt ohne Schrift-Server aus)
-    for (const mk of zonenMarker.current) mk.remove();
-    zonenMarker.current = daten.zonen.map((f) => {
+    // Bestandsnamen als HTML-Beschriftung (kommt ohne Schrift-Server aus)
+    for (const mk of beschriftungen.current) mk.remove();
+    beschriftungen.current = daten.bestaende.map((f) => {
       const el = document.createElement('div');
       el.className = 'zonen-beschriftung';
-      el.dataset.ebene = String(f.properties?.ebene_id ?? 'ohne');
-      el.dataset.zone = String(f.properties?.id ?? '');
-      el.dataset.name = String(f.properties?.name ?? '');
       el.textContent = String(f.properties?.name ?? '');
+      el.style.display = ebenen.bestaende ? '' : 'none';
       return new Marker({ element: el }).setLngLat(mittelpunkt(f.geometry)).addTo(m);
     });
-    zonenBeschriftungenAnzeigen();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [daten, bereit, gefiltert, heatQuelle]);
+  }, [daten, bereit]);
 
-  // WTE-Modus: kleiner Zähler an der Zone
-  useEffect(() => {
-    for (const mk of zonenMarker.current) {
-      const el = mk.getElement();
-      const n = wte ? wteSummen[el.dataset.zone ?? ''] : undefined;
-      el.replaceChildren(el.dataset.name ?? '');
-      if (n) {
-        const b = document.createElement('span');
-        b.className = 'zonen-summe';
-        b.textContent = String(n);
-        b.title = 'Sichtungen in der laufenden Zählung';
-        el.appendChild(b);
-      }
-    }
-  }, [wteSummen, wte, daten, bereit, gefiltert, heatQuelle]);
-
-  function zonenBeschriftungenAnzeigen() {
-    for (const mk of zonenMarker.current) {
-      const el = mk.getElement();
-      const ebene = el.dataset.ebene ?? 'ohne';
-      el.style.display = wte ? (wteEbenenIds.includes(ebene) ? '' : 'none') : ebenen.zonen && !ausgeblendet.has(ebene) ? '' : 'none';
-    }
-  }
-
-  // Beim ersten Laden auf das Revier zoomen, sonst auf den eigenen Standort
+  // Beim ersten Laden auf den Betrieb zoomen, sonst auf den eigenen Standort
   const gezoomt = useRef(false);
   useEffect(() => {
     const m = karte.current;
     if (!m || !daten || gezoomt.current) return;
     gezoomt.current = true;
-    const geometrien: Geometry[] = [
-      ...(daten.grenze ? [daten.grenze] : []),
-      ...daten.zonen.map((f) => f.geometry),
-      ...daten.einrichtungen.map((f) => f.geometry),
-      ...daten.pirschwege.map((f) => f.geometry),
-    ];
-    const b = grenzen(geometrien);
-    // Auf breiten Bildschirmen liegt das Werkzeug-Panel links über der Karte
-    const links = 40;
-    if (b) m.fitBounds(b, { padding: { top: 40, bottom: 60, left: links, right: 60 }, maxZoom: 16, duration: 0 });
+    const b = grenzen([...(daten.grenze ? [daten.grenze] : []), ...daten.bestaende.map((f) => f.geometry)]);
+    if (b) m.fitBounds(b, { padding: { top: 40, bottom: 60, left: 40, right: 60 }, maxZoom: 16, duration: 0 });
     else
       navigator.geolocation?.getCurrentPosition(
         (p) => m.jumpTo({ center: [p.coords.longitude, p.coords.latitude], zoom: 14 }),
@@ -708,62 +301,16 @@ export default function Karte({
       );
   }, [daten]);
 
-  // Felder: Daten in die Quelle, Gruppen ausblenden
-  useEffect(() => {
-    const m = karte.current;
-    if (!m || !bereit) return;
-    (m.getSource('felder') as GeoJSONSource | undefined)?.setData(felder.fc as unknown as FeatureCollection);
-  }, [felder.fc, bereit]);
-  useEffect(() => {
-    const m = karte.current;
-    if (!m || !bereit || !m.getLayer('felder-flaeche')) return;
-    const filter = (gruppenAus.length ? ['!', ['in', ['get', 'fruchtgruppe'], ['literal', gruppenAus]]] : null) as unknown as Parameters<typeof m.setFilter>[1];
-    m.setFilter('felder-flaeche', filter);
-    m.setFilter('felder-linie', filter);
-  }, [gruppenAus, bereit]);
-
   // Ebenen ein-/ausblenden
   useEffect(() => {
     const m = karte.current;
     if (!m || !bereit) return;
-    const sichtbar = (ebene: string, an: boolean) => m.setLayoutProperty(ebene, 'visibility', an ? 'visible' : 'none');
-    // OSM bleibt als Hintergrund außerhalb des Reviers sichtbar
-    // Im WTE-Modus nur Grenze, Hintergrund und Zonen der WTE-Ebenen
-    if (m.getLayer('luftbild')) sichtbar('luftbild', ebenen.luftbild);
-    sichtbar('grenze-linie', wte ? true : ebenen.grenze);
-    sichtbar('felder-flaeche', !wte && ebenen.felder);
-    sichtbar('felder-linie', !wte && ebenen.felder);
-    sichtbar('zonen-flaeche', wte ? true : ebenen.zonen);
-    sichtbar('zonen-linie', wte ? true : ebenen.zonen);
-    sichtbar('einrichtungen-punkt', !wte && ebenen.einrichtungen);
-    sichtbar('pirschwege-linie', !wte && ebenen.pirschwege);
-    sichtbar('treiberrouten-linie', !wte && ebenen.treiberrouten);
-    sichtbar('treiberrouten-pfeile', !wte && ebenen.treiberrouten);
-    // WTE-Routen sind im WTE-Modus immer sichtbar
-    sichtbar('wte-routen-linie', wte || ebenen.wteRouten);
-    sichtbar('wte-routen-pfeile', wte || ebenen.wteRouten);
-    // Routenebenen einzeln ausblenden; im WTE-Modus nur WTE-Routen aus WTE-aktiven Ebenen, Treiberrouten nur offener Jagden
-    const ebeneAus = ['!', ['in', ['coalesce', ['get', 'ebene_id'], 'ohne'], ['literal', routenEinst.aus]]];
-    const routenFilter = (typ: string, extra?: unknown) =>
-      ['all', ['==', ['get', 'typ'], typ], ebeneAus, ...(extra ? [extra] : [])] as unknown as Parameters<typeof m.setFilter>[1];
-    m.setFilter('pirschwege-linie', routenFilter('pirschweg'));
-    const treiberOffen = ['!=', ['get', 'jagd_offen'], false];
-    m.setFilter('treiberrouten-linie', routenFilter('treiberroute', treiberOffen));
-    m.setFilter('treiberrouten-pfeile', routenFilter('treiberroute', treiberOffen));
-    const wteRoute = wte ? ['in', ['coalesce', ['get', 'ebene_id'], 'ohne'], ['literal', wteRoutenEbenenIds]] : undefined;
-    m.setFilter('wte-routen-linie', routenFilter('wte_route', wteRoute));
-    m.setFilter('wte-routen-pfeile', routenFilter('wte_route', wteRoute));
-    sichtbar('heatmap', !wte && ebenen.heatmap);
-    sichtbar('abschuesse-punkt', !wte && ebenen.abschuesse);
-    // Einzelne Zonenebenen ein-/ausblenden
-    const filter = (wte
-      ? ['in', ['get', 'ebene_id'], ['literal', wteEbenenIds]]
-      : ['!', ['in', ['get', 'ebene_id'], ['literal', [...ausgeblendet]]]]) as unknown as Parameters<typeof m.setFilter>[1];
-    m.setFilter('zonen-flaeche', filter);
-    m.setFilter('zonen-linie', filter);
-    zonenBeschriftungenAnzeigen();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ebenen, bereit, ausgeblendet, wte, wteEbenenIds, routenEinst.aus, wteRoutenEbenenIds]);
+    const sichtbar = (ebene: string, an: boolean) => m.getLayer(ebene) && m.setLayoutProperty(ebene, 'visibility', an ? 'visible' : 'none');
+    sichtbar('luftbild', ebenen.luftbild);
+    sichtbar('grenze-linie', ebenen.grenze);
+    for (const s of EBENEN_SCHICHTEN.bestaende) sichtbar(s, ebenen.bestaende);
+    for (const mk of beschriftungen.current) mk.getElement().style.display = ebenen.bestaende ? '' : 'none';
+  }, [ebenen, bereit, daten]);
 
   // Reihenfolge und Transparenz der Ebenen
   useEffect(() => {
@@ -774,41 +321,25 @@ export default function Karte({
       if (m.getLayer(schicht)) (m.setPaintProperty as (s: string, e: string, w: number) => void)(schicht, eigenschaft, wert);
     };
     setze('luftbild', 'raster-opacity', d.luftbild);
-    setze('felder-flaeche', 'fill-opacity', d.felder);
-    setze('felder-linie', 'line-opacity', Math.min(1, d.felder * 1.5));
-    setze('zonen-flaeche', 'fill-opacity', d.zonen * 0.4);
-    setze('zonen-linie', 'line-opacity', Math.min(1, d.zonen * 1.8));
+    setze('bestaende-flaeche', 'fill-opacity', d.bestaende * 0.4);
+    setze('bestaende-linie', 'line-opacity', Math.min(1, d.bestaende * 1.8));
     setze('grenze-linie', 'line-opacity', d.grenze);
-    setze('heatmap', 'heatmap-opacity', d.heatmap);
-    // Routen: Gruppen-Deckkraft mal Deckkraft der jeweiligen Ebene
-    const routenDeckkraft = (gruppe: number) => {
-      const paare = Object.entries(routenEinst.transparenz).flatMap(([id, t]) => [id, 1 - t / 100]);
-      return (paare.length ? ['*', gruppe, ['match', ['coalesce', ['get', 'ebene_id'], 'ohne'], ...paare, 1]] : gruppe) as unknown as number;
-    };
-    setze('pirschwege-linie', 'line-opacity', routenDeckkraft(d.pirschwege));
-    setze('treiberrouten-linie', 'line-opacity', routenDeckkraft(d.treiberrouten));
-    setze('treiberrouten-pfeile', 'icon-opacity', routenDeckkraft(d.treiberrouten));
-    setze('wte-routen-linie', 'line-opacity', routenDeckkraft(d.wteRouten));
-    setze('wte-routen-pfeile', 'icon-opacity', routenDeckkraft(d.wteRouten));
-    setze('abschuesse-punkt', 'circle-opacity', d.abschuesse);
-    setze('abschuesse-punkt', 'circle-stroke-opacity', d.abschuesse);
-    setze('einrichtungen-punkt', 'icon-opacity', d.einrichtungen);
-    for (const mk of zonenMarker.current) mk.getElement().style.opacity = String(Math.min(1, d.zonen * 1.8));
+    for (const mk of beschriftungen.current) mk.getElement().style.opacity = String(Math.min(1, d.bestaende * 1.8));
     // von unten nach oben jeweils an die Spitze stellen; Zeichnung bleibt immer ganz oben
     for (const id of [...einst.reihenfolge].reverse()) {
       for (const schicht of EBENEN_SCHICHTEN[id]) if (m.getLayer(schicht)) m.moveLayer(schicht);
     }
     for (const schicht of ['zeichnung-flaeche', 'zeichnung-linie', 'zeichnung-punkte']) if (m.getLayer(schicht)) m.moveLayer(schicht);
-  }, [einst, bereit, daten, routenEinst.transparenz]);
+  }, [einst, bereit, daten]);
 
-  // Ausgewählte Zone hervorheben
+  // Ausgewählten Bestand hervorheben
   useEffect(() => {
     const m = karte.current;
-    if (!m || !bereit || !m.getLayer('zonen-auswahl')) return;
-    m.setFilter('zonen-auswahl', ['==', ['get', 'id'], gewaehlteZone?.id ?? '']);
-  }, [gewaehlteZone, bereit]);
+    if (!m || !bereit || !m.getLayer('bestaende-auswahl')) return;
+    m.setFilter('bestaende-auswahl', ['==', ['get', 'id'], gewaehlt?.id ?? '']);
+  }, [gewaehlt, bereit]);
   useEffect(() => {
-    if (modus) setGewaehlteZone(null);
+    if (modus) setGewaehlt(null);
   }, [modus]);
 
   // Zeichnung anzeigen
@@ -816,88 +347,49 @@ export default function Karte({
     const m = karte.current;
     if (!m || !bereit) return;
     const features: Feature[] = punkte.map((p, i) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: p }, properties: { sel: i === gewaehlterPunkt ? 1 : 0 } }));
-    const istFlaeche = modus?.art === 'grenze' || modus?.art === 'zone';
-    if (punkte.length >= 3 && istFlaeche) {
-      features.push({ type: 'Feature', geometry: { type: 'Polygon', coordinates: [[...punkte, punkte[0]!]] }, properties: {} });
-    } else if (punkte.length >= 2) {
-      features.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: punkte }, properties: {} });
-    }
+    if (punkte.length >= 3) features.push({ type: 'Feature', geometry: { type: 'Polygon', coordinates: [[...punkte, punkte[0]!]] }, properties: {} });
+    else if (punkte.length === 2) features.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: punkte }, properties: {} });
     (m.getSource('zeichnung') as GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features });
-  }, [punkte, modus, bereit, gewaehlterPunkt]);
+  }, [punkte, bereit, gewaehlterPunkt]);
 
-  // Klicks: im Zeichenmodus Punkte setzen, sonst Details anzeigen
+  // Klicks: im Zeichenmodus Punkte setzen, sonst Bestand anzeigen
   useEffect(() => {
     const m = karte.current;
     if (!m || !bereit) return;
     const klick = (e: MapMouseEvent) => {
       const aktiv = modusRef.current;
       const pos: Position = [e.lngLat.lng, e.lngLat.lat];
-      if (wte && !aktiv) {
-        // WTE-Modus: Tippen auf eine WTE-Zone öffnet die Sichtungserfassung
-        const z = m.queryRenderedFeatures(e.point, { layers: ['zonen-flaeche'] })[0];
-        if (z) {
-          const p = z.properties ?? {};
-          setWteMenue(false);
-          setWteZone({ id: String(p.id), name: String(p.name ?? ''), ebeneId: p.ebene_id && p.ebene_id !== 'ohne' ? String(p.ebene_id) : null });
-          void sitzungLaden();
-        }
-        return;
-      }
-      if (verschiebeAktiv.current) return; // beim Verschieben nur der Marker
-      if (aktiv?.art === 'einrichtung') {
-        setNeueEinrichtung(pos);
-        return;
-      }
-      if (aktiv?.art === 'zone' && aktiv.bearbeiten) return; // eigener Handler (Punkte ziehen/einfügen)
-      if (aktiv && aktiv.art !== 'aufzeichnung' && !sheetArt) {
+      if (aktiv?.art === 'bestand' && aktiv.bearbeiten) return; // eigener Handler (Punkte ziehen/einfügen)
+      if (aktiv && !zuordnen) {
         const grenze = grenzeRef.current;
-        if (aktiv.art === 'zone' && grenze && !punktInFlaeche(pos, grenze)) {
-          // Zonen dürfen nicht über die Reviergrenze hinausgehen
+        if (aktiv.art === 'bestand' && grenze && !punktInFlaeche(pos, grenze)) {
+          // Bestände dürfen nicht über die Betriebsgrenze hinausgehen
           setPunkte((alt) => [...alt, naechsterRandpunkt(pos, grenze)]);
-          setMeldung({ art: 'info', text: 'Punkt lag außerhalb und wurde auf die Reviergrenze gesetzt.' });
+          setMeldung({ art: 'info', text: 'Punkt lag außerhalb und wurde auf die Betriebsgrenze gesetzt.' });
           return;
         }
         setPunkte((alt) => [...alt, pos]);
         return;
       }
       if (aktiv) return;
-      const treffer = m.queryRenderedFeatures(e.point, { layers: ['einrichtungen-punkt', 'abschuesse-punkt', 'pirschwege-linie', 'treiberrouten-linie', 'wte-routen-linie', 'zonen-flaeche', 'felder-flaeche'] });
-      // Einrichtungen haben Vorrang vor allem, was darunter liegt (z. B. Zonen)
-      const f = treffer.find((x) => x.layer.id === 'einrichtungen-punkt') ?? treffer[0];
+      const f = m.queryRenderedFeatures(e.point, { layers: ['bestaende-flaeche'] })[0];
       if (!f) {
-        setGewaehlteZone(null);
-        setEinrSheet(null);
+        setGewaehlt(null);
         return;
       }
-      if (f.layer.id === 'einrichtungen-punkt' && f.geometry.type === 'Point') {
-        const p = f.properties ?? {};
-        const [lng, lat] = f.geometry.coordinates as [number, number];
-        setGewaehlteZone(null);
-        setEinrSheet({ id: String(p.id), name: (p.name as string | null) || null, typ: p.typ as Enums<'einrichtung_typ'>, bemerkung: (p.bemerkung as string | null) || null, lng, lat });
-        return;
-      }
-      if (f.layer.id === 'felder-flaeche') {
-        setEinrSheet(null);
-        setGewaehlteZone(null);
-        setFeldSheet(f.properties as unknown as FeldProps);
-        return;
-      }
-      if (f.layer.id === 'zonen-flaeche') {
-        setEinrSheet(null);
-        setFeldSheet(null);
-        const p = f.properties ?? {};
-        setGewaehlteZone({
-          id: String(p.id),
-          name: String(p.name ?? ''),
-          farbe: (p.farbe as string | null) ?? null,
-          flaecheHa: p.flaeche_ha != null ? Number(p.flaeche_ha) : null,
-        });
-        return;
-      }
-      new Popup({ closeButton: true, maxWidth: '260px' })
-        .setLngLat(e.lngLat)
-        .setDOMContent(popupInhalt(f.layer.id, f.properties ?? {}))
-        .addTo(m);
+      const p = f.properties ?? {};
+      // MapLibre liefert verschachtelte Eigenschaften als JSON-Text
+      const roh = typeof p.baumarten === 'string' ? (() => { try { return JSON.parse(p.baumarten as string) as unknown; } catch { return []; } })() : p.baumarten;
+      setGewaehlt({
+        id: String(p.id),
+        name: String(p.name ?? ''),
+        farbe: (p.farbe as string | null) ?? null,
+        flaecheHa: p.flaeche_ha != null ? Number(p.flaeche_ha) : null,
+        bestandestyp: (p.bestandestyp as string | null) ?? null,
+        baumarten: baumartenLesen(roh),
+        pflanzjahr: p.pflanzjahr != null ? Number(p.pflanzjahr) : null,
+        vorratVfmHa: p.vorrat_vfm_ha != null ? Number(p.vorrat_vfm_ha) : null,
+      });
     };
     m.on('click', klick);
     if (modus) m.doubleClickZoom.disable();
@@ -905,11 +397,10 @@ export default function Karte({
     return () => {
       m.off('click', klick);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bereit, modus, k.istInhaber, wildarten, wte, sheetArt]);
+  }, [bereit, modus, zuordnen]);
 
-  // Zone bearbeiten: Eckpunkte ziehen, Linie antippen = Punkt einfügen, Punkt antippen = markieren
-  const bearbeitet = modus?.art === 'zone' && !!modus.bearbeiten;
+  // Bestand bearbeiten: Eckpunkte ziehen, Linie antippen = Punkt einfügen, Punkt antippen = markieren
+  const bearbeitet = modus?.art === 'bestand' && !!modus.bearbeiten;
   useEffect(() => {
     const m = karte.current;
     if (!m || !bereit || !bearbeitet) return;
@@ -1005,12 +496,12 @@ export default function Karte({
     };
   }, [bereit, bearbeitet]);
 
-  // Vorhandene Zone zur Bearbeitung der Eckpunkte laden (größte Teilfläche; weitere Teile und Löcher bleiben erhalten)
-  function zoneBearbeiten(zoneId: string, name: string) {
-    const f = daten?.zonen.find((z) => String(z.id ?? (z.properties as { id?: string } | null)?.id) === zoneId);
+  // Vorhandenen Bestand zur Bearbeitung der Eckpunkte laden (größte Teilfläche; weitere Teile und Löcher bleiben erhalten)
+  function bestandBearbeiten(bestandId: string, name: string) {
+    const f = daten?.bestaende.find((b) => String((b.properties as { id?: string } | null)?.id ?? b.id) === bestandId);
     const g = f?.geometry;
     if (!g || (g.type !== 'Polygon' && g.type !== 'MultiPolygon')) {
-      setMeldung({ art: 'fehler', text: 'Diese Zone hat noch keine Fläche.' });
+      setMeldung({ art: 'fehler', text: 'Dieser Bestand hat noch keine Fläche.' });
       return;
     }
     const teile: Position[][][] = g.type === 'Polygon' ? [g.coordinates] : g.coordinates;
@@ -1024,454 +515,135 @@ export default function Karte({
       if (flaeche(t[0]!) > flaeche(teile[wahl]![0]!)) wahl = i;
     });
     const ring = teile[wahl]![0]!.slice(0, -1);
-    setModus({ art: 'zone', zoneId, name, bearbeiten: true });
-    zonenRest.current = { teile: teile.filter((_, i) => i !== wahl), loecher: teile[wahl]!.slice(1) };
+    setModus({ art: 'bestand', bestandId, name, bearbeiten: true });
+    flaechenRest.current = { teile: teile.filter((_, i) => i !== wahl), loecher: teile[wahl]!.slice(1) };
     setPunkte(ring);
-    setGewaehlteZone(null);
     setMeldung({ art: 'info', text: 'Punkte ziehen · auf eine Linie tippen fügt einen Punkt ein · Punkt antippen und „Punkt löschen“.' });
   }
 
-  // Eigenen Standort verfolgen, solange die Windpfeile an sind
-  useEffect(() => {
-    if (!windpfeile || !navigator.geolocation) return;
-    const id = navigator.geolocation.watchPosition(
-      (p) => setEigenePos([p.coords.longitude, p.coords.latitude]),
-      () => setEigenePos(null),
-      { enableHighAccuracy: true, maximumAge: 15000, timeout: 20000 },
-    );
-    return () => navigator.geolocation.clearWatch(id);
-  }, [windpfeile]);
-
-  // Windpfeile: 1–4 animierte Pfeile ab dem eigenen Punkt in Windrichtung (wohin der Wind weht)
-  useEffect(() => {
-    const m = karte.current;
-    windMarker.current?.remove();
-    windMarker.current = null;
-    if (!m || !bereit || !windpfeile || !wind) return;
-    const punkt = eigenePos ?? (() => { const c = m.getCenter(); return [c.lng, c.lat] as [number, number]; })();
-    const anzahl = wind.windKmh < 6 ? 1 : wind.windKmh < 16 ? 2 : wind.windKmh < 30 ? 3 : 4;
-    const dauer = 2.4;
-    const el = document.createElement('div');
-    el.className = 'windpfeile';
-    el.setAttribute('aria-hidden', 'true');
-    el.innerHTML =
-      '<span class="windpfeile-punkt"></span>' +
-      Array.from({ length: anzahl }, (_, i) => `<svg class="windpfeil-n" style="animation-duration:${dauer}s;animation-delay:${((i * dauer) / anzahl).toFixed(2)}s" viewBox="0 0 24 24"><path d="M12 2 L21 20 L12 15 L3 20 Z" /></svg>`).join('');
-    windMarker.current = new Marker({ element: el, rotation: (wind.windRichtung + 180) % 360, rotationAlignment: 'map', pitchAlignment: 'map' }).setLngLat(punkt).addTo(m);
-    return () => {
-      windMarker.current?.remove();
-      windMarker.current = null;
-    };
-  }, [bereit, windpfeile, wind, eigenePos]);
-
-  // Wind am Kartenmittelpunkt
-  const windLaden = useCallback(async () => {
-    const m = karte.current;
-    if (!m) return;
-    const c = m.getCenter();
-    setWetterOrt([c.lat, c.lng]);
-    setWind(await aktuellesWetter(c.lat, c.lng));
-  }, []);
-  useEffect(() => {
-    if (daten) void windLaden();
-  }, [daten, windLaden]);
-
-  // Aufräumen der GPS-Aufzeichnung
-  useEffect(
-    () => () => {
-      if (aufzeichnung.current !== null) navigator.geolocation.clearWatch(aufzeichnung.current);
-    },
-    [],
-  );
-
   // ---------- Aktionen ----------
 
-  function popupInhalt(ebene: string, p: Record<string, unknown>): HTMLElement {
-    const el = document.createElement('div');
-    el.className = 'popup';
-    const titel = document.createElement('strong');
-    const text = document.createElement('p');
-    let loeschen: (() => Promise<void>) | null = null;
-
-    if (ebene === 'einrichtungen-punkt') {
-      const typ = EINRICHTUNGSTYPEN.find((t) => t.wert === p.typ)?.label ?? 'Einrichtung';
-      titel.textContent = p.name ? `${String(p.name)} (${typ})` : typ;
-      text.textContent = [p.zustand, p.bemerkung].filter(Boolean).join(' · ');
-      loeschen = async () => {
-        await supabase.from('einrichtungen').update({ geloescht_am: new Date().toISOString() }).eq('id', String(p.id));
-      };
-    } else if (ebene === 'abschuesse-punkt') {
-      titel.textContent = `Abschuss: ${wildartName(wildarten, String(p.wildart_id ?? ''))}`;
-      const g = GESCHLECHTER.find((x) => x.wert === p.geschlecht)?.label ?? 'unbekannt';
-      text.textContent = `${datumZeitDE(String(p.erlegt_am ?? p.zeitpunkt ?? ''))} · ${g}`;
-    } else if (ebene === 'pirschwege-linie' || ebene === 'treiberrouten-linie' || ebene === 'wte-routen-linie') {
-      titel.textContent = `${ebene === 'treiberrouten-linie' ? 'Treiberroute' : ebene === 'wte-routen-linie' ? 'WTE-Route' : 'Pirschweg'}: ${String(p.name ?? '')}`;
-      text.textContent = `${Number(p.laenge_m ?? 0).toLocaleString('de-DE')} m${p.bemerkung ? ` · ${String(p.bemerkung)}` : ''}`;
-      loeschen = async () => {
-        await supabase.from('pirschwege').update({ geloescht_am: new Date().toISOString() }).eq('id', String(p.id));
-      };
-    } else {
-      titel.textContent = `Zone: ${String(p.name ?? '')}`;
-    }
-    el.append(titel, text);
-
-    if (k.istInhaber && loeschen) {
-      const knopf = document.createElement('button');
-      knopf.className = 'link gefahr';
-      knopf.textContent = 'Entfernen';
-      const aktion = loeschen;
-      knopf.onclick = async () => {
-        if (!window.confirm('Wirklich entfernen?')) return;
-        await aktion();
-        document.querySelectorAll('.maplibregl-popup').forEach((x) => x.remove());
-        await laden();
-      };
-      el.append(knopf);
-    }
-    return el;
-  }
-
-  // „Speichern“ in der Zeichenleiste: prüfen und – außer bei einer bestehenden Zone – Details im Bottom-Sheet abfragen
   function zeichnungAbschliessen() {
-    if (!modus || modus.art === 'einrichtung') return;
+    if (!modus) return;
     setMeldung(null);
-    if (modus.art === 'grenze' || modus.art === 'zone') {
-      if (punkte.length < 3) {
-        setMeldung({ art: 'fehler', text: 'Bitte mindestens drei Punkte setzen.' });
-        return;
-      }
-      if (modus.art === 'zone' && modus.zoneId) {
-        void zeichnungSpeichern();
-        return;
-      }
-      setSheetFehler(null);
-      setSheetArt(modus.art);
-    } else {
-      if (punkte.length < 2) {
-        setMeldung({ art: 'fehler', text: `Eine ${ROUTENNAME[modus.typ]} braucht mindestens zwei Punkte.` });
-        return;
-      }
-      setSheetFehler(null);
-      setSheetArt(modus.typ);
+    if (punkte.length < 3) {
+      setMeldung({ art: 'fehler', text: 'Bitte mindestens drei Punkte setzen.' });
+      return;
     }
+    // Neuer Bestand: erst fragen, zu welchem Bestand die Fläche gehört
+    if (modus.art === 'bestand' && !modus.bestandId) {
+      setZuordnen(true);
+      return;
+    }
+    void zeichnungSpeichern(modus.art === 'bestand' ? { bestandId: modus.bestandId, name: modus.name } : undefined);
   }
 
-  async function zeichnungSpeichern(w?: SheetWerte) {
-    if (!modus || modus.art === 'einrichtung') return;
+  async function zeichnungSpeichern(ziel?: { bestandId: string | null; name: string }) {
+    if (!modus) return;
     setMeldung(null);
-    setSheetSpeichert(true);
+    setSpeichert(true);
     try {
-      if (modus.art === 'grenze' || modus.art === 'zone') {
-        const aussen = [...punkte, punkte[0]!];
-        const geojson = (
-          modus.art === 'zone' && modus.bearbeiten
-            ? zonenRest.current.teile.length
-              ? { type: 'MultiPolygon', coordinates: [[aussen, ...zonenRest.current.loecher], ...zonenRest.current.teile] }
-              : { type: 'Polygon', coordinates: [aussen, ...zonenRest.current.loecher] }
-            : { type: 'Polygon', coordinates: [aussen] }
-        ) as unknown as Json;
-        if (modus.art === 'grenze') {
-          const { data, error } = await supabase.rpc('grenze_setzen', { p_revier_id: k.revierId, p_geojson: geojson });
-          if (error) throw error;
-          setMeldung({ art: 'erfolg', text: `Reviergrenze gespeichert · ${Number(data).toLocaleString('de-DE')} ha` });
-          await k.neuLaden();
-        } else {
-          let zoneId = modus.zoneId ?? w?.zoneId ?? null;
-          let name = modus.name;
-          const neu = !zoneId;
-          if (!zoneId) {
-            if (!w) return;
-            name = w.name;
-            const ziel = daten?.ebenen.find((e) => e.id === w.ebeneId);
-            const { data: angelegt, error: anlegeFehler } = await supabase
-              .from('zonen')
-              .insert({
-                revier_id: k.revierId,
-                name,
-                ebene_id: ziel?.id ?? null,
-                sortierung: zonen.length,
-                farbe: w.farbe || ziel?.farbe || ZONENFARBEN[zonen.length % ZONENFARBEN.length],
-              })
-              .select('id')
-              .single();
-            if (anlegeFehler) throw anlegeFehler;
-            zoneId = angelegt.id;
-            if (ziel && w.wteAktiv !== !!ziel.wte_aktiv) await supabase.from('zonen_ebenen').update({ wte_aktiv: w.wteAktiv }).eq('id', ziel.id);
-          } else if (w?.zoneId) {
-            name = zonen.find((z) => z.id === w.zoneId)?.name ?? name;
-          }
-          const { data: ha, error } = await supabase.rpc('zone_geometrie_setzen', { p_zone_id: zoneId, p_geojson: geojson });
-          if (error) {
-            // Neu angelegte Zone ohne gültige Fläche wieder entfernen
-            if (neu) await supabase.from('zonen').delete().eq('id', zoneId);
-            throw error;
-          }
-          setMeldung({ art: 'erfolg', text: `Zone „${name}“ gespeichert · ${Number(ha).toLocaleString('de-DE')} ha (auf Reviergrenze zugeschnitten)` });
-          await zonenLaden();
-        }
-      } else {
-        if (!w) return;
-        let ebeneId = w.routenEbeneId || null;
-        if (w.neueEbeneName) {
-          const { data: neueEbene, error: ebeneFehler } = await supabase
-            .from('routen_ebenen')
-            .insert({ revier_id: k.revierId, name: w.neueEbeneName, typ: modus.typ, reihenfolge: routenEbenen.length, wte_aktiv: modus.typ === 'wte_route', farbe: ZONENFARBEN[(routenEbenen.length + 3) % ZONENFARBEN.length] })
+      const aussen = [...punkte, punkte[0]!];
+      const geojson = (
+        modus.art === 'bestand' && modus.bearbeiten
+          ? flaechenRest.current.teile.length
+            ? { type: 'MultiPolygon', coordinates: [[aussen, ...flaechenRest.current.loecher], ...flaechenRest.current.teile] }
+            : { type: 'Polygon', coordinates: [aussen, ...flaechenRest.current.loecher] }
+          : { type: 'Polygon', coordinates: [aussen] }
+      ) as unknown as Json;
+      if (modus.art === 'grenze') {
+        const { data, error } = await supabase.rpc('grenze_setzen', { p_betrieb_id: k.betriebId, p_geojson: geojson });
+        if (error) throw error;
+        setMeldung({ art: 'erfolg', text: `Betriebsgrenze gespeichert · ${Number(data).toLocaleString('de-DE')} ha` });
+        await k.neuLaden();
+      } else if (ziel) {
+        let bestandId = ziel.bestandId;
+        const neu = !bestandId;
+        if (!bestandId) {
+          const { data: angelegt, error: anlegeFehler } = await supabase
+            .from('bestaende')
+            .insert({ betrieb_id: k.betriebId, name: ziel.name, sortierung: bestaende.length, farbe: BESTANDSFARBEN[bestaende.length % BESTANDSFARBEN.length] })
             .select('id')
             .single();
-          if (ebeneFehler) throw ebeneFehler;
-          ebeneId = neueEbene.id;
+          if (anlegeFehler) throw anlegeFehler;
+          bestandId = angelegt.id;
         }
-        const { error } = await supabase.from('pirschwege').insert({
-          revier_id: k.revierId,
-          ebene_id: ebeneId,
-          name: w.name,
-          bemerkung: w.bemerkung || null,
-          typ: modus.typ,
-          bewegungsjagd_id: modus.typ === 'treiberroute' ? w.bewegungsjagdId || null : null,
-          zaehlsitzung_id: modus.typ === 'wte_route' ? w.sitzungId || null : null,
-          geom: linieEWKT(punkte as Array<[number, number]>),
-        });
-        if (error) throw error;
-        setMeldung({ art: 'erfolg', text: `${ROUTENNAME[modus.typ]} „${w.name}“ gespeichert` });
+        const { data: ha, error } = await supabase.rpc('bestand_geometrie_setzen', { p_bestand_id: bestandId, p_geojson: geojson });
+        if (error) {
+          // Neu angelegter Bestand ohne gültige Fläche wieder entfernen
+          if (neu) await supabase.from('bestaende').delete().eq('id', bestandId);
+          throw error;
+        }
+        setMeldung({ art: 'erfolg', text: `Bestand „${ziel.name}“ gespeichert · ${Number(ha).toLocaleString('de-DE')} ha${grenzeRef.current ? ' (auf Betriebsgrenze zugeschnitten)' : ''}` });
+        await bestaendeLaden();
       }
-      aufzeichnungStoppen();
-      setSheetArt(null);
       setModus(null);
       await laden();
     } catch (err) {
-      if (sheetArt) setSheetFehler(fehlertext(err));
-      else setMeldung({ art: 'fehler', text: fehlertext(err) });
-    } finally {
-      setSheetSpeichert(false);
-    }
-  }
-
-  function aufzeichnungStarten(typ: RouteTyp) {
-    setModus({ art: 'aufzeichnung', typ });
-    setMeldung({ art: 'info', text: 'Aufzeichnung läuft – Bildschirm eingeschaltet lassen.' });
-    aufzeichnung.current = navigator.geolocation.watchPosition(
-      (p) => {
-        if (p.coords.accuracy > 30) return;
-        const neu: Position = [p.coords.longitude, p.coords.latitude];
-        setPunkte((alt) => {
-          const letzter = alt[alt.length - 1];
-          return letzter && abstandM(letzter, neu) < 5 ? alt : [...alt, neu];
-        });
-      },
-      () => setMeldung({ art: 'fehler', text: 'GPS nicht verfügbar – bitte Ortungsfreigabe prüfen.' }),
-      { enableHighAccuracy: true, maximumAge: 0 },
-    );
-  }
-
-  function aufzeichnungStoppen() {
-    if (aufzeichnung.current !== null) navigator.geolocation.clearWatch(aufzeichnung.current);
-    aufzeichnung.current = null;
-  }
-
-  // Position einer Einrichtung speichern (einmessen oder verschieben); offline über die Warteschlange
-  async function einrichtungPosition(id: string, lng: number, lat: number): Promise<'gespeichert' | 'gemerkt'> {
-    const r = await speichernOderMerken({ tabelle: 'einrichtungen', daten: { id, geom: punktEWKT(lng, lat) } });
-    setDaten((d) =>
-      d && {
-        ...d,
-        einrichtungen: d.einrichtungen.map((f) => (f.properties?.id === id ? { ...f, geometry: { type: 'Point', coordinates: [lng, lat] } } : f)),
-      },
-    );
-    if (r === 'gespeichert') await laden();
-    return r;
-  }
-
-  async function verschiebenBestaetigen() {
-    if (!verschiebe) return;
-    setVerschiebeLaeuft(true);
-    try {
-      const r = await einrichtungPosition(verschiebe.einr.id, verschiebe.lng, verschiebe.lat);
-      setMeldung({ art: 'erfolg', text: r === 'gemerkt' ? 'Neue Position auf dem Gerät gespeichert – wird übertragen, sobald du online bist' : 'Einrichtung verschoben' });
-      setVerschiebe(null);
-    } catch (err) {
       setMeldung({ art: 'fehler', text: fehlertext(err) });
     } finally {
-      setVerschiebeLaeuft(false);
+      setSpeichert(false);
     }
-  }
-
-  // Marker zum Verschieben: Original ausblenden, Ersatzmarker ziehbar
-  useEffect(() => {
-    const m = karte.current;
-    verschiebeAktiv.current = !!verschiebe;
-    if (!m || !bereit || !verschiebe) return;
-    const id = verschiebe.einr.id;
-    const el = document.createElement('div');
-    el.className = 'verschiebe-marker';
-    el.setAttribute('aria-label', 'Einrichtung verschieben');
-    const marker = new Marker({ element: el, draggable: true }).setLngLat([verschiebe.einr.lng, verschiebe.einr.lat]).addTo(m);
-    marker.on('dragend', () => {
-      const p = marker.getLngLat();
-      setVerschiebe((v) => v && { ...v, lng: p.lng, lat: p.lat });
-    });
-    if (m.getLayer('einrichtungen-punkt')) m.setFilter('einrichtungen-punkt', einrFilter(id));
-    return () => {
-      marker.remove();
-      if (m.getLayer('einrichtungen-punkt')) m.setFilter('einrichtungen-punkt', einrFilter());
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [verschiebe?.einr.id, bereit]);
-
-  useEffect(() => {
-    const m = karte.current;
-    if (!m || !bereit || !m.getLayer('einrichtungen-punkt')) return;
-    m.setFilter('einrichtungen-punkt', einrFilter(verschiebe?.einr.id));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [typenAus, bereit]);
-
-  async function einrichtungSpeichern(typ: Enums<'einrichtung_typ'>, name: string, bemerkung: string) {
-    if (!neueEinrichtung) return;
-    if (name.trim() && nameVergeben(einrichtungsNamen, name)) {
-      setMeldung({ art: 'fehler', text: `Eine Einrichtung „${name.trim()}“ gibt es in diesem Revier bereits.` });
-      return;
-    }
-    const { error } = await supabase.from('einrichtungen').insert({
-      revier_id: k.revierId,
-      typ,
-      name: name.trim() || null,
-      bemerkung: bemerkung.trim() || null,
-      geom: punktEWKT(neueEinrichtung[0]!, neueEinrichtung[1]!),
-    });
-    if (error) {
-      setMeldung({ art: 'fehler', text: fehlertext(error) });
-      return;
-    }
-    setNeueEinrichtung(null);
-    setMeldung({ art: 'erfolg', text: 'Einrichtung gespeichert – weitere per Tippen auf die Karte setzen' });
-    await laden();
   }
 
   // ---------- Darstellung ----------
 
-  // Offenes Sheet oder Dialog am unteren Rand: die Statusleiste schrumpft zum kleinen Chip oben und bleibt so immer sichtbar
-  const sheetOffen = !!feldSheet || !!sheetArt || !!neueEinrichtung || !!einrSheet || !!gewaehlteZone || (wte && !!wteZone) || gpsImport;
-  const zeichnet = modus && modus.art !== 'einrichtung';
-  const einrichtungsNamen = (daten?.einrichtungen ?? []).map((e) => (e.properties?.name as string | null) ?? null);
-  const kartenEbenen = daten?.ebenen ?? [];
-  const hatOhneEbene = (daten?.zonen ?? []).some((z) => z.properties?.ebene_id === 'ohne');
-  const anzahlBeob = daten?.beobachtungen.length ?? 0;
-
-  const imBlock = (id: EbenenId) => id === 'heatmap' || id === 'abschuesse';
+  const zeichnet = !!modus;
+  const reglerUmschalten = (id: string) => setReglerOffen((a) => (a.includes(id) ? a.filter((x) => x !== id) : [...a, id]));
   const verschieben = (i: number, richtung: -1 | 1) =>
     setEinst((alt) => {
       const liste = [...alt.reihenfolge];
-      let j = i + richtung;
-      // Ebenen im Block „Heatmap & Abschüsse“ stehen nicht in der Liste und werden übersprungen
-      while (j >= 0 && j < liste.length && imBlock(liste[j]!)) j += richtung;
+      const j = i + richtung;
       if (j < 0 || j >= liste.length) return alt;
       [liste[i], liste[j]] = [liste[j]!, liste[i]!];
       return { ...alt, reihenfolge: liste };
     });
-  const ebenenInfo: Record<EbenenId, { name: string; label: string; an: boolean; gesperrt?: boolean; setAn: (an: boolean) => void }> = {
+  const ebenenInfo: Record<EbenenId, { name: string; label: string; an: boolean; gesperrt?: boolean }> = {
     luftbild: {
       name: 'Luftbild',
-      label: ISTHANDY ? (daten?.grenze ? 'Luftbild (LGLN, nur Revierbereich)' : 'Luftbild – erst Reviergrenze zeichnen') : 'Luftbild (LGLN)',
+      label: ISTHANDY ? (daten?.grenze ? 'Luftbild (LGLN, nur Betriebsbereich)' : 'Luftbild – erst Betriebsgrenze zeichnen') : 'Luftbild (LGLN)',
       an: ebenen.luftbild && (!ISTHANDY || !!daten?.grenze),
       gesperrt: ISTHANDY && !daten?.grenze,
-      setAn: (an) => setEbenen({ ...ebenen, luftbild: an }),
     },
-    felder: { name: 'Felder', label: 'Felder', an: ebenen.felder, setAn: (an) => setEbenen({ ...ebenen, felder: an }) },
-    zonen: { name: 'Zonen', label: 'Zonen', an: ebenen.zonen, setAn: (an) => setEbenen({ ...ebenen, zonen: an }) },
-    grenze: { name: 'Reviergrenze', label: 'Reviergrenze', an: ebenen.grenze, setAn: (an) => setEbenen({ ...ebenen, grenze: an }) },
-    heatmap: { name: 'Heatmap', label: `Heatmap ${HEATNAMEN[heatQuelle]} (${gefiltert[heatQuelle].length})`, an: ebenen.heatmap, setAn: (an) => setEbenen({ ...ebenen, heatmap: an }) },
-    pirschwege: { name: 'Pirschwege', label: 'Pirschwege', an: ebenen.pirschwege, setAn: (an) => setEbenen({ ...ebenen, pirschwege: an }) },
-    treiberrouten: { name: 'Treiberrouten', label: 'Treiberrouten', an: ebenen.treiberrouten, setAn: (an) => setEbenen({ ...ebenen, treiberrouten: an }) },
-    wteRouten: { name: 'WTE-Routen', label: 'WTE-Routen', an: ebenen.wteRouten, setAn: (an) => setEbenen({ ...ebenen, wteRouten: an }) },
-    abschuesse: {
-      name: 'Abschüsse',
-      label: `Abschüsse (${gefiltert.abschuesse.length})`,
-      an: ebenen.abschuesse,
-      setAn: (an) => setEbenen({ ...ebenen, abschuesse: an }),
-    },
-    einrichtungen: { name: 'Einrichtungen', label: 'Einrichtungen', an: ebenen.einrichtungen, setAn: (an) => setEbenen({ ...ebenen, einrichtungen: an }) },
+    bestaende: { name: 'Bestände', label: `Bestände (${daten?.bestaende.length ?? 0})`, an: ebenen.bestaende },
+    grenze: { name: 'Betriebsgrenze', label: 'Betriebsgrenze', an: ebenen.grenze },
   };
+  const ohneFlaeche = bestaende.filter((b) => !b.hatGeometrie);
 
   const werkzeuge = (
     <>
-          {meldung && <div className={`hinweis hinweis-${meldung.art}`}>{meldung.text}</div>}
-
-          <Abschnitt titel="Heatmap & Abschüsse">
-            {(['heatmap', 'abschuesse'] as const).map((id) => (
-              <div key={id} className="ebenen-block">
+      {meldung && <div className={`hinweis hinweis-${meldung.art}`}>{meldung.text}</div>}
+      <Abschnitt titel="Ebenen" offen>
+        <p className="leer" style={{ margin: 0 }}>
+          Oberste Ebene liegt über den anderen. Mit den Pfeilen verschieben, mit dem Regler die Transparenz einstellen.
+        </p>
+        <ul className="ebenen-liste">
+          {einst.reihenfolge.map((id, i) => {
+            const info = ebenenInfo[id];
+            return (
+              <li key={id}>
                 <div className="ebenen-kopf">
-                  <EbenenSchalter label={ebenenInfo[id].label} an={ebenenInfo[id].an} onAendern={ebenenInfo[id].setAn} />
-                  <span className="ebenen-schieber">{reglerKnopf(id, ebenenInfo[id].name)}</span>
+                  <EbenenSchalter label={info.label} an={info.an} gesperrt={info.gesperrt} onAendern={(an) => setEbenen({ ...ebenen, [id]: an })} />
+                  <span className="ebenen-schieber">
+                    <button
+                      type="button"
+                      className="regler-knopf"
+                      aria-label={`Transparenz-Einstellung ${info.name}`}
+                      aria-expanded={reglerOffen.includes(id)}
+                      title="Transparenz einstellen"
+                      onClick={() => reglerUmschalten(id)}
+                    >
+                      <Symbol name="einstellungen" className="symbol klein" />
+                    </button>
+                    <button type="button" aria-label={`${info.name} nach oben`} disabled={i === 0} onClick={() => verschieben(i, -1)}>
+                      <Symbol name="nachOben" className="symbol klein" />
+                    </button>
+                    <button type="button" aria-label={`${info.name} nach unten`} disabled={i === einst.reihenfolge.length - 1} onClick={() => verschieben(i, 1)}>
+                      <Symbol name="nachUnten" className="symbol klein" />
+                    </button>
+                  </span>
                 </div>
-                {id === 'heatmap' && (
-                  <div className="segmente" role="radiogroup" aria-label="Quelle der Heatmap">
-                    {(Object.keys(HEATNAMEN) as HeatQuelle[]).map((q) => (
-                      <button key={q} type="button" role="radio" aria-checked={heatQuelle === q} onClick={() => setHeatQuelle(q)}>
-                        {HEATNAMEN[q]}
-                      </button>
-                    ))}
-                  </div>
-                )}
                 {reglerOffen.includes(id) && (
-                <label className="transparenz">
-                  <span>Transparenz</span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={100}
-                    step={5}
-                    value={Math.round((1 - einst.deckkraft[id]) * 100)}
-                    aria-label={`Transparenz ${ebenenInfo[id].name}`}
-                    onChange={(e) => setEinst((alt) => ({ ...alt, deckkraft: { ...alt.deckkraft, [id]: 1 - Number(e.target.value) / 100 } }))}
-                  />
-                  <output>{Math.round((1 - einst.deckkraft[id]) * 100)} %</output>
-                </label>
-                )}
-              </div>
-            ))}
-            <label className="transparenz">
-              <span>Wildart</span>
-              <select value={wildartFilter} onChange={(e) => setWildartFilter(e.target.value)} aria-label="Wildart filtern">
-                <option value="">Alle Wildarten</option>
-                {wildarten.map((w) => (
-                  <option key={w.id} value={w.id}>
-                    {w.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="transparenz">
-              <span>Zeitraum</span>
-              <select value={tageFilter} onChange={(e) => setTageFilter(Number(e.target.value) as 30 | 90 | 365)} aria-label="Zeitraum filtern">
-                <option value={30}>Letzte 30 Tage</option>
-                <option value={90}>Letzte 90 Tage</option>
-                <option value={365}>Letzte 12 Monate</option>
-              </select>
-            </label>
-            <p className="leer" style={{ margin: 0 }}>Der Filter gilt für Heatmap und Abschüsse. Jeder Eintrag zählt einfach; Zählungen liegen in ihrer Zone.</p>
-          </Abschnitt>
-
-          <Abschnitt titel="Ebenen" offen>
-          <p className="leer" style={{ margin: 0 }}>Oberste Ebene liegt über den anderen. Mit den Pfeilen verschieben, mit dem Regler die Transparenz einstellen.</p>
-          <ul className="ebenen-liste">
-            {einst.reihenfolge.map((id, i) => {
-              if (imBlock(id)) return null;
-              const info = ebenenInfo[id];
-              const sichtbareIds = einst.reihenfolge.filter((x) => !imBlock(x));
-              return (
-                <li key={id}>
-                  <div className="ebenen-kopf">
-                    <EbenenSchalter label={info.label} an={info.an} gesperrt={info.gesperrt} onAendern={info.setAn} />
-                    <span className="ebenen-schieber">
-                      {reglerKnopf(id, info.name)}
-                      <button type="button" aria-label={`${info.name} nach oben`} disabled={id === sichtbareIds[0]} onClick={() => verschieben(i, -1)}>
-                        <Symbol name="nachOben" className="symbol klein" />
-                      </button>
-                      <button type="button" aria-label={`${info.name} nach unten`} disabled={id === sichtbareIds[sichtbareIds.length - 1]} onClick={() => verschieben(i, 1)}>
-                        <Symbol name="nachUnten" className="symbol klein" />
-                      </button>
-                    </span>
-                  </div>
-                  {reglerOffen.includes(id) && (
                   <label className="transparenz">
                     <span>Transparenz</span>
                     <input
@@ -1485,143 +657,23 @@ export default function Karte({
                     />
                     <output>{Math.round((1 - einst.deckkraft[id]) * 100)} %</output>
                   </label>
-                  )}
-                  {id === 'zonen' && ebenen.zonen && kartenEbenen.length > 0 && (
-                    <div className="unterebenen">
-                      {[...kartenEbenen, ...(hatOhneEbene ? [{ id: 'ohne', name: 'Ohne Ebene', farbe: null }] : [])].map((e) => (
-                        <label key={e.id} className="ebene">
-                          <input
-                            type="checkbox"
-                            checked={!ausgeblendet.has(e.id)}
-                            onChange={(ev) =>
-                              setAusgeblendet((alt) => {
-                                const neu = new Set(alt);
-                                if (ev.target.checked) neu.delete(e.id);
-                                else neu.add(e.id);
-                                return neu;
-                              })
-                            }
-                          />
-                          <i className="farbpunkt" style={{ background: e.farbe ?? 'var(--text-leise)' }} />
-                          {e.name}
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                  {(id === 'pirschwege' || id === 'treiberrouten' || id === 'wteRouten') && ebenen[id] && (() => {
-                    const typ = id === 'pirschwege' ? 'pirschweg' : id === 'treiberrouten' ? 'treiberroute' : 'wte_route';
-                    const liste: Array<{ id: string; name: string; farbe: string | null }> = routenEbenen.filter((e) => e.typ === typ);
-                    if ((daten?.pirschwege ?? []).some((f) => f.properties?.typ === typ && !f.properties?.ebene_id)) liste.push({ id: 'ohne', name: 'Ohne Ebene', farbe: null });
-                    if (!liste.length) return null;
-                    return (
-                      <div className="unterebenen">
-                        {liste.map((e) => (
-                          <div key={e.id} className="routen-unterebene">
-                            <label className="ebene">
-                              <input
-                                type="checkbox"
-                                checked={!routenEinst.aus.includes(e.id)}
-                                onChange={(ev) => setRoutenEinst((alt) => ({ ...alt, aus: ev.target.checked ? alt.aus.filter((x) => x !== e.id) : [...alt.aus, e.id] }))}
-                              />
-                              <i className="farbpunkt" style={{ background: e.farbe ?? routenTypFarbe(typ) }} />
-                              {e.name}
-                            </label>
-                            <span className="ebenen-schieber">{reglerKnopf(`route-${e.id}`, e.name)}</span>
-                            {reglerOffen.includes(`route-${e.id}`) && (
-                            <label className="transparenz">
-                              <span>Transparenz</span>
-                              <input
-                                type="range"
-                                min={0}
-                                max={100}
-                                step={5}
-                                value={routenEinst.transparenz[e.id] ?? 0}
-                                aria-label={`Transparenz ${e.name}`}
-                                onChange={(ev) => setRoutenEinst((alt) => ({ ...alt, transparenz: { ...alt.transparenz, [e.id]: Number(ev.target.value) } }))}
-                              />
-                              <output>{routenEinst.transparenz[e.id] ?? 0} %</output>
-                            </label>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    );
-                  })()}
-                  {id === 'felder' && ebenen.felder && (() => {
-                    const aktuelle = felder.ebenen.find((e) => e.id === felder.ebeneId);
-                    const summen = new Map<string, number>();
-                    for (const f of felder.fc.features) summen.set(f.properties.fruchtgruppe, (summen.get(f.properties.fruchtgruppe) ?? 0) + f.properties.flaeche_im_revier_ha);
-                    const gesamt = [...summen.values()].reduce((a, b) => a + b, 0);
-                    if (!felder.ebenen.length) return <p className="leer" style={{ margin: 0 }}>{felder.fehler ? 'Felder konnten nicht geladen werden.' : 'Noch keine Feldgrenzen – Import unter „Datenimport“.'}</p>;
-                    return (
-                      <>
-                        {felder.ebenen.length > 1 && (
-                          <label className="transparenz">
-                            <span>Anbaujahr</span>
-                            <select value={felder.ebeneId ?? ''} onChange={(e) => setFeldJahr(e.target.value)} aria-label="Ebene der Felder wählen">
-                              {felder.ebenen.map((e) => (
-                                <option key={e.id} value={e.id}>{e.name}{e.anbaujahr ? ` (${e.anbaujahr})` : ''}</option>
-                              ))}
-                            </select>
-                          </label>
-                        )}
-                        <div className="legende legende-schalter">
-                          {FRUCHTGRUPPEN.filter((g) => summen.has(g.schluessel)).map((g) => (
-                            <button
-                              key={g.schluessel}
-                              type="button"
-                              className={`legende-typ ${gruppenAus.includes(g.schluessel) ? 'aus' : ''}`}
-                              aria-pressed={!gruppenAus.includes(g.schluessel)}
-                              title={gruppenAus.includes(g.schluessel) ? `${g.name} einblenden` : `${g.name} ausblenden`}
-                              onClick={() => setGruppenAus((a) => (a.includes(g.schluessel) ? a.filter((x) => x !== g.schluessel) : [...a, g.schluessel]))}
-                            >
-                              <i className="farbpunkt" style={{ background: gruppenFarbe(aktuelle?.farben, g.schluessel) }} /> {g.name} · {summen.get(g.schluessel)!.toLocaleString('de-DE', { maximumFractionDigits: 1 })} ha
-                            </button>
-                          ))}
-                        </div>
-                        <p className="leer" style={{ margin: 0 }}>Summe: {felder.fc.features.length.toLocaleString('de-DE')} Schläge · {gesamt.toLocaleString('de-DE', { maximumFractionDigits: 1 })} ha im Revier</p>
-                      </>
-                    );
-                  })()}
-                  {id === 'einrichtungen' && ebenen.einrichtungen && (
-                    <div className="legende legende-schalter">
-                      {EINRICHTUNGSTYPEN.filter((t) => daten?.einrichtungen.some((e) => e.properties?.typ === t.wert)).map((t) => (
-                        <button
-                          key={t.wert}
-                          type="button"
-                          className={`legende-typ ${typenAus.includes(t.wert) ? 'aus' : ''}`}
-                          aria-pressed={!typenAus.includes(t.wert)}
-                          title={typenAus.includes(t.wert) ? `${t.label} einblenden` : `${t.label} ausblenden`}
-                          onClick={() => setTypenAus((a) => (a.includes(t.wert) ? a.filter((x) => x !== t.wert) : [...a, t.wert]))}
-                        >
-                          <EinrichtungsIcon typ={t.wert} farbe={t.farbe} groesse={18} /> {t.label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-          {!ISTHANDY && <p className="leer" style={{ margin: 0 }}>Das Luftbild wird für den gesamten Kartenausschnitt geladen und auf dem Gerät zwischengespeichert.</p>}
-          {ISTHANDY && <p className="leer" style={{ margin: 0 }}>Mobil wird das Luftbild nur für den Revierbereich geladen und auf dem Gerät zwischengespeichert, um Daten zu sparen.</p>}
-
-          </Abschnitt>
-
-          {k.istInhaber && (
-            <Abschnitt titel="Import">
-              <button className="knopf knopf-sekundaer" onClick={() => navigieren('/import')}>
-                Geodaten importieren (SHP, GeoPackage)
-              </button>
-            </Abschnitt>
-          )}
-          <p className="leer">Zeichnen, Aufzeichnen und GPS-Import findest du im Menü „+ NEU“ auf der Karte.</p>
-          <p className="leer">Heatmap und Abschüsse zeigen nur Erfassungen mit Position (Zählungen: Zone). Wind: Open-Meteo.</p>
-          {wildarten.length > 0 && anzahlBeob > 0 && (
-            <p className="leer">
-              Häufigste Wildart: {wildartName(wildarten, haeufigste(daten?.beobachtungen ?? []))}
-            </p>
-          )}
+                )}
+              </li>
+            );
+          })}
+        </ul>
+        <p className="leer" style={{ margin: 0 }}>
+          {ISTHANDY
+            ? 'Mobil wird das Luftbild nur für den Betriebsbereich geladen und auf dem Gerät zwischengespeichert, um Daten zu sparen.'
+            : 'Das Luftbild wird für den gesamten Kartenausschnitt geladen und auf dem Gerät zwischengespeichert.'}
+        </p>
+      </Abschnitt>
+      {ohneFlaeche.length > 0 && (
+        <p className="leer">
+          Noch ohne Fläche: {ohneFlaeche.map((b) => b.name).join(', ')}. Über „+ NEU“ → „Bestand zeichnen“ zuordnen.
+        </p>
+      )}
+      <p className="leer">Zeichnen findest du im Menü „+ NEU“ auf der Karte.</p>
     </>
   );
 
@@ -1629,53 +681,50 @@ export default function Karte({
     <div className="karte-seite">
       <div ref={container} className="karte" />
 
-      {!zeichnet && (
+      {!zeichnet && k.istInhaber && (
         <div className="karte-chips">
           <div className="karte-chip-reihe">
-            {wind && (
-              <div className="karte-chip wind" title="Wetter, Sonne, Mond und Büchsenlicht">
-                <button type="button" className="wind-haupt" aria-expanded={wetterOffen} aria-haspopup="dialog" onClick={() => setWetterOffen((o) => !o)}>
-                  <span className="wind-pfeil" style={{ transform: `rotate(${wind.windRichtung + 180}deg)` }} aria-hidden="true">
-                    ↑
-                  </span>
-                  <span>
-                    <strong>{Math.round(wind.windKmh)} km/h</strong> aus {himmelsrichtung(wind.windRichtung)}
-                    <small>{Math.round(wind.temperatur)} °C · Wetter</small>
-                  </span>
-                </button>
-                <button className="link" onClick={windLaden} aria-label="Wind aktualisieren">
-                  <Symbol name="aktualisieren" className="symbol klein" />
-                </button>
-              </div>
-            )}
-            <button
-              type="button"
-              className={`karte-chip chip-knopf ${windpfeile ? 'an' : ''}`}
-              aria-pressed={windpfeile}
-              aria-label="Windpfeile auf der Karte ein- oder ausblenden"
-              title="Windpfeile von deinem Standort"
-              onClick={() => setWindpfeile(!windpfeile)}
-            >
-              <Symbol name="wind" className="symbol klein" /> Windpfeile
-            </button>
-            <button type="button" className={`karte-chip chip-knopf ${wte ? 'an' : ''}`} aria-pressed={wte} aria-label="Neu: Einrichtung, Fang, Wildtiererfassung" aria-haspopup="menu" aria-expanded={wteMenue} onClick={() => setWteMenue((o) => !o)}>
+            <button type="button" className="karte-chip chip-knopf" aria-haspopup="menu" aria-expanded={menueOffen} onClick={() => setMenueOffen((o) => !o)}>
               <Symbol name="neu" className="symbol klein" /> NEU
             </button>
           </div>
-          {wind && wetterOffen && <WetterPanel lat={wetterOrt[0]} lon={wetterOrt[1]} mitte={daten?.mitte ?? null} onSchliessen={() => setWetterOffen(false)} />}
         </div>
       )}
 
-      {zeichnet && (
+      {menueOffen && !zeichnet && (
+        <div className="wte-menue" role="menu" aria-label="Neu">
+          <p className="menue-gruppe">Zeichnen</p>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setMenueOffen(false);
+              setModus({ art: 'grenze' });
+            }}
+          >
+            {daten?.grenze ? 'Betriebsgrenze neu zeichnen' : 'Betriebsgrenze zeichnen'}
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setMenueOffen(false);
+              setModus({ art: 'bestand', bestandId: null, name: '' });
+            }}
+          >
+            Bestand zeichnen
+          </button>
+        </div>
+      )}
+
+      {zeichnet && !zuordnen && (
         <div className="zeichen-leiste">
           <span>
-            {modus.art === 'grenze' && 'Reviergrenze: Eckpunkte antippen'}
-            {modus.art === 'zone' && modus.bearbeiten && `Zone „${modus.name}“ bearbeiten: Punkte ziehen, Linie antippen = Punkt einfügen`}
-            {modus.art === 'zone' && !modus.bearbeiten && (modus.zoneId ? `Zone „${modus.name}“: Eckpunkte antippen` : 'Neue Zone: Eckpunkte antippen')}
-            {modus.art === 'route' && `${ROUTENNAME[modus.typ]}: Wegpunkte antippen`}
-            {modus.art === 'aufzeichnung' && `${ROUTENNAME[modus.typ]} per GPS: ${punkte.length} Punkte`}
+            {modus.art === 'grenze' && 'Betriebsgrenze: Eckpunkte antippen'}
+            {modus.art === 'bestand' && modus.bearbeiten && `Bestand „${modus.name}“ bearbeiten: Punkte ziehen, Linie antippen = Punkt einfügen`}
+            {modus.art === 'bestand' && !modus.bearbeiten && 'Neuer Bestand: Eckpunkte antippen'}
           </span>
-          {modus.art === 'zone' && modus.bearbeiten ? (
+          {modus.art === 'bestand' && modus.bearbeiten ? (
             <button
               className="knopf knopf-sekundaer klein"
               onClick={() => {
@@ -1691,194 +740,33 @@ export default function Karte({
               ↶ Zurück
             </button>
           )}
-          <button className="knopf knopf-primaer klein" onClick={zeichnungAbschliessen}>
+          <button className="knopf knopf-primaer klein" disabled={speichert} onClick={zeichnungAbschliessen}>
             Fertig
           </button>
-          <button
-            className="knopf knopf-gefahr klein"
-            onClick={() => {
-              aufzeichnungStoppen();
-              setSheetArt(null);
-              setModus(null);
-            }}
-          >
+          <button className="knopf knopf-gefahr klein" onClick={() => setModus(null)}>
             Abbrechen
           </button>
         </div>
       )}
 
-      {neueEinrichtung && (
-        <EinrichtungFormular
-          vergeben={einrichtungsNamen}
-          onSpeichern={einrichtungSpeichern}
-          onAbbrechen={() => setNeueEinrichtung(null)}
-        />
-      )}
-
-      {wteMenue && (
-        <div className="wte-menue" role="menu" aria-label="Neu">
-          {(() => {
-            const frei = !modus && !sheetArt;
-            const los = (f: () => void) => () => {
-              setWteMenue(false);
-              f();
-            };
-            const eintrag = (text: string, f: () => void, an = true) =>
-              an && (
-                <button type="button" role="menuitem" disabled={!frei && !text.includes('beenden')} onClick={los(f)}>
-                  {text}
-                </button>
-              );
-            const route = (typ: RouteTyp) => () => {
-              setWte(false);
-              setPunkte([]);
-              setModus({ art: 'route', typ });
-            };
-            return (
-              <>
-                <p className="menue-gruppe">Erfassen</p>
-                {wte
-                  ? eintrag('Wildtiererfassung beenden', () => setWte(false))
-                  : eintrag('Wildtiererfassung starten', () => setWte(true))}
-                {eintrag('Fang melden', () => navigieren('/abschuesse/fang'))}
-                {eintrag('Einrichtung anlegen', () => {
-                  setWte(false);
-                  setModus({ art: 'einrichtung' });
-                }, k.istInhaber)}
-                <p className="menue-gruppe">Zeichnen</p>
-                {eintrag(daten?.grenze ? 'Reviergrenze neu zeichnen' : 'Reviergrenze zeichnen', () => setModus({ art: 'grenze' }), k.istInhaber)}
-                {eintrag('Zone zeichnen', () => setModus({ art: 'zone', zoneId: null, name: '' }), k.istInhaber)}
-                {eintrag('Pirschweg zeichnen', route('pirschweg'), k.istInhaber)}
-                {eintrag('Treiberroute zeichnen', route('treiberroute'), k.istInhaber)}
-                {eintrag('WTE-Route zeichnen', route('wte_route'), k.istInhaber)}
-                <p className="menue-gruppe">Aufzeichnen</p>
-                {eintrag('Pirschweg per GPS aufzeichnen', () => aufzeichnungStarten('pirschweg'), k.istInhaber)}
-                {eintrag('WTE-Route per GPS aufzeichnen', () => aufzeichnungStarten('wte_route'), k.istInhaber)}
-                <p className="menue-gruppe">Import</p>
-                {eintrag('GPS-Datei (Smartwatch)', () => setGpsImport(true), k.istInhaber)}
-              </>
-            );
-          })()}
-        </div>
-      )}
-      {gpsImport && (
-        <GpsImport
-          k={k}
-          standardSitzungId={wteSitzung?.id ?? null}
-          onZu={() => setGpsImport(false)}
-          onFertig={(text) => {
-            setGpsImport(false);
-            setMeldung({ art: 'erfolg', text });
-            void laden();
-          }}
-        />
-      )}
-      {sheetArt && (
-        <ZeichnenSheet
-          art={sheetArt}
-          standardSitzungId={wteSitzung?.id ?? null}
-          routenEbenen={routenEbenen}
-          routenNamen={(daten?.pirschwege ?? []).map((f) => String(f.properties?.name ?? ''))}
-          darfEbenenAnlegen={k.istInhaber}
-          revierId={k.revierId}
-          zonen={zonen}
-          ebenen={kartenEbenen}
-          hatGrenze={!!daten?.grenze}
+      {zuordnen && (
+        <BestandZuordnen
+          ohneFlaeche={ohneFlaeche.map((b) => ({ id: b.id, name: b.name }))}
+          vergeben={bestaende.map((b) => b.name)}
           info={`${punkte.length} Punkte`}
-          speichert={sheetSpeichert}
-          fehler={sheetFehler}
-          onSpeichern={(w) => void zeichnungSpeichern(w)}
-          onAbbrechen={() => setSheetArt(null)}
-        />
-      )}
-      {modus?.art === 'einrichtung' && (
-        <div className={`wte-leiste${sheetOffen ? ' kompakt' : ''}${wteMenue ? ' kompakt-mobil' : ''}`} role="status">
-          <strong>Einrichtung</strong>
-          <span>Karte antippen, um die Position zu setzen</span>
-          <button type="button" className="link" onClick={() => setModus(null)}>
-            Beenden
-          </button>
-        </div>
-      )}
-      {wte && (
-        <div className={`wte-leiste${sheetOffen ? ' kompakt' : ''}${wteMenue ? ' kompakt-mobil' : ''}`} role="status">
-          <strong>WTE</strong>
-          <span>
-            {wteEbenenIds.length === 0
-              ? 'Keine Zonenebene als WTE markiert (Zonen → Ebenen)'
-              : wteSitzung
-                ? `Zählung vom ${datumDE(wteSitzung.datum)} läuft – Zone antippen`
-                : 'Keine laufende Zählung – Zone antippen startet eine'}
-          </span>
-          <button type="button" className="link" onClick={() => setWte(false)}>
-            Beenden
-          </button>
-        </div>
-      )}
-      {wte && meldung && !panelOffen && (
-        <div className={`wte-toast hinweis hinweis-${meldung.art}`} role="status" onAnimationEnd={() => setMeldung(null)}>
-          {meldung.text}
-        </div>
-      )}
-      {wte && wteZone && (
-        <WteSichtung
-          key={wteZone.id}
-          k={k}
-          zone={wteZone}
-          sitzung={wteSitzung}
-          ebenen={(daten?.ebenen ?? []).map((e) => ({ id: e.id, name: e.name }))}
-          onSchliessen={() => setWteZone(null)}
-          onSitzung={sitzungLaden}
-          onGespeichert={(text) => {
-            setWteZone(null);
-            setMeldung({ art: 'info', text });
-          }}
+          speichert={speichert}
+          onSpeichern={(z) => void zeichnungSpeichern(z)}
+          onAbbrechen={() => setZuordnen(false)}
         />
       )}
 
-      {einrSheet && !modus && !verschiebe && !wte && (
-        <EinrichtungSheet
-          key={einrSheet.id}
-          k={k}
-          einr={einrSheet}
-          vergebeneNamen={einrichtungsNamen}
-          onSchliessen={() => setEinrSheet(null)}
-          onGeaendert={(text) => {
-            setEinrSheet(null);
-            setMeldung({ art: 'erfolg', text });
-            void laden();
-          }}
-          onVerschieben={() => {
-            setVerschiebe({ einr: einrSheet, lng: einrSheet.lng, lat: einrSheet.lat });
-            setEinrSheet(null);
-          }}
-          onPosition={(lng, lat) => einrichtungPosition(einrSheet.id, lng, lat)}
+      {gewaehlt && !modus && (
+        <BestandInfo
+          bestand={gewaehlt}
+          onSchliessen={() => setGewaehlt(null)}
+          onBearbeiten={k.istInhaber ? () => bestandBearbeiten(gewaehlt.id, gewaehlt.name) : undefined}
         />
       )}
-      {verschiebe && (
-        <VerschiebeLeiste
-          name={verschiebe.einr.name || 'Einrichtung'}
-          laeuft={verschiebeLaeuft}
-          geaendert={verschiebe.lng !== verschiebe.einr.lng || verschiebe.lat !== verschiebe.einr.lat}
-          onOk={() => void verschiebenBestaetigen()}
-          onAbbrechen={() => setVerschiebe(null)}
-        />
-      )}
-      {feldSheet && !modus && !einrSheet && (
-        <FeldSheet
-          key={feldSheet.id}
-          feld={feldSheet}
-          ebene={felder.ebenen.find((e) => e.id === felder.ebeneId)}
-          gleicheWerte={felder.fc.features.filter((f) => normalisieren(f.properties.frucht_roh) === normalisieren(feldSheet.frucht_roh)).length}
-          istInhaber={k.istInhaber}
-          onSchliessen={() => setFeldSheet(null)}
-          onGeaendert={() => {
-            setFeldSheet(null);
-            void felder.laden();
-          }}
-        />
-      )}
-      {gewaehlteZone && !modus && !einrSheet && <ZonenInfo zone={gewaehlteZone} onSchliessen={() => setGewaehlteZone(null)} onBearbeiten={k.istInhaber ? () => zoneBearbeiten(gewaehlteZone.id, gewaehlteZone.name) : undefined} />}
 
       {kartenFehler && (
         <div className="karte-fehler" role="alert">
@@ -1913,17 +801,7 @@ function Abschnitt({ titel, offen = false, children }: { titel: string; offen?: 
   );
 }
 
-function EbenenSchalter({
-  label,
-  an,
-  gesperrt = false,
-  onAendern,
-}: {
-  label: string;
-  an: boolean;
-  gesperrt?: boolean;
-  onAendern: (an: boolean) => void;
-}) {
+function EbenenSchalter({ label, an, gesperrt = false, onAendern }: { label: string; an: boolean; gesperrt?: boolean; onAendern: (an: boolean) => void }) {
   return (
     <label className={`ebene ${gesperrt ? 'gesperrt' : ''}`}>
       <input type="checkbox" checked={an} disabled={gesperrt} onChange={(e) => onAendern(e.target.checked)} />
@@ -1932,37 +810,49 @@ function EbenenSchalter({
   );
 }
 
-function EinrichtungFormular({
+/** Nach dem Zeichnen: Fläche einem vorhandenen Bestand ohne Fläche zuordnen oder einen neuen anlegen */
+function BestandZuordnen({
+  ohneFlaeche,
   vergeben,
+  info,
+  speichert,
   onSpeichern,
   onAbbrechen,
 }: {
-  vergeben: Array<string | null>;
-  onSpeichern: (typ: Enums<'einrichtung_typ'>, name: string, bemerkung: string) => Promise<void>;
+  ohneFlaeche: Array<{ id: string; name: string }>;
+  vergeben: string[];
+  info: string;
+  speichert: boolean;
+  onSpeichern: (ziel: { bestandId: string | null; name: string }) => void;
   onAbbrechen: () => void;
 }) {
-  const [typ, setTyp] = useState<Enums<'einrichtung_typ'>>('hochsitz');
+  const [wahl, setWahl] = useState(ohneFlaeche[0]?.id ?? '');
   const [name, setName] = useState('');
-  const [bemerkung, setBemerkung] = useState('');
+  const neu = wahl === '';
+  const doppelt = neu && !!name.trim() && nameVergeben(vergeben, name);
+  const ok = neu ? !!name.trim() && !doppelt : true;
   return (
-    <div className="karte-dialog" role="dialog" aria-label="Neue Einrichtung">
-      <strong>Neue Einrichtung</strong>
-      <select value={typ} onChange={(e) => setTyp(e.target.value as Enums<'einrichtung_typ'>)}>
-        <EinrichtungsOptionen />
+    <div className="karte-dialog" role="dialog" aria-label="Fläche einem Bestand zuordnen">
+      <strong>Fläche zuordnen</strong>
+      <small>{info}</small>
+      <select value={wahl} onChange={(e) => setWahl(e.target.value)} aria-label="Bestand">
+        {ohneFlaeche.map((b) => (
+          <option key={b.id} value={b.id}>
+            {b.name} (noch ohne Fläche)
+          </option>
+        ))}
+        <option value="">Neuer Bestand …</option>
       </select>
-      <input placeholder="Name, z. B. Eichenkanzel" value={name} onChange={(e) => setName(e.target.value)} />
-      {name.trim() && nameVergeben(vergeben, name) && (
-        <span className="feld-fehler">Eine Einrichtung „{name.trim()}“ gibt es bereits.</span>
-      )}
-      <input placeholder="Bemerkung (optional)" value={bemerkung} onChange={(e) => setBemerkung(e.target.value)} />
+      {neu && <input placeholder="Name, z. B. 4a" value={name} onChange={(e) => setName(e.target.value)} aria-label="Name des neuen Bestands" />}
+      {doppelt && <span className="feld-fehler">Einen Bestand „{name.trim()}“ gibt es bereits.</span>}
       <div className="karte-dialog-knoepfe">
         <button className="knopf knopf-sekundaer klein" onClick={onAbbrechen}>
-          Abbrechen
+          Zurück
         </button>
         <button
           className="knopf knopf-primaer klein"
-          disabled={!!name.trim() && nameVergeben(vergeben, name)}
-          onClick={() => void onSpeichern(typ, name, bemerkung)}
+          disabled={!ok || speichert}
+          onClick={() => onSpeichern(neu ? { bestandId: null, name: name.trim() } : { bestandId: wahl, name: ohneFlaeche.find((b) => b.id === wahl)?.name ?? '' })}
         >
           Speichern
         </button>
@@ -1979,13 +869,4 @@ function grenzen(geometrien: Geometry[]): LngLatBounds | null {
   const b = new LngLatBounds();
   for (const p of alle) b.extend([p[0]!, p[1]!]);
   return b;
-}
-
-function haeufigste(features: Feature[]): string {
-  const z = new Map<string, number>();
-  for (const f of features) {
-    const id = String(f.properties?.wildart_id ?? '');
-    z.set(id, (z.get(id) ?? 0) + Number(f.properties?.anzahl ?? 1));
-  }
-  return [...z.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? '';
 }

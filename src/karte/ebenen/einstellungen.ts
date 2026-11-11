@@ -1,8 +1,7 @@
 import { STANDARD_DECKKRAFT, STANDARD_REIHENFOLGE, istEbenenId, type EbenenId } from './registry';
 
-// Reihenfolge und Deckkraft der Ebenen je Gerät. Wird in Phase 2 durch Kartenansichten in der Datenbank abgelöst
-// (docs/rework/ARBEITSPAKETE.md, AP 2.4); das Format bleibt bis dahin unverändert.
-export const EBENEN_SPEICHER = 'hegewerk.karte.ebenen';
+// Reihenfolge und Deckkraft der Ebenen je Gerät
+export const EBENEN_SPEICHER = 'waldmanager.karte.ebenen';
 
 export type EbenenEinstellungen = { reihenfolge: EbenenId[]; deckkraft: Record<EbenenId, number> };
 

@@ -1,9 +1,9 @@
 // Zwischenspeicher für lesende Supabase-Abfragen (IndexedDB), damit die App ohne Netz zuletzt geladene Daten zeigt.
 // Gilt für PostgREST-GET-Abfragen und eine Liste rein lesender RPCs. Schreibzugriffe laufen nie über den Cache.
-const DB_NAME = 'hegewerk-offline';
+const DB_NAME = 'waldmanager-offline';
 const STORE = 'antworten';
 const MAX_ALTER_MS = 30 * 24 * 3600 * 1000;
-const LESENDE_RPC = new Set(['karte_daten', 'felder_laden', 'zonen_flaechen', 'quervergleich', 'jagdjahr_report', 'bj_laden', 'revier_letzte_logins', 'masteradmin_letzte_logins']);
+const LESENDE_RPC = new Set(['karte_daten', 'bestaende_flaechen', 'funde_laden', 'betrieb_letzte_logins', 'masteradmin_letzte_logins']);
 
 type Eintrag = { status: number; body: string; headers: Array<[string, string]>; zeit: number };
 
@@ -81,7 +81,7 @@ export async function offlineCacheAufraeumen(): Promise<void> {
 }
 
 // ----- Hinweis „zeigt gespeicherte Daten“ -----
-const EREIGNIS = 'hegewerk:aus-cache';
+const EREIGNIS = 'waldmanager:aus-cache';
 let zuletztAusCache = 0;
 export function zuletztAusCacheAm() {
   return zuletztAusCache;

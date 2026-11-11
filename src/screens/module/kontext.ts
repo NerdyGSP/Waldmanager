@@ -1,11 +1,11 @@
 import type { Enums } from '../../lib/database.types';
 
-export type RevierKontext = {
-  revierId: string;
-  revierName: string;
+export type BetriebKontext = {
+  betriebId: string;
+  betriebName: string;
   flaecheHa: number | null;
   bundesland: string;
-  rolle: Enums<'revier_rolle'>;
+  rolle: Enums<'betrieb_rolle'>;
   istInhaber: boolean;
   userId: string;
   neuLaden: () => Promise<void>;

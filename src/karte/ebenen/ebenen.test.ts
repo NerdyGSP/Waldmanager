@@ -20,19 +20,14 @@ describe('Ebenen-Registry', () => {
     }
   });
 
-  it('entspricht dem Stand von Karte.tsx vor dem Rework', () => {
-    expect(STANDARD_REIHENFOLGE).toEqual(['einrichtungen', 'abschuesse', 'pirschwege', 'treiberrouten', 'wteRouten', 'heatmap', 'grenze', 'zonen', 'felder', 'luftbild']);
-    expect(STANDARD_DECKKRAFT).toMatchObject({ heatmap: 0.75, zonen: 0.55, felder: 0.45, luftbild: 1 });
-    expect(EBENEN_SCHICHTEN.zonen).toEqual(['zonen-flaeche', 'zonen-linie', 'zonen-auswahl']);
-    expect(standardSichtbarkeit()).toEqual({
-      felder: false, luftbild: false, grenze: true, zonen: true, einrichtungen: true,
-      pirschwege: true, treiberrouten: true, wteRouten: true, heatmap: false, abschuesse: false,
-    });
+  it('hat die Forstebenen in Standardreihenfolge', () => {
+    expect(STANDARD_REIHENFOLGE).toEqual(['grenze', 'bestaende', 'luftbild']);
+    expect(STANDARD_DECKKRAFT).toMatchObject({ bestaende: 0.55, luftbild: 1 });
+    expect(EBENEN_SCHICHTEN.bestaende).toEqual(['bestaende-flaeche', 'bestaende-linie', 'bestaende-auswahl']);
+    expect(standardSichtbarkeit()).toEqual({ grenze: true, bestaende: true, luftbild: false });
   });
 
-  it('zeigt im Zählmodus nur Grenze, Zonen, WTE-Routen und Luftbild', () => {
-    const imZaehlen = EBENEN.map((e) => e.id).filter((id) => imModusErlaubt(id, 'zaehlen'));
-    expect(imZaehlen.sort()).toEqual(['grenze', 'luftbild', 'wteRouten', 'zonen']);
+  it('zeigt die Grenze in jedem Modus', () => {
     for (const m of KARTEN_MODI) expect(imModusErlaubt('grenze', m)).toBe(true);
   });
 });
@@ -46,23 +41,23 @@ describe('Ebenen-Einstellungen', () => {
 
   it('behält die Nutzerreihenfolge und übernimmt gültige Deckkraft', () => {
     const umgekehrt = [...STANDARD_REIHENFOLGE].reverse();
-    const e = einstellungenAusRoh({ reihenfolge: umgekehrt, deckkraft: { zonen: 0.2, heatmap: 7, luftbild: 'x' } });
+    const e = einstellungenAusRoh({ reihenfolge: umgekehrt, deckkraft: { bestaende: 0.2, grenze: 7, luftbild: 'x' } });
     expect(e.reihenfolge).toEqual(umgekehrt);
-    expect(e.deckkraft.zonen).toBe(0.2);
-    expect(e.deckkraft.heatmap).toBe(0.75);
+    expect(e.deckkraft.bestaende).toBe(0.2);
+    expect(e.deckkraft.grenze).toBe(1);
     expect(e.deckkraft.luftbild).toBe(1);
   });
 
   it('fügt in alten Speicherständen fehlende Ebenen an ihrem Standardplatz ein', () => {
-    // Speicherstand von vor der Ebene „Felder“: sie gehört direkt über das Luftbild
-    const alt = ['zonen', 'einrichtungen', 'abschuesse', 'pirschwege', 'treiberrouten', 'wteRouten', 'heatmap', 'grenze', 'luftbild'];
-    expect(reihenfolgeAnpassen(alt)).toEqual(['zonen', 'einrichtungen', 'abschuesse', 'pirschwege', 'treiberrouten', 'wteRouten', 'heatmap', 'grenze', 'felder', 'luftbild']);
+    // Speicherstand ohne „Bestände“: sie gehören direkt über das Luftbild
+    expect(reihenfolgeAnpassen(['luftbild', 'grenze'])).toEqual(['bestaende', 'luftbild', 'grenze']);
+    expect(reihenfolgeAnpassen(['grenze', 'luftbild'])).toEqual(['grenze', 'bestaende', 'luftbild']);
   });
 
   it('verwirft unbekannte und doppelte Ebenen', () => {
-    const r = reihenfolgeAnpassen(['luftbild', 'gibt-es-nicht', 'luftbild', 'zonen', 42]);
+    const r = reihenfolgeAnpassen(['luftbild', 'gibt-es-nicht', 'luftbild', 'bestaende', 42]);
     expect(r).toHaveLength(STANDARD_REIHENFOLGE.length);
     expect(new Set(r).size).toBe(r.length);
-    expect(r.indexOf('luftbild')).toBeLessThan(r.indexOf('zonen'));
+    expect(r.indexOf('luftbild')).toBeLessThan(r.indexOf('bestaende'));
   });
 });

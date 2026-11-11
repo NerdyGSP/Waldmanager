@@ -32,7 +32,7 @@ const MAX_BYTES = 100 * 1024 * 1024;
 const MAX_ENTPACKT = 400 * 1024 * 1024;
 const MAX_FEATURES = 50000;
 
-// Koordinatensysteme, die bei Revierdaten in Niedersachsen üblich sind
+// Koordinatensysteme, die bei Geodaten in Niedersachsen üblich sind
 const EPSG: Record<number, string> = {
   25832: '+proj=utm +zone=32 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs',
   25833: '+proj=utm +zone=33 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs',
@@ -42,7 +42,7 @@ const EPSG: Record<number, string> = {
   31468: '+proj=tmerc +lat_0=0 +lon_0=12 +k=1 +x_0=4500000 +y_0=0 +ellps=bessel +towgs84=598.1,73.7,418.2,0.202,0.045,-2.455,6.7 +units=m +no_defs',
   3857: '+proj=merc +a=6378137 +b=6378137 +lat_ts=0 +lon_0=0 +x_0=0 +y_0=0 +k=1 +units=m +nadgrids=@null +wktext +no_defs',
 };
-const WGS84_GLEICH = new Set([4326, 4258, 4979, 4937]); // geografisch, für Revierdaten gleichwertig
+const WGS84_GLEICH = new Set([4326, 4258, 4979, 4937]); // geografisch, für Betriebsdaten gleichwertig
 
 const ok = (text: string): Pruefschritt => ({ text, status: 'ok' });
 const warn = (text: string): Pruefschritt => ({ text, status: 'warnung' });

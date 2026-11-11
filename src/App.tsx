@@ -4,13 +4,10 @@ import { AuthScreen } from './screens/AuthScreen';
 import { Home } from './screens/Home';
 import { NeuesPasswort } from './screens/NeuesPasswort';
 import { Hinweis } from './components/ui';
-import { usePfad } from './lib/router';
-import { BjTeilnehmer } from './screens/bewegungsjagd/BjTeilnehmer';
 import { OfflineHinweis } from './components/OfflineHinweis';
 
 export function App() {
   const { session, laedt, passwortNeuSetzen } = useAuth();
-  const pfad = usePfad();
 
   if (konfigurationFehlt) {
     return (
@@ -21,15 +18,7 @@ export function App() {
       </main>
     );
   }
-  // Öffentliche Anmeldeseite der Bewegungsjagd: Zugang nur mit Code, ohne Konto
-  if (pfad[0] === 'bj' && pfad[1])
-    return (
-      <>
-        <OfflineHinweis />
-        <BjTeilnehmer jagdId={pfad[1]} />
-      </>
-    );
-  if (laedt) return <div className="laden">Hegewerk wird geladen …</div>;
+  if (laedt) return <div className="laden">Waldmanager wird geladen …</div>;
   if (passwortNeuSetzen) return <NeuesPasswort />;
   if (!session) return <AuthScreen />;
   return (

@@ -301,7 +301,7 @@ export function Chevron({ offen }: { offen: boolean }) {
   );
 }
 
-const EINKLAPP_PRAEFIX = 'hegewerk.auf.';
+const EINKLAPP_PRAEFIX = 'waldmanager.auf.';
 
 /** Offen/zu-Zustand; mit `speicher` je Gerät in localStorage gemerkt */
 export function useGemerkt(speicher: string | undefined, standard: boolean): [boolean, (v: boolean) => void] {

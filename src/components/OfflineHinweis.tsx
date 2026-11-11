@@ -10,7 +10,7 @@ export function OfflineHinweis() {
   const [ausCache, setAusCache] = useState(false);
   const [tipp, setTipp] = useState(() => {
     try {
-      return iOS() && !istInstalliert() && localStorage.getItem('hegewerk.tipp.installieren') !== '1';
+      return iOS() && !istInstalliert() && localStorage.getItem('waldmanager.tipp.installieren') !== '1';
     } catch {
       return false;
     }
@@ -51,7 +51,7 @@ export function OfflineHinweis() {
             type="button"
             onClick={() => {
               setTipp(false);
-              try { localStorage.setItem('hegewerk.tipp.installieren', '1'); } catch { /* egal */ }
+              try { localStorage.setItem('waldmanager.tipp.installieren', '1'); } catch { /* egal */ }
             }}
           >
             OK

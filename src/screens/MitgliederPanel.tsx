@@ -5,7 +5,7 @@ import type { Enums } from '../lib/database.types';
 import { useBreit } from '../lib/useBreit';
 import { Auswahl, CodeAnzeige, Feld, Gruppe, Hinweis, Knopf, Zeile } from '../components/ui';
 
-type Mitglied = { user_id: string; rolle: Enums<'revier_rolle'>; name: string; email: string; login: string | null; aktiv: string | null };
+type Mitglied = { user_id: string; rolle: Enums<'betrieb_rolle'>; name: string; email: string; login: string | null; aktiv: string | null };
 type OffeneEinladung = { code: string; rolle: string; email: string | null; gueltig_bis: string };
 
 const INAKTIV_TAGE = 90;
@@ -40,7 +40,7 @@ function Aktivitaet({ m }: { m: Mitglied }) {
   );
 }
 
-export function MitgliederPanel({ revierId, eigeneId }: { revierId: string; eigeneId: string }) {
+export function MitgliederPanel({ betriebId, eigeneId }: { betriebId: string; eigeneId: string }) {
   const [mitglieder, setMitglieder] = useState<Mitglied[]>([]);
   const [offene, setOffene] = useState<OffeneEinladung[]>([]);
   const [fehler, setFehler] = useState<string | null>(null);
@@ -50,15 +50,15 @@ export function MitgliederPanel({ revierId, eigeneId }: { revierId: string; eige
 
   const laden = useCallback(async () => {
     const [mit, logins, einl] = await Promise.all([
-      supabase.from('revier_mitglieder').select('user_id, rolle, profiles(name, email)').eq('revier_id', revierId),
-      supabase.rpc('revier_letzte_logins', { p_revier_id: revierId }),
-      supabase.from('einladungen').select('code, rolle, email, gueltig_bis').eq('revier_id', revierId).is('eingeloest_am', null).gt('gueltig_bis', new Date().toISOString()).order('gueltig_bis'),
+      supabase.from('betrieb_mitglieder').select('user_id, rolle, profiles(name, email)').eq('betrieb_id', betriebId),
+      supabase.rpc('betrieb_letzte_logins', { p_betrieb_id: betriebId }),
+      supabase.from('einladungen').select('code, rolle, email, gueltig_bis').eq('betrieb_id', betriebId).is('eingeloest_am', null).gt('gueltig_bis', new Date().toISOString()).order('gueltig_bis'),
     ]);
     if (mit.error) {
       setFehler(fehlertext(mit.error));
       return;
     }
-    // Nur Inhaber des Reviers bekommen Werte; sonst bleibt die Spalte ausgeblendet
+    // Nur Inhaber des Betriebs bekommen Werte; sonst bleibt die Spalte ausgeblendet
     const aktivMap = new Map((logins.data ?? []).map((l) => [l.user_id, l]));
     setZeigeAktivitaet(!logins.error && aktivMap.size > 0);
     setOffene(einl.error ? [] : (einl.data ?? []));
@@ -72,7 +72,7 @@ export function MitgliederPanel({ revierId, eigeneId }: { revierId: string; eige
         aktiv: aktivMap.get(m.user_id)?.zuletzt_aktiv_am ?? null,
       })),
     );
-  }, [revierId]);
+  }, [betriebId]);
 
   useEffect(() => {
     void laden();
@@ -88,24 +88,24 @@ export function MitgliederPanel({ revierId, eigeneId }: { revierId: string; eige
     return a.rolle === b.rolle ? a.name.localeCompare(b.name, 'de') : a.rolle === 'inhaber' ? -1 : 1;
   });
 
-  async function rolleAendern(m: Mitglied, rolle: Enums<'revier_rolle'>) {
+  async function rolleAendern(m: Mitglied, rolle: Enums<'betrieb_rolle'>) {
     setFehler(null);
     const { error } = await supabase
-      .from('revier_mitglieder')
+      .from('betrieb_mitglieder')
       .update({ rolle })
-      .eq('revier_id', revierId)
+      .eq('betrieb_id', betriebId)
       .eq('user_id', m.user_id);
     if (error) setFehler(fehlertext(error));
     await laden();
   }
 
   async function entfernen(m: Mitglied) {
-    if (!window.confirm(`${m.name} aus dem Revier entfernen?`)) return;
+    if (!window.confirm(`${m.name} aus dem Forstbetrieb entfernen?`)) return;
     setFehler(null);
     const { error } = await supabase
-      .from('revier_mitglieder')
+      .from('betrieb_mitglieder')
       .delete()
-      .eq('revier_id', revierId)
+      .eq('betrieb_id', betriebId)
       .eq('user_id', m.user_id);
     if (error) setFehler(fehlertext(error));
     await laden();
@@ -144,9 +144,9 @@ export function MitgliederPanel({ revierId, eigeneId }: { revierId: string; eige
                     <small>{m.email}</small>
                   </td>
                   <td>
-                    <select className="zeile-auswahl" aria-label={`Rolle von ${m.name}`} value={m.rolle} onChange={(e) => rolleAendern(m, e.target.value as Enums<'revier_rolle'>)}>
-                      <option value="inhaber">Inhaber/Pächter</option>
-                      <option value="mitjaeger">Mitjäger</option>
+                    <select className="zeile-auswahl" aria-label={`Rolle von ${m.name}`} value={m.rolle} onChange={(e) => rolleAendern(m, e.target.value as Enums<'betrieb_rolle'>)}>
+                      <option value="inhaber">Inhaber</option>
+                      <option value="mitarbeiter">Mitarbeiter</option>
                     </select>
                   </td>
                   <td>
@@ -165,7 +165,7 @@ export function MitgliederPanel({ revierId, eigeneId }: { revierId: string; eige
                 <tr key={e.code} className="offen">
                   <td>
                     {e.email ?? 'Einladung ohne E-Mail'}
-                    <small>{e.rolle === 'inhaber' ? 'Inhaber/Pächter' : 'Mitjäger'} · gültig bis {new Date(e.gueltig_bis).toLocaleDateString('de-DE')}</small>
+                    <small>{e.rolle === 'inhaber' ? 'Inhaber' : 'Mitarbeiter'} · gültig bis {new Date(e.gueltig_bis).toLocaleDateString('de-DE')}</small>
                   </td>
                   <td />
                   <td>
@@ -193,9 +193,9 @@ export function MitgliederPanel({ revierId, eigeneId }: { revierId: string; eige
                   </>
                 }
               >
-                <select className="zeile-auswahl" aria-label={`Rolle von ${m.name}`} value={m.rolle} onChange={(e) => rolleAendern(m, e.target.value as Enums<'revier_rolle'>)}>
-                  <option value="inhaber">Inhaber/Pächter</option>
-                  <option value="mitjaeger">Mitjäger</option>
+                <select className="zeile-auswahl" aria-label={`Rolle von ${m.name}`} value={m.rolle} onChange={(e) => rolleAendern(m, e.target.value as Enums<'betrieb_rolle'>)}>
+                  <option value="inhaber">Inhaber</option>
+                  <option value="mitarbeiter">Mitarbeiter</option>
                 </select>
                 {m.user_id !== eigeneId && (
                   <button className="link gefahr" onClick={() => entfernen(m)}>
@@ -211,7 +211,7 @@ export function MitgliederPanel({ revierId, eigeneId }: { revierId: string; eige
                   <>
                     {e.email ?? 'Einladung ohne E-Mail'}
                     <small>
-                      Einladung offen · {e.rolle === 'inhaber' ? 'Inhaber/Pächter' : 'Mitjäger'} · gültig bis {new Date(e.gueltig_bis).toLocaleDateString('de-DE')}
+                      Einladung offen · {e.rolle === 'inhaber' ? 'Inhaber' : 'Mitarbeiter'} · gültig bis {new Date(e.gueltig_bis).toLocaleDateString('de-DE')}
                     </small>
                   </>
                 }
@@ -221,52 +221,36 @@ export function MitgliederPanel({ revierId, eigeneId }: { revierId: string; eige
         )}
       </Gruppe>
       {fehler && <Hinweis art="fehler">{fehler}</Hinweis>}
-      <EinladungErstellen revierId={revierId} />
+      <EinladungErstellen betriebId={betriebId} />
     </>
   );
 }
 
 export function EinladungErstellen({
-  revierId,
+  betriebId,
   festeRolle,
   titel = 'Jemanden einladen',
 }: {
-  revierId: string;
-  festeRolle?: Enums<'revier_rolle'>;
+  betriebId: string;
+  festeRolle?: Enums<'betrieb_rolle'>;
   titel?: string;
 }) {
-  const [rolle, setRolle] = useState<Enums<'revier_rolle'>>(festeRolle ?? 'mitjaeger');
+  const [rolle, setRolle] = useState<Enums<'betrieb_rolle'>>(festeRolle ?? 'mitarbeiter');
   const [email, setEmail] = useState('');
   const [tage, setTage] = useState(14);
   const [code, setCode] = useState<string | null>(null);
   const [fehler, setFehler] = useState<string | null>(null);
   const [laedt, setLaedt] = useState(false);
-  const [mailInfo, setMailInfo] = useState<string | null>(null);
 
   async function absenden(e: FormEvent) {
     e.preventDefault();
     setFehler(null);
     setCode(null);
-    setMailInfo(null);
     setLaedt(true);
-    const adresse = email.trim();
-    if (adresse) {
-      // Mit E-Mail-Adresse: Code erstellen und die Einladung per Mail versenden
-      const { data, error } = await supabase.functions.invoke('revier-einladen', {
-        body: { revier_id: revierId, rolle: festeRolle ?? rolle, email: adresse, tage },
-      });
-      setLaedt(false);
-      if (error || !data?.code) {
-        setFehler(data?.fehler ?? (error ? fehlertext(error) : 'Einladung konnte nicht erstellt werden.'));
-        return;
-      }
-      setCode(data.code);
-      setMailInfo(data.mail ? `Einladung per E-Mail an ${adresse} gesendet.` : `Code erstellt, aber die E-Mail konnte nicht gesendet werden (${data.fehler ?? 'unbekannter Fehler'}). Gib den Code selbst weiter.`);
-      return;
-    }
     const { data, error } = await supabase.rpc('einladung_erstellen', {
-      p_revier_id: revierId,
+      p_betrieb_id: betriebId,
       p_rolle: festeRolle ?? rolle,
+      p_email: email.trim() || undefined,
       p_gueltig_tage: tage,
     });
     setLaedt(false);
@@ -278,12 +262,12 @@ export function EinladungErstellen({
     <form onSubmit={absenden}>
       <Gruppe
         titel={titel}
-        fuss="Der Code ist einmal nutzbar. Mit E-Mail-Adresse kann ihn nur diese Person einlösen, und die Einladung wird ihr per E-Mail geschickt."
+        fuss="Der Code ist einmal nutzbar. Mit E-Mail-Adresse kann ihn nur diese Person einlösen. Es wird keine E-Mail verschickt – gib den Code selbst weiter."
       >
         {!festeRolle && (
-          <Auswahl label="Rolle" value={rolle} onChange={(e) => setRolle(e.target.value as Enums<'revier_rolle'>)}>
-            <option value="mitjaeger">Mitjäger</option>
-            <option value="inhaber">Inhaber/Pächter</option>
+          <Auswahl label="Rolle" value={rolle} onChange={(e) => setRolle(e.target.value as Enums<'betrieb_rolle'>)}>
+            <option value="mitarbeiter">Mitarbeiter</option>
+            <option value="inhaber">Inhaber</option>
           </Auswahl>
         )}
         <Feld label="E-Mail (optional)" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
@@ -295,7 +279,6 @@ export function EinladungErstellen({
         </Auswahl>
       </Gruppe>
       {fehler && <Hinweis art="fehler">{fehler}</Hinweis>}
-      {mailInfo && <Hinweis>{mailInfo}</Hinweis>}
       {code ? (
         <CodeAnzeige
           code={code}

@@ -1,69 +1,60 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { supabase } from '../lib/supabase';
 import { fehlertext } from '../lib/fehler';
-import { Auswahl, Feld, Gruppe, Hinweis, Knopf, Zeile } from '../components/ui';
+import { Feld, Gruppe, Hinweis, Knopf, Zeile } from '../components/ui';
 import { EinladungErstellen } from './MitgliederPanel';
 
-type Hegering = { id: string; name: string };
-type RevierZeile = {
+type BetriebZeile = {
   id: string;
   name: string;
   flaeche_ha: number | null;
-  hegering_id: string;
-  hegering: string;
   inhaber: string[];
   mitglieder: number;
   selbstMitglied: boolean;
 };
 
-// Masteradmin: Hegeringe und Reviere anlegen, Inhaber einladen, Reviere löschen.
-// Fachdaten der Reviere sind für den Masteradmin per RLS nicht sichtbar –
-// außer in Revieren, in denen er selbst Mitglied ist.
+// Masteradmin: Forstbetriebe anlegen, Inhaber einladen, Betriebe löschen.
+// Fachdaten der Betriebe sind für den Masteradmin per RLS nicht sichtbar –
+// außer in Betrieben, in denen er selbst Mitglied ist.
 export function AdminPanel({
   eigeneId,
   onGeaendert,
 }: {
   eigeneId: string;
-  onGeaendert: (revierId?: string) => Promise<void>;
+  onGeaendert: (betriebId?: string) => Promise<void>;
 }) {
-  const [hegeringe, setHegeringe] = useState<Hegering[]>([]);
-  const [reviere, setReviere] = useState<RevierZeile[]>([]);
-  const [einladenFuer, setEinladenFuer] = useState<string | null>(null);
+  const [betriebe, setBetriebe] = useState<BetriebZeile[]>([]);
   const [fehler, setFehler] = useState<string | null>(null);
+  const [einladenFuer, setEinladenFuer] = useState<string | null>(null);
+  // Bestätigung im Formular statt window.prompt (im Artefakt-Viewer und auf manchen Geräten gesperrt)
+  const [loeschen, setLoeschen] = useState<{ id: string; name: string; eingabe: string } | null>(null);
 
   const laden = useCallback(async () => {
-    const [hr, rv] = await Promise.all([
-      supabase.from('hegeringe').select('id, name').order('name'),
-      supabase
-        .from('reviere')
-        .select('id, name, flaeche_ha, hegering_id, hegeringe(name), revier_mitglieder(user_id, rolle, profiles(name))')
-        .order('name'),
-    ]);
-    const err = hr.error ?? rv.error;
-    if (err) setFehler(fehlertext(err));
-    setHegeringe(hr.data ?? []);
-    setReviere(
-      (rv.data ?? []).map((r) => ({
-        id: r.id,
-        name: r.name,
-        flaeche_ha: r.flaeche_ha,
-        hegering_id: r.hegering_id,
-        hegering: r.hegeringe?.name ?? '–',
-        inhaber: r.revier_mitglieder.filter((m) => m.rolle === 'inhaber').map((m) => m.profiles?.name ?? '?'),
-        mitglieder: r.revier_mitglieder.length,
-        selbstMitglied: r.revier_mitglieder.some((m) => m.user_id === eigeneId),
+    const { data, error } = await supabase
+      .from('betriebe')
+      .select('id, name, flaeche_ha, betrieb_mitglieder(user_id, rolle, profiles(name))')
+      .order('name');
+    if (error) setFehler(fehlertext(error));
+    setBetriebe(
+      (data ?? []).map((b) => ({
+        id: b.id,
+        name: b.name,
+        flaeche_ha: b.flaeche_ha,
+        inhaber: b.betrieb_mitglieder.filter((m) => m.rolle === 'inhaber').map((m) => m.profiles?.name ?? '?'),
+        mitglieder: b.betrieb_mitglieder.length,
+        selbstMitglied: b.betrieb_mitglieder.some((m) => m.user_id === eigeneId),
       })),
     );
   }, [eigeneId]);
 
+  useEffect(() => {
+    void laden();
+  }, [laden]);
+
   // Masteradmin trägt sich selbst als Inhaber ein: Einladung erzeugen und sofort einlösen
-  async function selbstEintragen(r: RevierZeile) {
+  async function selbstEintragen(b: BetriebZeile) {
     setFehler(null);
-    const erstellt = await supabase.rpc('einladung_erstellen', {
-      p_revier_id: r.id,
-      p_rolle: 'inhaber',
-      p_gueltig_tage: 1,
-    });
+    const erstellt = await supabase.rpc('einladung_erstellen', { p_betrieb_id: b.id, p_rolle: 'inhaber', p_gueltig_tage: 1 });
     if (erstellt.error || !erstellt.data) {
       setFehler(fehlertext(erstellt.error ?? 'Einladung konnte nicht erstellt werden.'));
       return;
@@ -74,138 +65,91 @@ export function AdminPanel({
       return;
     }
     await laden();
-    await onGeaendert(r.id);
+    await onGeaendert(b.id);
   }
 
-  useEffect(() => {
-    void laden();
-  }, [laden]);
-
-  async function revierLoeschen(r: RevierZeile) {
-    const eingabe = window.prompt(
-      `Revier „${r.name}“ endgültig löschen? Alle Zählungen, Abschüsse, Zonen und Einrichtungen werden mitgelöscht.\n\nZur Bestätigung den Reviernamen eingeben:`,
-    );
-    if (eingabe?.trim() !== r.name) return;
+  async function betriebLoeschen() {
+    if (!loeschen) return;
     setFehler(null);
-    const { error } = await supabase.from('reviere').delete().eq('id', r.id);
+    const { error } = await supabase.from('betriebe').delete().eq('id', loeschen.id);
     if (error) setFehler(fehlertext(error));
+    setLoeschen(null);
     await laden();
     await onGeaendert();
   }
 
-  // Hegeringe lassen sich nur löschen, wenn ihnen kein Revier mehr zugeordnet ist
-  async function hegeringLoeschen(h: Hegering) {
-    if (!window.confirm(`Hegering „${h.name}“ löschen?`)) return;
-    setFehler(null);
-    const { error } = await supabase.from('hegeringe').delete().eq('id', h.id);
-    if (error) setFehler(fehlertext(error));
-    await laden();
-  }
-
-  const revierAnzahl = (hegeringId: string) => reviere.filter((r) => r.hegering_id === hegeringId).length;
-
   return (
     <div className="admin">
-      <h2 className="bereich-titel">Hegeringe &amp; Reviere</h2>
+      <h2 className="bereich-titel">Forstbetriebe</h2>
       {fehler && <Hinweis art="fehler">{fehler}</Hinweis>}
 
-      <Gruppe titel="Reviere">
-        {reviere.length === 0 && <Zeile label="Noch keine Reviere angelegt" />}
-        {reviere.map((r) => (
-          <div key={r.id}>
+      <Gruppe titel="Forstbetriebe">
+        {betriebe.length === 0 && <Zeile label="Noch keine Forstbetriebe angelegt" />}
+        {betriebe.map((b) => (
+          <div key={b.id}>
             <Zeile
               label={
                 <>
-                  {r.name}
+                  {b.name}
                   <small>
-                    {r.hegering}
-                    {r.flaeche_ha ? ` · ${r.flaeche_ha.toLocaleString('de-DE')} ha` : ''} · {r.mitglieder}{' '}
-                    {r.mitglieder === 1 ? 'Mitglied' : 'Mitglieder'}
-                    {r.inhaber.length ? ` · Inhaber: ${r.inhaber.join(', ')}` : ' · noch kein Inhaber'}
+                    {b.flaeche_ha ? `${b.flaeche_ha.toLocaleString('de-DE')} ha · ` : ''}
+                    {b.mitglieder} {b.mitglieder === 1 ? 'Mitglied' : 'Mitglieder'}
+                    {b.inhaber.length ? ` · Inhaber: ${b.inhaber.join(', ')}` : ' · noch kein Inhaber'}
                   </small>
                 </>
               }
             >
-              {r.selbstMitglied ? (
+              {b.selbstMitglied ? (
                 <span className="zeile-wert">Du bist Mitglied</span>
               ) : (
-                <button className="link" onClick={() => selbstEintragen(r)}>
+                <button className="link" onClick={() => selbstEintragen(b)}>
                   Mich als Inhaber eintragen
                 </button>
               )}
-              <button className="link" onClick={() => setEinladenFuer(einladenFuer === r.id ? null : r.id)}>
+              <button className="link" onClick={() => setEinladenFuer(einladenFuer === b.id ? null : b.id)}>
                 Inhaber einladen
               </button>
-              <button className="link gefahr" onClick={() => revierLoeschen(r)}>
+              <button className="link gefahr" onClick={() => setLoeschen({ id: b.id, name: b.name, eingabe: '' })}>
                 Löschen
               </button>
             </Zeile>
-            {einladenFuer === r.id && (
+            {loeschen?.id === b.id && (
               <div className="eingerueckt">
-                <EinladungErstellen revierId={r.id} festeRolle="inhaber" titel={`Inhaber für ${r.name} einladen`} />
+                <Hinweis art="fehler">
+                  „{b.name}“ endgültig löschen? Bestände, Flurstücke, Maßnahmen und Funde werden mitgelöscht. Zur Bestätigung den Namen eingeben.
+                </Hinweis>
+                <Feld label="Name des Betriebs" value={loeschen.eingabe} onChange={(e) => setLoeschen({ ...loeschen, eingabe: e.target.value })} />
+                <Knopf variante="gefahr" disabled={loeschen.eingabe.trim() !== b.name} onClick={() => void betriebLoeschen()}>
+                  Endgültig löschen
+                </Knopf>
+                <Knopf variante="ghost" onClick={() => setLoeschen(null)}>
+                  Abbrechen
+                </Knopf>
+              </div>
+            )}
+            {einladenFuer === b.id && (
+              <div className="eingerueckt">
+                <EinladungErstellen betriebId={b.id} festeRolle="inhaber" titel={`Inhaber für ${b.name} einladen`} />
               </div>
             )}
           </div>
         ))}
       </Gruppe>
 
-      <RevierAnlegen
-        hegeringe={hegeringe}
+      <BetriebAnlegen
         onAngelegt={async (id) => {
           await laden();
           setEinladenFuer(id);
         }}
       />
-      <Gruppe
-        titel="Hegeringe"
-        fuss="Ein Hegering lässt sich erst löschen, wenn ihm kein Revier mehr zugeordnet ist."
-      >
-        {hegeringe.length === 0 && <Zeile label="Noch keine Hegeringe angelegt" />}
-        {hegeringe.map((h) => {
-          const anzahl = revierAnzahl(h.id);
-          return (
-            <Zeile
-              key={h.id}
-              label={
-                <>
-                  {h.name}
-                  <small>
-                    {anzahl} {anzahl === 1 ? 'Revier' : 'Reviere'}
-                  </small>
-                </>
-              }
-            >
-              {anzahl === 0 && (
-                <button className="link gefahr" onClick={() => hegeringLoeschen(h)}>
-                  Löschen
-                </button>
-              )}
-            </Zeile>
-          );
-        })}
-      </Gruppe>
-
-      <HegeringAnlegen onAngelegt={laden} />
     </div>
   );
 }
 
-function RevierAnlegen({
-  hegeringe,
-  onAngelegt,
-}: {
-  hegeringe: Hegering[];
-  onAngelegt: (id: string) => Promise<void>;
-}) {
+function BetriebAnlegen({ onAngelegt }: { onAngelegt: (id: string) => Promise<void> }) {
   const [name, setName] = useState('');
-  const [hegeringId, setHegeringId] = useState('');
   const [flaeche, setFlaeche] = useState('');
   const [fehler, setFehler] = useState<string | null>(null);
-
-  // Auswahl gültig halten: nach Löschen oder Neuanlage eines Hegerings nie auf eine alte ID zeigen
-  useEffect(() => {
-    if (!hegeringe.some((h) => h.id === hegeringId)) setHegeringId(hegeringe[0]?.id ?? '');
-  }, [hegeringe, hegeringId]);
 
   async function absenden(e: FormEvent) {
     e.preventDefault();
@@ -215,11 +159,7 @@ function RevierAnlegen({
       setFehler('Bitte eine gültige Fläche in Hektar angeben.');
       return;
     }
-    const { data, error } = await supabase
-      .from('reviere')
-      .insert({ name: name.trim(), hegering_id: hegeringId, flaeche_ha: ha })
-      .select('id')
-      .single();
+    const { data, error } = await supabase.from('betriebe').insert({ name: name.trim(), flaeche_ha: ha }).select('id').single();
     if (error) {
       setFehler(fehlertext(error));
       return;
@@ -229,55 +169,15 @@ function RevierAnlegen({
     await onAngelegt(data.id);
   }
 
-  if (hegeringe.length === 0) {
-    return <Hinweis>Lege zuerst einen Hegering an, danach kannst du Reviere anlegen.</Hinweis>;
-  }
-
   return (
     <form onSubmit={absenden}>
-      <Gruppe titel="Revier anlegen" fuss="Nach dem Anlegen kannst du direkt den Inhaber/Pächter einladen.">
+      <Gruppe titel="Forstbetrieb anlegen" fuss="Nach dem Anlegen kannst du direkt den Inhaber einladen oder dich selbst eintragen.">
         <Feld label="Name" required value={name} onChange={(e) => setName(e.target.value)} />
-        <Auswahl label="Hegering" value={hegeringId} onChange={(e) => setHegeringId(e.target.value)}>
-          {hegeringe.map((h) => (
-            <option key={h.id} value={h.id}>
-              {h.name}
-            </option>
-          ))}
-        </Auswahl>
         <Feld label="Fläche (ha)" inputMode="decimal" placeholder="optional" value={flaeche} onChange={(e) => setFlaeche(e.target.value)} />
       </Gruppe>
       {fehler && <Hinweis art="fehler">{fehler}</Hinweis>}
       <Knopf type="submit" variante="sekundaer">
-        Revier anlegen
-      </Knopf>
-    </form>
-  );
-}
-
-function HegeringAnlegen({ onAngelegt }: { onAngelegt: () => Promise<void> }) {
-  const [name, setName] = useState('');
-  const [fehler, setFehler] = useState<string | null>(null);
-
-  async function absenden(e: FormEvent) {
-    e.preventDefault();
-    setFehler(null);
-    const { error } = await supabase.from('hegeringe').insert({ name: name.trim() });
-    if (error) {
-      setFehler(fehlertext(error));
-      return;
-    }
-    setName('');
-    await onAngelegt();
-  }
-
-  return (
-    <form onSubmit={absenden}>
-      <Gruppe titel="Hegering anlegen">
-        <Feld label="Name" required value={name} onChange={(e) => setName(e.target.value)} />
-      </Gruppe>
-      {fehler && <Hinweis art="fehler">{fehler}</Hinweis>}
-      <Knopf type="submit" variante="sekundaer">
-        Hegering anlegen
+        Forstbetrieb anlegen
       </Knopf>
     </form>
   );

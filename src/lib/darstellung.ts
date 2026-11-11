@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
 export type Darstellung = 'system' | 'hell' | 'dunkel';
-const SCHLUESSEL = 'hegewerk.darstellung';
+const SCHLUESSEL = 'waldmanager.darstellung';
 
 export function darstellungLesen(): Darstellung {
   try {

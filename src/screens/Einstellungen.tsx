@@ -4,37 +4,31 @@ import { codeFormatieren, fehlertext } from '../lib/fehler';
 import { navigieren } from '../lib/router';
 import type { Mitgliedschaft, NutzerKontext } from '../lib/useNutzerKontext';
 import { Auswahl, Einklappbar, Feld, Gruppe, Hinweis, Knopf, PasswortFeld, Seite, Segmente, Zeile } from '../components/ui';
-import { BUNDESLAENDER } from '../lib/jagdzeiten';
 import { useDarstellung, type Darstellung } from '../lib/darstellung';
-import { EREIGNIS_GRUPPEN } from '../lib/ereignisse';
 import { MitgliederPanel } from './MitgliederPanel';
-import { RevierdatenLoeschen } from './module/Revierdaten';
 
-const ROLLEN = { inhaber: 'Revierinhaber/-pächter', mitjaeger: 'Mitjäger' } as const;
+const BUNDESLAENDER = ['Baden-Württemberg','Bayern','Berlin','Brandenburg','Bremen','Hamburg','Hessen','Mecklenburg-Vorpommern','Niedersachsen','Nordrhein-Westfalen','Rheinland-Pfalz','Saarland','Sachsen','Sachsen-Anhalt','Schleswig-Holstein','Thüringen'];
+
+const ROLLEN = { inhaber: 'Inhaber', mitarbeiter: 'Mitarbeiter' } as const;
 
 export function Einstellungen({
   kontext,
-  userId,
-  istInhaber,
   nachAenderung,
 }: {
   kontext: NutzerKontext;
-  userId: string;
-  istInhaber: boolean;
-  nachAenderung: (neueRevierId?: string | null) => Promise<void>;
+  nachAenderung: (neueBetriebId?: string | null) => Promise<void>;
 }) {
   return (
     <Seite titel="Einstellungen">
       <Einklappbar titel="Konto" speicher="einstellungen.konto">
         <Konto name={kontext.name} email={kontext.email} onGeaendert={() => nachAenderung()} />
         <p className="gruppe-fuss" style={{ padding: '0 var(--abstand)' }}>
-          Datenschutz: Inhaber deiner Reviere sehen, wann du dich zuletzt angemeldet bzw. die App zuletzt genutzt hast (nur der Zeitpunkt, keine Orte oder Geräte).
+          Datenschutz: Inhaber deiner Forstbetriebe sehen, wann du dich zuletzt angemeldet bzw. die App zuletzt genutzt hast (nur der Zeitpunkt, keine Orte oder Geräte).
         </p>
       </Einklappbar>
       <DarstellungWahl />
-      <BenachrichtigungenWahl userId={userId} istInhaber={istInhaber} />
       <KartenSpeicher />
-      <Gruppe titel="Lizenzen" fuss="Navigationsicons: Material Symbols (Google, Apache 2.0). Einrichtungssymbole: game-icons.net (Lorc, Delapouite u. a., CC BY 3.0).">
+      <Gruppe titel="Lizenzen" fuss="Navigationsicons: Material Symbols (Google, Apache 2.0).">
         <Zeile label="Kartendaten © OpenStreetMap-Mitwirkende, Luftbild © GeoBasis-DE/LGLN, Daten geändert" />
       </Gruppe>
 
@@ -45,35 +39,25 @@ export function Einstellungen({
   );
 }
 
-// Revierverwaltung: Revier, Mitglieder & Einladungen, Kartendaten löschen, Revier verlassen, Code einlösen
-export function Reviermanagement({
+// Betriebsverwaltung: Forstbetrieb, Mitglieder & Einladungen, Betrieb verlassen, Code einlösen
+export function Betriebsverwaltung({
   userId,
   aktuell,
   nachAenderung,
 }: {
   userId: string;
   aktuell: Mitgliedschaft | null;
-  nachAenderung: (neueRevierId?: string | null) => Promise<void>;
+  nachAenderung: (neueBetriebId?: string | null) => Promise<void>;
 }) {
   return (
-    <Seite titel="Reviermanagement">
+    <Seite titel="Forstbetrieb">
       {aktuell && (
         <>
-          <Revier aktuell={aktuell} onGeaendert={() => nachAenderung()} />
-          <Gruppe titel="Einrichtungen">
-            <div style={{ padding: '10px var(--abstand)' }}>
-              <Knopf variante="sekundaer" onClick={() => navigieren('/reviermanagement/einrichtungen')}>
-                Alle Einrichtungen (Tabelle)
-              </Knopf>
-            </div>
-          </Gruppe>
+          <Betrieb aktuell={aktuell} onGeaendert={() => nachAenderung()} />
           {aktuell.rolle === 'inhaber' ? (
-            <>
-              <MitgliederPanel revierId={aktuell.revier.id} eigeneId={userId} />
-              <RevierdatenLoeschen revierId={aktuell.revier.id} onGeaendert={() => nachAenderung()} />
-            </>
+            <MitgliederPanel betriebId={aktuell.betrieb.id} eigeneId={userId} />
           ) : (
-            <RevierVerlassen aktuell={aktuell} userId={userId} onVerlassen={() => nachAenderung()} />
+            <BetriebVerlassen aktuell={aktuell} userId={userId} onVerlassen={() => nachAenderung()} />
           )}
         </>
       )}
@@ -164,28 +148,27 @@ function Konto({ name, email, onGeaendert }: { name: string; email: string; onGe
   );
 }
 
-function Revier({ aktuell, onGeaendert }: { aktuell: Mitgliedschaft; onGeaendert: () => Promise<void> }) {
+function Betrieb({ aktuell, onGeaendert }: { aktuell: Mitgliedschaft; onGeaendert: () => Promise<void> }) {
   const istInhaber = aktuell.rolle === 'inhaber';
-  const [name, setName] = useState(aktuell.revier.name);
-  const [flaeche, setFlaeche] = useState(aktuell.revier.flaeche_ha ? String(aktuell.revier.flaeche_ha).replace('.', ',') : '');
+  const [name, setName] = useState(aktuell.betrieb.name);
+  const [flaeche, setFlaeche] = useState(aktuell.betrieb.flaeche_ha ? String(aktuell.betrieb.flaeche_ha).replace('.', ',') : '');
   const [meldung, setMeldung] = useState<{ art: 'fehler' | 'erfolg'; text: string } | null>(null);
 
   useEffect(() => {
-    setName(aktuell.revier.name);
-    setFlaeche(aktuell.revier.flaeche_ha ? String(aktuell.revier.flaeche_ha).replace('.', ',') : '');
+    setName(aktuell.betrieb.name);
+    setFlaeche(aktuell.betrieb.flaeche_ha ? String(aktuell.betrieb.flaeche_ha).replace('.', ',') : '');
   }, [aktuell]);
 
   const geaendert =
-    name.trim() !== aktuell.revier.name ||
-    flaeche.trim() !== (aktuell.revier.flaeche_ha ? String(aktuell.revier.flaeche_ha).replace('.', ',') : '');
+    name.trim() !== aktuell.betrieb.name ||
+    flaeche.trim() !== (aktuell.betrieb.flaeche_ha ? String(aktuell.betrieb.flaeche_ha).replace('.', ',') : '');
 
-  // Wirkt sofort auf das Modul „Jagd- & Schonzeiten“ und die Hinweise bei Abschüssen
   async function bundeslandAendern(neu: string) {
     setMeldung(null);
-    const { error } = await supabase.from('reviere').update({ bundesland: neu }).eq('id', aktuell.revier.id);
+    const { error } = await supabase.from('betriebe').update({ bundesland: neu }).eq('id', aktuell.betrieb.id);
     if (error) setMeldung({ art: 'fehler', text: fehlertext(error) });
     else {
-      setMeldung({ art: 'erfolg', text: `Bundesland: ${neu}. Jagd- und Schonzeiten gelten jetzt für dieses Bundesland; Auswertungen des Vorjahres können abweichende Zeiten haben.` });
+      setMeldung({ art: 'erfolg', text: `Bundesland: ${neu}` });
       await onGeaendert();
     }
   }
@@ -198,10 +181,10 @@ function Revier({ aktuell, onGeaendert }: { aktuell: Mitgliedschaft; onGeaendert
       setMeldung({ art: 'fehler', text: 'Bitte eine gültige Fläche in Hektar angeben.' });
       return;
     }
-    const { error } = await supabase.from('reviere').update({ name: name.trim(), flaeche_ha: ha }).eq('id', aktuell.revier.id);
+    const { error } = await supabase.from('betriebe').update({ name: name.trim(), flaeche_ha: ha }).eq('id', aktuell.betrieb.id);
     if (error) setMeldung({ art: 'fehler', text: fehlertext(error) });
     else {
-      setMeldung({ art: 'erfolg', text: 'Revier gespeichert' });
+      setMeldung({ art: 'erfolg', text: 'Forstbetrieb gespeichert' });
       await onGeaendert();
     }
   }
@@ -209,8 +192,8 @@ function Revier({ aktuell, onGeaendert }: { aktuell: Mitgliedschaft; onGeaendert
   return (
     <form onSubmit={speichern}>
       <Gruppe
-        titel="Revier"
-        fuss={istInhaber ? 'Die Fläche wird beim Zeichnen der Reviergrenze automatisch berechnet.' : undefined}
+        titel="Forstbetrieb"
+        fuss={istInhaber ? 'Die Fläche wird beim Zeichnen der Betriebsgrenze automatisch berechnet.' : undefined}
       >
         {istInhaber ? (
           <>
@@ -219,15 +202,15 @@ function Revier({ aktuell, onGeaendert }: { aktuell: Mitgliedschaft; onGeaendert
           </>
         ) : (
           <>
-            <Zeile label="Name" wert={aktuell.revier.name} />
+            <Zeile label="Name" wert={aktuell.betrieb.name} />
             <Zeile
               label="Fläche"
-              wert={aktuell.revier.flaeche_ha ? `${aktuell.revier.flaeche_ha.toLocaleString('de-DE')} ha` : 'nicht hinterlegt'}
+              wert={aktuell.betrieb.flaeche_ha ? `${aktuell.betrieb.flaeche_ha.toLocaleString('de-DE')} ha` : 'nicht hinterlegt'}
             />
           </>
         )}
         {istInhaber ? (
-          <Auswahl label="Bundesland" value={aktuell.revier.bundesland} onChange={(e) => void bundeslandAendern(e.target.value)}>
+          <Auswahl label="Bundesland" value={aktuell.betrieb.bundesland} onChange={(e) => void bundeslandAendern(e.target.value)}>
             {BUNDESLAENDER.map((b) => (
               <option key={b} value={b}>
                 {b}
@@ -235,22 +218,21 @@ function Revier({ aktuell, onGeaendert }: { aktuell: Mitgliedschaft; onGeaendert
             ))}
           </Auswahl>
         ) : (
-          <Zeile label="Bundesland" wert={aktuell.revier.bundesland} />
+          <Zeile label="Bundesland" wert={aktuell.betrieb.bundesland} />
         )}
-        <Zeile label="Hegering" wert={aktuell.revier.hegering ?? '–'} />
         <Zeile label="Deine Rolle" wert={ROLLEN[aktuell.rolle]} />
       </Gruppe>
       {meldung && <Hinweis art={meldung.art}>{meldung.text}</Hinweis>}
       {istInhaber && geaendert && (
         <Knopf type="submit" variante="sekundaer">
-          Revier speichern
+          Forstbetrieb speichern
         </Knopf>
       )}
     </form>
   );
 }
 
-function RevierVerlassen({
+function BetriebVerlassen({
   aktuell,
   userId,
   onVerlassen,
@@ -261,11 +243,11 @@ function RevierVerlassen({
 }) {
   const [fehler, setFehler] = useState<string | null>(null);
   async function verlassen() {
-    if (!window.confirm(`Revier „${aktuell.revier.name}“ wirklich verlassen?`)) return;
+    if (!window.confirm(`Forstbetrieb „${aktuell.betrieb.name}“ wirklich verlassen?`)) return;
     const { error } = await supabase
-      .from('revier_mitglieder')
+      .from('betrieb_mitglieder')
       .delete()
-      .eq('revier_id', aktuell.revier.id)
+      .eq('betrieb_id', aktuell.betrieb.id)
       .eq('user_id', userId);
     if (error) setFehler(fehlertext(error));
     else {
@@ -277,13 +259,13 @@ function RevierVerlassen({
     <>
       {fehler && <Hinweis art="fehler">{fehler}</Hinweis>}
       <Knopf variante="gefahr" onClick={verlassen}>
-        Revier verlassen
+        Forstbetrieb verlassen
       </Knopf>
     </>
   );
 }
 
-export function CodeEinloesen({ onEingeloest }: { onEingeloest: (revierId: string | null) => Promise<void> }) {
+export function CodeEinloesen({ onEingeloest }: { onEingeloest: (betriebId: string | null) => Promise<void> }) {
   const [code, setCode] = useState('');
   const [fehler, setFehler] = useState<string | null>(null);
   const [erfolg, setErfolg] = useState(false);
@@ -307,7 +289,7 @@ export function CodeEinloesen({ onEingeloest }: { onEingeloest: (revierId: strin
 
   return (
     <form onSubmit={absenden}>
-      <Gruppe titel="Einladungscode einlösen" fuss="Damit trittst du mit deinem bestehenden Account einem weiteren Revier bei.">
+      <Gruppe titel="Einladungscode einlösen" fuss="Damit trittst du mit deinem bestehenden Konto einem weiteren Forstbetrieb bei.">
         <Feld
           label="Code"
           placeholder="XXXX-XXXX"
@@ -325,51 +307,6 @@ export function CodeEinloesen({ onEingeloest }: { onEingeloest: (revierId: strin
         Einlösen
       </Knopf>
     </form>
-  );
-}
-
-// Benachrichtigungen: Ein/Aus je Ereignisgruppe, je Nutzer gespeichert
-function BenachrichtigungenWahl({ userId, istInhaber }: { userId: string; istInhaber: boolean }) {
-  const [werte, setWerte] = useState<Record<string, boolean> | null>(null);
-  const [fehler, setFehler] = useState<string | null>(null);
-  useEffect(() => {
-    void supabase
-      .from('profiles')
-      .select('benachrichtigungen')
-      .eq('id', userId)
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (error) setFehler(fehlertext(error));
-        else setWerte((data?.benachrichtigungen ?? {}) as Record<string, boolean>);
-      });
-  }, [userId]);
-  async function umschalten(id: string, an: boolean) {
-    if (!werte) return;
-    const neu = { ...werte, [id]: an };
-    setWerte(neu);
-    const { error } = await supabase.from('profiles').update({ benachrichtigungen: neu }).eq('id', userId);
-    if (error) {
-      setWerte(werte);
-      setFehler(fehlertext(error));
-    } else setFehler(null);
-  }
-  const gruppen = EREIGNIS_GRUPPEN.filter((g) => istInhaber || !g.nurInhaber);
-  return (
-    <Gruppe titel="Benachrichtigungen" fuss="Steuert, welche Meldungen in der Glocke erscheinen. Eigene Aktionen werden nie gemeldet. Es gibt keinen E-Mail- oder Push-Versand.">
-      {fehler && <Hinweis art="fehler">{fehler}</Hinweis>}
-      {gruppen.map((g) => (
-        <Zeile key={g.id} label={<><strong>{g.label}</strong><br /><small style={{ color: 'var(--text-leise)' }}>{g.text}</small></>}>
-          <input
-            type="checkbox"
-            role="switch"
-            aria-label={g.label}
-            checked={werte ? werte[g.id] !== false : true}
-            disabled={!werte}
-            onChange={(e) => void umschalten(g.id, e.target.checked)}
-          />
-        </Zeile>
-      ))}
-    </Gruppe>
   );
 }
 
@@ -398,7 +335,7 @@ function KartenSpeicher() {
   const [anzahl, setAnzahl] = useState<number | null>(null);
   const zaehlen = async () => {
     try {
-      setAnzahl((await (await caches.open('hegewerk-karten-v1')).keys()).length);
+      setAnzahl((await (await caches.open('waldmanager-karten-v1')).keys()).length);
     } catch {
       setAnzahl(null);
     }
@@ -414,7 +351,7 @@ function KartenSpeicher() {
           variante="sekundaer"
           disabled={anzahl === 0}
           onClick={async () => {
-            await caches.delete('hegewerk-karten-v1');
+            await caches.delete('waldmanager-karten-v1');
             await zaehlen();
           }}
         >
