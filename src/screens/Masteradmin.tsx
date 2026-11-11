@@ -9,9 +9,8 @@ import { Symbol } from '../components/symbole';
 type Zeile = {
   key: string;
   art: 'mitglied' | 'einladung';
-  hegering: string;
-  revier: string;
-  revierId: string;
+  betrieb: string;
+  betriebId: string;
   name: string;
   email: string;
   rolle: string;
@@ -20,26 +19,25 @@ type Zeile = {
   userId?: string;
   einladungId?: string;
 };
-type Spalte = 'hegering' | 'revier' | 'name' | 'rolle' | 'einladung' | 'login';
-const ROLLEN: Record<string, string> = { inhaber: 'Inhaber/Pächter', mitjaeger: 'Mitjäger' };
+type Spalte = 'betrieb' | 'name' | 'rolle' | 'einladung' | 'login';
+const ROLLEN: Record<string, string> = { inhaber: 'Inhaber', mitarbeiter: 'Mitarbeiter' };
 
-// Masteradmin: Gesamtübersicht der Mitgliedschaften (ohne Fachdaten) und Verwaltung von Hegeringen/Revieren
-export function Masteradmin({ userId, nachAenderung }: { userId: string; nachAenderung: (revierId?: string | null) => Promise<void> }) {
+// Masteradmin: Gesamtübersicht der Mitgliedschaften (ohne Fachdaten) und Verwaltung der Forstbetriebe
+export function Masteradmin({ userId, nachAenderung }: { userId: string; nachAenderung: (betriebId?: string | null) => Promise<void> }) {
   const [zeilen, setZeilen] = useState<Zeile[]>([]);
   const [fehler, setFehler] = useState<string | null>(null);
   const [laedt, setLaedt] = useState(true);
   const [suche, setSuche] = useState('');
-  const [hegering, setHegering] = useState('');
-  const [revier, setRevier] = useState('');
-  const [sort, setSort] = useState<{ spalte: Spalte; auf: boolean }>({ spalte: 'hegering', auf: true });
+  const [betrieb, setBetrieb] = useState('');
+  const [sort, setSort] = useState<{ spalte: Spalte; auf: boolean }>({ spalte: 'betrieb', auf: true });
   const [neuerCode, setNeuerCode] = useState<{ code: string; fuer: string } | null>(null);
 
   const laden = useCallback(async () => {
     const [m, e, l] = await Promise.all([
-      supabase.from('revier_mitglieder').select('user_id, rolle, revier_id, reviere(name, hegeringe(name)), profiles(name, email)'),
+      supabase.from('betrieb_mitglieder').select('user_id, rolle, betrieb_id, betriebe(name), profiles(name, email)'),
       supabase
         .from('einladungen')
-        .select('id, rolle, email, revier_id, gueltig_bis, reviere(name, hegeringe(name))')
+        .select('id, rolle, email, betrieb_id, gueltig_bis, betriebe(name)')
         .is('eingeloest_am', null)
         .gt('gueltig_bis', new Date().toISOString()),
       supabase.rpc('masteradmin_letzte_logins'),
@@ -48,11 +46,10 @@ export function Masteradmin({ userId, nachAenderung }: { userId: string; nachAen
     if (err) setFehler(fehlertext(err));
     const logins = new Map((l.data ?? []).map((x) => [x.user_id, x.letzter_login] as const));
     const mitglieder: Zeile[] = (m.data ?? []).map((x) => ({
-      key: `m-${x.revier_id}-${x.user_id}`,
+      key: `m-${x.betrieb_id}-${x.user_id}`,
       art: 'mitglied',
-      hegering: x.reviere?.hegeringe?.name ?? '–',
-      revier: x.reviere?.name ?? '–',
-      revierId: x.revier_id,
+      betrieb: x.betriebe?.name ?? '–',
+      betriebId: x.betrieb_id,
       name: x.profiles?.name ?? '?',
       email: x.profiles?.email ?? '',
       rolle: x.rolle,
@@ -61,13 +58,12 @@ export function Masteradmin({ userId, nachAenderung }: { userId: string; nachAen
       userId: x.user_id,
     }));
     const einladungen: Zeile[] = (e.data ?? [])
-      .filter((x) => x.revier_id)
+      .filter((x) => x.betrieb_id)
       .map((x) => ({
         key: `e-${x.id}`,
         art: 'einladung',
-        hegering: x.reviere?.hegeringe?.name ?? '–',
-        revier: x.reviere?.name ?? '–',
-        revierId: x.revier_id!,
+        betrieb: x.betriebe?.name ?? '–',
+        betriebId: x.betrieb_id!,
         name: '(noch nicht registriert)',
         email: x.email ?? '',
         rolle: x.rolle,
@@ -82,16 +78,15 @@ export function Masteradmin({ userId, nachAenderung }: { userId: string; nachAen
     void laden();
   }, [laden]);
 
-  const hegeringe = useMemo(() => [...new Set(zeilen.map((z) => z.hegering))].sort((a, b) => a.localeCompare(b, 'de')), [zeilen]);
-  const reviere = useMemo(() => [...new Set(zeilen.filter((z) => !hegering || z.hegering === hegering).map((z) => z.revier))].sort((a, b) => a.localeCompare(b, 'de')), [zeilen, hegering]);
+  const betriebe = useMemo(() => [...new Set(zeilen.map((z) => z.betrieb))].sort((a, b) => a.localeCompare(b, 'de')), [zeilen]);
 
   const sichtbar = useMemo(() => {
     const q = suche.trim().toLowerCase();
     const wert = (z: Zeile): string => (sort.spalte === 'login' ? z.login ?? '' : sort.spalte === 'einladung' ? z.einladung ?? '' : z[sort.spalte]);
     return zeilen
-      .filter((z) => (!hegering || z.hegering === hegering) && (!revier || z.revier === revier) && (!q || `${z.name} ${z.email}`.toLowerCase().includes(q)))
-      .sort((a, b) => wert(a).localeCompare(wert(b), 'de') * (sort.auf ? 1 : -1) || a.revier.localeCompare(b.revier, 'de'));
-  }, [zeilen, suche, hegering, revier, sort]);
+      .filter((z) => (!betrieb || z.betrieb === betrieb) && (!q || `${z.name} ${z.email}`.toLowerCase().includes(q)))
+      .sort((a, b) => wert(a).localeCompare(wert(b), 'de') * (sort.auf ? 1 : -1) || a.betrieb.localeCompare(b.betrieb, 'de'));
+  }, [zeilen, suche, betrieb, sort]);
 
   const kopf = (spalte: Spalte, titel: string) => (
     <th aria-sort={sort.spalte === spalte ? (sort.auf ? 'ascending' : 'descending') : 'none'}>
@@ -102,23 +97,23 @@ export function Masteradmin({ userId, nachAenderung }: { userId: string; nachAen
   );
 
   async function entfernen(z: Zeile) {
-    if (!window.confirm(`${z.name} aus „${z.revier}“ entfernen? Der Account bleibt bestehen.`)) return;
-    const { error } = await supabase.from('revier_mitglieder').delete().eq('revier_id', z.revierId).eq('user_id', z.userId!);
+    if (!window.confirm(`${z.name} aus „${z.betrieb}“ entfernen? Der Account bleibt bestehen.`)) return;
+    const { error } = await supabase.from('betrieb_mitglieder').delete().eq('betrieb_id', z.betriebId).eq('user_id', z.userId!);
     setFehler(error ? fehlertext(error) : null);
     await laden();
     await nachAenderung();
   }
   async function erneutSenden(z: Zeile) {
     const { data, error } = await supabase.rpc('einladung_erstellen', {
-      p_revier_id: z.revierId,
-      p_rolle: z.rolle as 'inhaber' | 'mitjaeger',
+      p_betrieb_id: z.betriebId,
+      p_rolle: z.rolle as 'inhaber' | 'mitarbeiter',
       p_email: z.email || undefined,
       p_gueltig_tage: 14,
     });
     if (error || !data) return setFehler(fehlertext(error ?? 'Einladung konnte nicht erstellt werden.'));
     await supabase.from('einladungen').delete().eq('id', z.einladungId!);
     setFehler(null);
-    setNeuerCode({ code: data, fuer: `${z.email || 'Einladung'} · ${z.revier}` });
+    setNeuerCode({ code: data, fuer: `${z.email || 'Einladung'} · ${z.betrieb}` });
     await laden();
   }
 
@@ -127,24 +122,19 @@ export function Masteradmin({ userId, nachAenderung }: { userId: string; nachAen
       {fehler && <Hinweis art="fehler">{fehler}</Hinweis>}
       {neuerCode && <CodeAnzeige code={neuerCode.code} beschreibung={`Neue Einladung für ${neuerCode.fuer} (14 Tage gültig). Der alte Code ist ungültig – bitte dem Empfänger übermitteln.`} />}
 
-      <Gruppe titel="Übersicht" fuss="Nur Mitgliedschaften und offene Einladungen – keine Fachdaten der Reviere.">
+      <Gruppe titel="Übersicht" fuss="Nur Mitgliedschaften und offene Einladungen – keine Fachdaten der Forstbetriebe.">
         <div className="ma-filter" style={{ padding: 10 }}>
           <input type="search" placeholder="Suche nach Name oder E-Mail" aria-label="Suche" value={suche} onChange={(e) => setSuche(e.target.value)} />
-          <select aria-label="Hegering" value={hegering} onChange={(e) => { setHegering(e.target.value); setRevier(''); }}>
-            <option value="">Alle Hegeringe</option>
-            {hegeringe.map((h) => <option key={h}>{h}</option>)}
-          </select>
-          <select aria-label="Revier" value={revier} onChange={(e) => setRevier(e.target.value)}>
-            <option value="">Alle Reviere</option>
-            {reviere.map((r) => <option key={r}>{r}</option>)}
+          <select aria-label="Forstbetrieb" value={betrieb} onChange={(e) => setBetrieb(e.target.value)}>
+            <option value="">Alle Forstbetriebe</option>
+            {betriebe.map((r) => <option key={r}>{r}</option>)}
           </select>
         </div>
         <div className="ma-tabelle">
           <table>
             <thead>
               <tr>
-                {kopf('hegering', 'Hegering')}
-                {kopf('revier', 'Revier')}
+                {kopf('betrieb', 'Forstbetrieb')}
                 {kopf('name', 'User')}
                 {kopf('rolle', 'Rolle')}
                 {kopf('einladung', 'Einladung offen')}
@@ -153,12 +143,11 @@ export function Masteradmin({ userId, nachAenderung }: { userId: string; nachAen
               </tr>
             </thead>
             <tbody>
-              {laedt && <tr><td colSpan={7}>Lade …</td></tr>}
-              {!laedt && sichtbar.length === 0 && <tr><td colSpan={7}>Keine Einträge.</td></tr>}
+              {laedt && <tr><td colSpan={6}>Lade …</td></tr>}
+              {!laedt && sichtbar.length === 0 && <tr><td colSpan={6}>Keine Einträge.</td></tr>}
               {sichtbar.map((z) => (
                 <tr key={z.key}>
-                  <td>{z.hegering}</td>
-                  <td>{z.revier}</td>
+                  <td>{z.betrieb}</td>
                   <td>{z.name}<small>{z.email}</small></td>
                   <td>{ROLLEN[z.rolle] ?? z.rolle}</td>
                   <td>{z.einladung ? `ja, bis ${datumDE(z.einladung)}` : '–'}</td>

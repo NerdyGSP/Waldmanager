@@ -2,8 +2,8 @@
 // Die Liste PRECACHE und die Version werden beim Build von vite.config.ts eingesetzt.
 const PRECACHE = /*__PRECACHE__*/ [];
 const VERSION = /*__VERSION__*/ 'dev';
-const APP_CACHE = `hegewerk-app-${VERSION}`;
-const KACHEL_CACHE = 'hegewerk-karten-v1';
+const APP_CACHE = `waldmanager-app-${VERSION}`;
+const KACHEL_CACHE = 'waldmanager-karten-v1';
 const MAX_EINTRAEGE = 5000;
 const MAX_ALTER_MS = 60 * 24 * 3600 * 1000;
 const HOSTS = ['opendata.lgln.niedersachsen.de', 'tile.openstreetmap.org'];
@@ -25,7 +25,7 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     (async () => {
       // Die letzten zwei App-Versionen behalten: offene Tabs laden ihre Teil-Dateien weiter aus der alten Version
-      const namen = (await caches.keys()).filter((n) => n.startsWith('hegewerk-app-')).sort().reverse();
+      const namen = (await caches.keys()).filter((n) => n.startsWith('waldmanager-app-')).sort().reverse();
       await Promise.all(namen.slice(2).map((n) => caches.delete(n)));
       await self.clients.claim();
     })(),
@@ -75,7 +75,7 @@ async function kachel(req) {
   const cache = await caches.open(KACHEL_CACHE);
   const treffer = await cache.match(req);
   if (treffer) {
-    const datum = Number(treffer.headers.get('x-hegewerk-geladen')) || 0;
+    const datum = Number(treffer.headers.get('x-waldmanager-geladen')) || 0;
     if (Date.now() - datum < MAX_ALTER_MS) return treffer;
   }
   try {
@@ -84,7 +84,7 @@ async function kachel(req) {
     // Nur echte Bilder merken (WMS liefert Fehler als XML mit Status 200)
     if (antwort.ok && typ.startsWith('image/')) {
       const kopf = new Headers(antwort.headers);
-      kopf.set('x-hegewerk-geladen', String(Date.now()));
+      kopf.set('x-waldmanager-geladen', String(Date.now()));
       const kopie = new Response(await antwort.clone().blob(), { status: 200, headers: kopf });
       await cache.put(req, kopie);
       aufraeumen(cache);

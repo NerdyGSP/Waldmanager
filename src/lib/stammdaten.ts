@@ -1,89 +1,92 @@
-import { EINRICHTUNGS_REIHENFOLGE } from './einrichtungsIcons';
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from './supabase';
-import type { Enums, Tables } from './database.types';
+import type { Enums } from './database.types';
 
-export type Wildart = Pick<Tables<'wildarten'>, 'id' | 'name' | 'gruppe' | 'sortierung' | 'altersklassen'>;
-export type Zone = {
+/** Baumartenanteil eines Bestands, gespeichert in bestaende.baumarten */
+export type Baumartenanteil = { art: string; anteil: number };
+
+export type Bestand = {
   id: string;
   name: string;
+  abteilung: string | null;
+  bestandestyp: string | null;
+  baumarten: Baumartenanteil[];
+  pflanzjahr: number | null;
+  vorratVfmHa: number | null;
   farbe: string | null;
   sortierung: number;
   hatGeometrie: boolean;
-  ebeneId: string | null;
 };
-export type ZonenEbene = { id: string; name: string; farbe: string | null; sortierung: number; wte_aktiv: boolean };
-export type Mitglied = { user_id: string; name: string; rolle: Enums<'revier_rolle'> };
+export type Mitglied = { user_id: string; name: string; rolle: Enums<'betrieb_rolle'> };
 
-let wildartenCache: Wildart[] | null = null;
+/** Gängige Baumarten mit forstlichem Kürzel */
+export const BAUMARTEN: Array<{ kuerzel: string; name: string; gruppe: 'nadel' | 'laub' }> = [
+  { kuerzel: 'Fi', name: 'Fichte', gruppe: 'nadel' },
+  { kuerzel: 'Ki', name: 'Kiefer', gruppe: 'nadel' },
+  { kuerzel: 'Dgl', name: 'Douglasie', gruppe: 'nadel' },
+  { kuerzel: 'Lä', name: 'Lärche', gruppe: 'nadel' },
+  { kuerzel: 'Ta', name: 'Tanne', gruppe: 'nadel' },
+  { kuerzel: 'Bu', name: 'Buche', gruppe: 'laub' },
+  { kuerzel: 'Ei', name: 'Eiche', gruppe: 'laub' },
+  { kuerzel: 'BAh', name: 'Bergahorn', gruppe: 'laub' },
+  { kuerzel: 'Es', name: 'Esche', gruppe: 'laub' },
+  { kuerzel: 'Hbu', name: 'Hainbuche', gruppe: 'laub' },
+  { kuerzel: 'Bi', name: 'Birke', gruppe: 'laub' },
+  { kuerzel: 'Erl', name: 'Erle', gruppe: 'laub' },
+];
 
-export function useWildarten(): Wildart[] {
-  const [liste, setListe] = useState<Wildart[]>(wildartenCache ?? []);
-  useEffect(() => {
-    if (wildartenCache) return;
-    void supabase
-      .from('wildarten')
-      .select('id, name, gruppe, sortierung, altersklassen')
-      .order('sortierung')
-      .then(({ data }) => {
-        wildartenCache = [...(data ?? [])].sort((a, b) => a.sortierung - b.sortierung);
-        setListe(wildartenCache);
-      });
-  }, []);
-  return liste;
+export function baumartName(kuerzel: string): string {
+  return BAUMARTEN.find((b) => b.kuerzel === kuerzel)?.name ?? kuerzel;
 }
 
-export function wildartName(liste: Wildart[], id: string): string {
-  return liste.find((w) => w.id === id)?.name ?? id;
+/** Liest die Baumartenanteile robust aus dem JSON-Feld */
+export function baumartenLesen(wert: unknown): Baumartenanteil[] {
+  if (!Array.isArray(wert)) return [];
+  return wert.flatMap((x) => {
+    const o = x as { art?: unknown; anteil?: unknown };
+    return typeof o?.art === 'string' && Number.isFinite(Number(o.anteil)) ? [{ art: o.art, anteil: Number(o.anteil) }] : [];
+  });
 }
 
-export function useZonen(revierId: string) {
-  const [zonen, setZonen] = useState<Zone[]>([]);
+/** Kurzform wie „Fi 80 · Lä 20“ */
+export function baumartenText(liste: Baumartenanteil[]): string {
+  return liste.map((b) => `${b.art} ${b.anteil}`).join(' · ');
+}
+
+export function useBestaende(betriebId: string) {
+  const [bestaende, setBestaende] = useState<Bestand[]>([]);
   const [laedt, setLaedt] = useState(true);
 
   const laden = useCallback(async () => {
     const { data } = await supabase
-      .from('zonen')
-      .select('id, name, farbe, sortierung, geom, ebene_id')
-      .eq('revier_id', revierId)
+      .from('bestaende')
+      .select('id, name, abteilung, bestandestyp, baumarten, pflanzjahr, vorrat_vfm_ha, farbe, sortierung, geom')
+      .eq('betrieb_id', betriebId)
       .is('geloescht_am', null)
       .order('sortierung')
       .order('name');
-    setZonen(
-      (data ?? []).map((z) => ({
-        id: z.id,
-        name: z.name,
-        farbe: z.farbe,
-        sortierung: z.sortierung,
-        hatGeometrie: z.geom !== null,
-        ebeneId: z.ebene_id,
+    setBestaende(
+      (data ?? []).map((b) => ({
+        id: b.id,
+        name: b.name,
+        abteilung: b.abteilung,
+        bestandestyp: b.bestandestyp,
+        baumarten: baumartenLesen(b.baumarten),
+        pflanzjahr: b.pflanzjahr,
+        vorratVfmHa: b.vorrat_vfm_ha,
+        farbe: b.farbe,
+        sortierung: b.sortierung,
+        hatGeometrie: b.geom !== null,
       })),
     );
     setLaedt(false);
-  }, [revierId]);
+  }, [betriebId]);
 
   useEffect(() => {
     void laden();
   }, [laden]);
 
-  return { zonen, laedt, laden };
-}
-
-export function useZonenEbenen(revierId: string) {
-  const [ebenen, setEbenen] = useState<ZonenEbene[]>([]);
-  const laden = useCallback(async () => {
-    const { data } = await supabase
-      .from('zonen_ebenen')
-      .select('id, name, farbe, sortierung, wte_aktiv')
-      .eq('revier_id', revierId)
-      .order('sortierung')
-      .order('name');
-    setEbenen(data ?? []);
-  }, [revierId]);
-  useEffect(() => {
-    void laden();
-  }, [laden]);
-  return { ebenen, laden };
+  return { bestaende, laedt, laden };
 }
 
 /** Prüft, ob ein Name (ohne Groß-/Kleinschreibung) schon vergeben ist */
@@ -92,13 +95,13 @@ export function nameVergeben(namen: Array<string | null | undefined>, name: stri
   return namen.some((x) => x != null && x.trim().toLowerCase() === n && x !== ausser);
 }
 
-export function useMitglieder(revierId: string): Mitglied[] {
+export function useMitglieder(betriebId: string): Mitglied[] {
   const [liste, setListe] = useState<Mitglied[]>([]);
   useEffect(() => {
     void supabase
-      .from('revier_mitglieder')
+      .from('betrieb_mitglieder')
       .select('user_id, rolle, profiles(name)')
-      .eq('revier_id', revierId)
+      .eq('betrieb_id', betriebId)
       .then(({ data }) =>
         setListe(
           (data ?? [])
@@ -106,35 +109,11 @@ export function useMitglieder(revierId: string): Mitglied[] {
             .sort((a, b) => a.name.localeCompare(b.name, 'de')),
         ),
       );
-  }, [revierId]);
+  }, [betriebId]);
   return liste;
 }
 
-export const GESCHLECHTER: Array<{ wert: Enums<'geschlecht'>; label: string; kurz: string }> = [
-  { wert: 'maennlich', label: 'männlich', kurz: '♂' },
-  { wert: 'weiblich', label: 'weiblich', kurz: '♀' },
-  { wert: 'unbekannt', label: 'unbekannt', kurz: '?' },
-];
-
-export const ZONENFARBEN = ['#1e5c3a', '#b5651d', '#1f6fb2', '#8e44ad', '#c0392b', '#16a085', '#d4a017', '#5d6d7e'];
-
-const EINRICHTUNGSTYPEN_UNSORTIERT: Array<{ wert: Enums<'einrichtung_typ'>; label: string; farbe: string }> = [
-  { wert: 'hochsitz', label: 'Hochsitz', farbe: '#8b5a2b' },
-  { wert: 'kanzel', label: 'Kanzel', farbe: '#5d3a1a' },
-  { wert: 'ansitzleiter', label: 'Ansitzleiter', farbe: '#b07d4f' },
-  { wert: 'bodensitz', label: 'Bodensitz', farbe: '#a0855b' },
-  { wert: 'kirrung', label: 'Kirrung', farbe: '#d4a017' },
-  { wert: 'salzlecke', label: 'Salzlecke', farbe: '#9aa5b1' },
-  { wert: 'fuetterung', label: 'Fütterung', farbe: '#c97b2a' },
-  { wert: 'wildacker', label: 'Wildacker', farbe: '#4caf50' },
-  { wert: 'wildkamera', label: 'Wildkamera', farbe: '#1f6fb2' },
-  { wert: 'falle', label: 'Falle', farbe: '#7f4f9e' },
-  { wert: 'drueckjagdbock', label: 'Drückjagdbock', farbe: '#c0392b' },
-  { wert: 'sonstiges', label: 'Sonstiges', farbe: '#5d6d7e' },
-];
-
-// In der festen Gruppenreihenfolge (siehe einrichtungsIcons.tsx)
-export const EINRICHTUNGSTYPEN = [...EINRICHTUNGSTYPEN_UNSORTIERT].sort((a, b) => EINRICHTUNGS_REIHENFOLGE.indexOf(a.wert) - EINRICHTUNGS_REIHENFOLGE.indexOf(b.wert));
+export const BESTANDSFARBEN = ['#2f6b4a', '#b5651d', '#1f6fb2', '#8e44ad', '#c0392b', '#16a085', '#d4a017', '#5d6d7e'];
 
 // n gut unterscheidbare Zufallsfarben (Goldener Winkel, zufälliger Startton)
 export function zufallsFarben(n: number): string[] {

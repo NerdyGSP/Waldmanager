@@ -3,12 +3,11 @@ import { supabase } from './supabase';
 import type { Enums } from './database.types';
 
 export type Mitgliedschaft = {
-  rolle: Enums<'revier_rolle'>;
-  revier: {
+  rolle: Enums<'betrieb_rolle'>;
+  betrieb: {
     id: string;
     name: string;
     flaeche_ha: number | null;
-    hegering: string | null;
     bundesland: string;
   };
 };
@@ -36,10 +35,7 @@ export function useNutzerKontext(userId: string): NutzerKontext {
     const [profil, master, mitglieder] = await Promise.all([
       supabase.from('profiles').select('name, email').eq('id', userId).maybeSingle(),
       supabase.from('masteradmins').select('user_id').eq('user_id', userId).maybeSingle(),
-      supabase
-        .from('revier_mitglieder')
-        .select('rolle, reviere(id, name, flaeche_ha, bundesland, hegeringe(name))')
-        .eq('user_id', userId),
+      supabase.from('betrieb_mitglieder').select('rolle, betriebe(id, name, flaeche_ha, bundesland)').eq('user_id', userId),
     ]);
 
     const ersterFehler = profil.error ?? master.error ?? mitglieder.error;
@@ -50,18 +46,17 @@ export function useNutzerKontext(userId: string): NutzerKontext {
     setIstMasteradmin(Boolean(master.data));
     setMitgliedschaften(
       (mitglieder.data ?? [])
-        .filter((m) => m.reviere)
+        .filter((m) => m.betriebe)
         .map((m) => ({
           rolle: m.rolle,
-          revier: {
-            id: m.reviere!.id,
-            name: m.reviere!.name,
-            flaeche_ha: m.reviere!.flaeche_ha,
-            hegering: m.reviere!.hegeringe?.name ?? null,
-            bundesland: m.reviere!.bundesland,
+          betrieb: {
+            id: m.betriebe!.id,
+            name: m.betriebe!.name,
+            flaeche_ha: m.betriebe!.flaeche_ha,
+            bundesland: m.betriebe!.bundesland,
           },
         }))
-        .sort((a, b) => a.revier.name.localeCompare(b.revier.name, 'de')),
+        .sort((a, b) => a.betrieb.name.localeCompare(b.betrieb.name, 'de')),
     );
     setLaedt(false);
   }, [userId]);
@@ -73,9 +68,9 @@ export function useNutzerKontext(userId: string): NutzerKontext {
   return { laedt, fehler, name, email, istMasteradmin, mitgliedschaften, neuLaden };
 }
 
-const SPEICHER_SCHLUESSEL = 'hegewerk.aktuellesRevier';
+const SPEICHER_SCHLUESSEL = 'waldmanager.aktuellerBetrieb';
 
-export function gemerktesRevier(): string | null {
+export function gemerkterBetrieb(): string | null {
   try {
     return localStorage.getItem(SPEICHER_SCHLUESSEL);
   } catch {
@@ -83,7 +78,7 @@ export function gemerktesRevier(): string | null {
   }
 }
 
-export function revierMerken(id: string) {
+export function betriebMerken(id: string) {
   try {
     localStorage.setItem(SPEICHER_SCHLUESSEL, id);
   } catch {

@@ -2,59 +2,35 @@ import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { fehlertext } from '../lib/fehler';
 import { supabase } from '../lib/supabase';
-import { gemerktesRevier, revierMerken, useNutzerKontext, type Mitgliedschaft } from '../lib/useNutzerKontext';
+import { gemerkterBetrieb, betriebMerken, useNutzerKontext, type Mitgliedschaft } from '../lib/useNutzerKontext';
 import { navigieren, usePfad } from '../lib/router';
-import { Glocke } from '../components/Glocke';
 import { useWarteschlange } from '../lib/offline';
 import { EingebettetKontext, Hinweis, Knopf } from '../components/ui';
 import { Symbol } from '../components/symbole';
 import { useBreit } from '../lib/useBreit';
 import type { NutzerKontext } from '../lib/useNutzerKontext';
 import { Logo } from './AuthScreen';
-import { CodeEinloesen, Einstellungen, Reviermanagement } from './Einstellungen';
+import { Betriebsverwaltung, CodeEinloesen, Einstellungen } from './Einstellungen';
 import { Masteradmin } from './Masteradmin';
 import { useModulBreite } from '../lib/modulBreite';
 import { Segmente } from '../components/ui';
-import { Freigaben } from './module/Freigaben';
-import { Jagdzeiten } from './module/Jagdzeiten';
-import { Zonen } from './module/Zonen';
-import { Abschuesse } from './module/Abschuesse';
-import { Erfassung } from './module/Erfassung';
-import { Zaehlung } from './module/Zaehlung';
-import { Monitoring } from './module/Monitoring';
-import { Wildschaeden } from './module/Wildschaeden';
-import { Aufgaben } from './module/Aufgaben';
-import { Begehungsscheine } from './module/Begehungsscheine';
-import { Datenimport } from './module/Datenimport';
-import { EinrichtungenVollbild } from './module/Einrichtungstabelle';
-import { BewegungsjagdListe, BewegungsjagdVollbild } from './bewegungsjagd/Bewegungsjagd';
-import type { RevierKontext } from './module/kontext';
+import { Bestaende } from './module/Bestaende';
+import type { BetriebKontext } from './module/kontext';
 
 // Die Karte ist groß (MapLibre) und wird erst bei Bedarf geladen
 const Karte = lazy(() => import('./module/Karte'));
 
-const ROLLEN = { inhaber: 'Inhaber/Pächter', mitjaeger: 'Mitjäger' } as const;
+const ROLLEN = { inhaber: 'Inhaber', mitarbeiter: 'Mitarbeiter' } as const;
 
 const MODULE = [
-  { pfad: 'karte', titel: 'Karte', text: 'Reviergrenze, Zonen, Einrichtungen, Pirschwege, Wind, Heatmap', symbol: '🗺' },
-  { pfad: 'zaehlung', titel: 'Wildzählung', text: 'Zählsitzung je Zone mit Gesamtübersicht und Historie', symbol: '🔢' },
-  { pfad: 'erfassung', titel: 'Einzelerfassung', text: 'Beobachtungen unterwegs, auch ohne Netz', symbol: '👁' },
-  { pfad: 'abschuesse', titel: 'Strecke', text: 'Abschüsse, Fänge und Fallwild mit Wildart, Geschlecht, Altersklasse', symbol: '🎯' },
-  { pfad: 'wildschaeden', titel: 'Wildschäden', text: 'Schäden erfassen, Anmeldefrist im Blick', symbol: '🌾' },
-  { pfad: 'aufgaben', titel: 'Aufgaben', text: 'Revierarbeiten planen und verteilen', symbol: '✅' },
-  { pfad: 'bewegungsjagd', titel: 'Bewegungsjagd', text: 'Einladen, Zu- und Absagen, Stände zuweisen', symbol: '🦌' },
-  { pfad: 'begehungsscheine', titel: 'Begehungsscheine', text: 'Gastjäger-Scheine ausstellen und prüfen', symbol: '📄' },
-  { pfad: 'monitoring', titel: 'Monitoring', text: 'Statistik und Quervergleich im Hegering', symbol: '📈' },
-  { pfad: 'zonen', titel: 'Zonen & Routen', text: 'Erfassungszonen, Routen und Ebenen anlegen und ordnen', symbol: '▦' },
-  { pfad: 'jagdzeiten', titel: 'Jagdzeiten', text: 'Was ist heute jagdbar? Zeiten und Sonderregeln je Wildart', symbol: '' },
-  { pfad: 'freigaben', titel: 'Freigaben', text: 'Wildarten für den Quervergleich freigeben', symbol: '🤝' },
-  { pfad: 'import', titel: 'Datenimport', text: 'Historische Zählungen und Abschüsse aus CSV', symbol: '⬆️' },
-  { pfad: 'reviermanagement', titel: 'Reviermanagement', text: 'Revier, Mitglieder & Einladungen, Kartendaten', symbol: '🏡' },
-  { pfad: 'masteradmin', titel: 'Masteradmin', text: 'Hegeringe, Reviere und User im Überblick', symbol: '🛡' },
+  { pfad: 'karte', titel: 'Karte', text: 'Betriebsgrenze und Bestände auf Karte und Luftbild', symbol: 'karte' },
+  { pfad: 'bestaende', titel: 'Bestände', text: 'Bestände anlegen, Baumarten, Alter und Vorrat pflegen', symbol: 'zonen' },
+  { pfad: 'forstbetrieb', titel: 'Forstbetrieb', text: 'Betrieb, Mitglieder und Einladungen', symbol: 'reviermanagement' },
+  { pfad: 'masteradmin', titel: 'Masteradmin', text: 'Forstbetriebe und Nutzer im Überblick', symbol: 'masteradmin' },
 ];
 
-// Seiten ohne Revier-Kontext-Modul (Einstellungen, Reviermanagement, Masteradmin)
-const SONDERSEITEN = ['einstellungen', 'reviermanagement', 'masteradmin'];
+// Seiten ohne Betriebs-Kontext-Modul (Einstellungen, Forstbetrieb, Masteradmin)
+const SONDERSEITEN = ['einstellungen', 'forstbetrieb', 'masteradmin'];
 
 export function Home({ session }: { session: Session }) {
   const kontext = useNutzerKontext(session.user.id);
@@ -68,30 +44,30 @@ export function Home({ session }: { session: Session }) {
     document.addEventListener('visibilitychange', melden);
     return () => document.removeEventListener('visibilitychange', melden);
   }, []);
-  const [revierId, setRevierId] = useState<string | null>(gemerktesRevier());
+  const [betriebId, setBetriebId] = useState<string | null>(gemerkterBetrieb());
   const pfad = usePfad();
   const offen = useWarteschlange();
   const breit = useBreit();
 
-  // Gültiges Revier wählen, sobald die Mitgliedschaften geladen sind
+  // Gültigen Betrieb wählen, sobald die Mitgliedschaften geladen sind
   useEffect(() => {
     if (kontext.laedt) return;
-    const ids = kontext.mitgliedschaften.map((m) => m.revier.id);
-    if (!revierId || !ids.includes(revierId)) setRevierId(ids[0] ?? null);
-  }, [kontext.laedt, kontext.mitgliedschaften, revierId]);
+    const ids = kontext.mitgliedschaften.map((m) => m.betrieb.id);
+    if (!betriebId || !ids.includes(betriebId)) setBetriebId(ids[0] ?? null);
+  }, [kontext.laedt, kontext.mitgliedschaften, betriebId]);
 
   const aktuell = useMemo(
-    () => kontext.mitgliedschaften.find((m) => m.revier.id === revierId) ?? null,
-    [kontext.mitgliedschaften, revierId],
+    () => kontext.mitgliedschaften.find((m) => m.betrieb.id === betriebId) ?? null,
+    [kontext.mitgliedschaften, betriebId],
   );
 
-  function revierWechseln(id: string) {
-    setRevierId(id);
-    revierMerken(id);
+  function betriebWechseln(id: string) {
+    setBetriebId(id);
+    betriebMerken(id);
   }
-  const nachAenderung = async (neueRevierId?: string | null) => {
+  const nachAenderung = async (neueBetriebId?: string | null) => {
     await kontext.neuLaden();
-    if (neueRevierId) revierWechseln(neueRevierId);
+    if (neueBetriebId) betriebWechseln(neueBetriebId);
   };
 
   if (kontext.laedt) {
@@ -99,12 +75,12 @@ export function Home({ session }: { session: Session }) {
   }
 
   const modul = pfad[0];
-  const revierKontext: RevierKontext | null = aktuell
+  const betriebKontext: BetriebKontext | null = aktuell
     ? {
-        revierId: aktuell.revier.id,
-        revierName: aktuell.revier.name,
-        flaecheHa: aktuell.revier.flaeche_ha,
-        bundesland: aktuell.revier.bundesland,
+        betriebId: aktuell.betrieb.id,
+        betriebName: aktuell.betrieb.name,
+        flaecheHa: aktuell.betrieb.flaeche_ha,
+        bundesland: aktuell.betrieb.bundesland,
         rolle: aktuell.rolle,
         istInhaber: aktuell.rolle === 'inhaber',
         userId: session.user.id,
@@ -112,32 +88,17 @@ export function Home({ session }: { session: Session }) {
       }
     : null;
 
-  // Abgedocktes Monitoring: eigenes Fenster ohne Seitenleiste und Karte
-  if (revierKontext && modul === 'monitoring' && pfad[1] === 'fenster') {
-    return <MonitoringFenster k={revierKontext} kontext={kontext} revierId={revierId} revierWechseln={revierWechseln} />;
-  }
-
-  // Bewegungsjagd (Assistent/Auswertung): Vollbild ohne Seitenleiste und Navigation
-  if (revierKontext && modul === 'bewegungsjagd' && pfad[1]) {
-    return <BewegungsjagdVollbild key={`${revierKontext.revierId}-${pfad[1]}`} k={revierKontext} id={pfad[1]} />;
-  }
-
-  // Einrichtungstabelle: Vollbild ohne Seitenleiste
-  if (revierKontext && modul === 'reviermanagement' && pfad[1] === 'einrichtungen') {
-    return <EinrichtungenVollbild key={revierKontext.revierId} k={revierKontext} />;
-  }
-
   // Browseransicht: Seitenleiste mit Navigation und Modulinhalt, rechts dauerhaft die Karte
-  if (breit && revierKontext) {
+  if (breit && betriebKontext) {
     return (
       <DesktopLayout
         modul={modul ?? 'karte'}
         unterpfad={pfad.slice(1)}
-        k={revierKontext}
+        k={betriebKontext}
         kontext={kontext}
         aktuell={aktuell}
-        revierId={revierId}
-        revierWechseln={revierWechseln}
+        betriebId={betriebId}
+        betriebWechseln={betriebWechseln}
         offen={offen}
         userId={session.user.id}
         nachAenderung={nachAenderung}
@@ -150,16 +111,16 @@ export function Home({ session }: { session: Session }) {
       <header className="leiste">
         <button className="leiste-marke" onClick={() => navigieren('/')} aria-label="Zur Übersicht">
           <Logo />
-          <span>Hegewerk</span>
+          <span>Waldmanager</span>
         </button>
 
         {kontext.mitgliedschaften.length > 0 && (
           <label className="revier-wahl">
-            <span className="visuell-versteckt">Aktuelles Revier</span>
-            <select value={revierId ?? ''} onChange={(e) => revierWechseln(e.target.value)}>
+            <span className="visuell-versteckt">Aktueller Forstbetrieb</span>
+            <select value={betriebId ?? ''} onChange={(e) => betriebWechseln(e.target.value)}>
               {kontext.mitgliedschaften.map((m) => (
-                <option key={m.revier.id} value={m.revier.id}>
-                  {m.revier.name}
+                <option key={m.betrieb.id} value={m.betrieb.id}>
+                  {m.betrieb.name}
                 </option>
               ))}
             </select>
@@ -167,7 +128,6 @@ export function Home({ session }: { session: Session }) {
         )}
 
         <div className="leiste-nutzer">
-          <Glocke revierId={revierId} userId={session.user.id} />
           {offen > 0 && (
             <span className="warteschlange" title="Noch nicht übertragene Erfassungen">
               {offen} offline
@@ -192,15 +152,15 @@ export function Home({ session }: { session: Session }) {
 
         {modul && SONDERSEITEN.includes(modul) ? (
           <Sonderseite modul={modul} userId={session.user.id} kontext={kontext} aktuell={aktuell} nachAenderung={nachAenderung} />
-        ) : modul && revierKontext ? (
-          <ModulInhalt key={`${revierKontext.revierId}-${modul}`} modul={modul} unterpfad={pfad.slice(1)} k={revierKontext} />
+        ) : modul && betriebKontext ? (
+          <ModulInhalt key={`${betriebKontext.betriebId}-${modul}`} modul={modul} unterpfad={pfad.slice(1)} k={betriebKontext} />
         ) : (
           <Start
             aktuell={aktuell}
             name={kontext.name}
             istMasteradmin={kontext.istMasteradmin}
             neuLaden={kontext.neuLaden}
-            revierWechseln={revierWechseln}
+            betriebWechseln={betriebWechseln}
           />
         )}
       </main>
@@ -209,22 +169,11 @@ export function Home({ session }: { session: Session }) {
 }
 
 const NAVIGATION = [
-  { pfad: 'karte', titel: 'Karte' },
-  { pfad: 'zaehlung', titel: 'Wildzählung' },
-  { pfad: 'erfassung', titel: 'Einzelerfassung' },
-  { pfad: 'abschuesse', titel: 'Strecke' },
-  { pfad: 'wildschaeden', titel: 'Wildschäden' },
-  { pfad: 'aufgaben', titel: 'Aufgaben' },
-  { pfad: 'bewegungsjagd', titel: 'Bewegungsjagd' },
-  { pfad: 'begehungsscheine', titel: 'Begehungsscheine' },
-  { pfad: 'monitoring', titel: 'Monitoring' },
-  { pfad: 'zonen', titel: 'Zonen & Routen' },
-  { pfad: 'jagdzeiten', titel: 'Jagdzeiten' },
-  { pfad: 'freigaben', titel: 'Freigaben' },
-  { pfad: 'import', titel: 'Datenimport' },
-  { pfad: 'reviermanagement', titel: 'Reviermanagement' },
-  { pfad: 'masteradmin', titel: 'Masteradmin' },
-  { pfad: 'einstellungen', titel: 'Einstellungen' },
+  { pfad: 'karte', titel: 'Karte', symbol: 'karte' },
+  { pfad: 'bestaende', titel: 'Bestände', symbol: 'zonen' },
+  { pfad: 'forstbetrieb', titel: 'Forstbetrieb', symbol: 'reviermanagement' },
+  { pfad: 'masteradmin', titel: 'Masteradmin', symbol: 'masteradmin' },
+  { pfad: 'einstellungen', titel: 'Einstellungen', symbol: 'einstellungen' },
 ];
 
 function DesktopLayout({
@@ -233,27 +182,27 @@ function DesktopLayout({
   k,
   kontext,
   aktuell,
-  revierId,
-  revierWechseln,
+  betriebId,
+  betriebWechseln,
   offen,
   userId,
   nachAenderung,
 }: {
   modul: string;
   unterpfad: string[];
-  k: RevierKontext;
+  k: BetriebKontext;
   kontext: NutzerKontext;
   aktuell: Mitgliedschaft | null;
-  revierId: string | null;
-  revierWechseln: (id: string) => void;
+  betriebId: string | null;
+  betriebWechseln: (id: string) => void;
   offen: number;
   userId: string;
-  nachAenderung: (neueRevierId?: string | null) => Promise<void>;
+  nachAenderung: (neueBetriebId?: string | null) => Promise<void>;
 }) {
   const [panelEl, setPanelEl] = useState<HTMLDivElement | null>(null);
   const [eingeklappt, setEingeklappt] = useState(() => {
     try {
-      return localStorage.getItem('hegewerk.menue') === 'zu';
+      return localStorage.getItem('waldmanager.menue') === 'zu';
     } catch {
       return false;
     }
@@ -261,8 +210,7 @@ function DesktopLayout({
   // Nach Modulwahl klappen die übrigen Module ein, das aktive bleibt sichtbar
   const [navZu, setNavZu] = useState(true);
   const titel = NAVIGATION.find((n) => n.pfad === modul)?.titel ?? '';
-  // Monitoring kann die ganze Breite einnehmen (Karte ausgeblendet) – Adresse /monitoring/voll
-  const urlVoll = modul === 'monitoring' && unterpfad[0] === 'voll';
+  const urlVoll = false;
   const [gespeicherteBreite, breiteSetzen] = useModulBreite(modul);
   const breiteWaehlbar = modul !== 'karte';
   const voll = urlVoll || (breiteWaehlbar && gespeicherteBreite === 'voll');
@@ -270,7 +218,7 @@ function DesktopLayout({
   function einklappen(zu: boolean) {
     setEingeklappt(zu);
     try {
-      localStorage.setItem('hegewerk.menue', zu ? 'zu' : 'offen');
+      localStorage.setItem('waldmanager.menue', zu ? 'zu' : 'offen');
     } catch {
       /* Speicher nicht verfügbar – Zustand gilt nur für diese Sitzung */
     }
@@ -282,13 +230,12 @@ function DesktopLayout({
         <div className="desk-kopf">
           <div className="desk-marke">
             <Logo />
-            <span>Hegewerk</span>
+            <span>Waldmanager</span>
             {offen > 0 && (
               <span className="warteschlange" title="Noch nicht übertragene Erfassungen">
                 {offen} offline
               </span>
             )}
-            <Glocke revierId={revierId} userId={userId} />
             {!voll && (
               <button
                 className="desk-einklappen"
@@ -302,15 +249,15 @@ function DesktopLayout({
             )}
           </div>
           {kontext.mitgliedschaften.length > 1 ? (
-            <select className="desk-revier" aria-label="Aktuelles Revier" value={revierId ?? ''} onChange={(e) => revierWechseln(e.target.value)}>
+            <select className="desk-revier" aria-label="Aktueller Forstbetrieb" value={betriebId ?? ''} onChange={(e) => betriebWechseln(e.target.value)}>
               {kontext.mitgliedschaften.map((m) => (
-                <option key={m.revier.id} value={m.revier.id}>
-                  {m.revier.name}
+                <option key={m.betrieb.id} value={m.betrieb.id}>
+                  {m.betrieb.name}
                 </option>
               ))}
             </select>
           ) : (
-            <div className="desk-revier-name">{k.revierName}</div>
+            <div className="desk-revier-name">{k.betriebName}</div>
           )}
           <h1>
             {titel}
@@ -322,7 +269,6 @@ function DesktopLayout({
                   wert={voll ? 'voll' : 'drittel'}
                   onAendern={(b) => {
                     breiteSetzen(b);
-                    if (b === 'drittel' && urlVoll) navigieren('/monitoring');
                   }}
                 />
               </span>
@@ -348,7 +294,7 @@ function DesktopLayout({
                 navigieren(`/${n.pfad}`);
               }}
             >
-              <Symbol name={n.pfad} />
+              <Symbol name={n.symbol} />
               <span>{n.titel}</span>
             </button>
           ))}
@@ -360,7 +306,7 @@ function DesktopLayout({
             {modul === 'karte' ? null : SONDERSEITEN.includes(modul) ? (
               <Sonderseite modul={modul} userId={userId} kontext={kontext} aktuell={aktuell} nachAenderung={nachAenderung} />
             ) : (
-              <ModulInhalt key={`${k.revierId}-${modul}`} modul={modul} unterpfad={unterpfad} k={k} breit />
+              <ModulInhalt key={`${k.betriebId}-${modul}`} modul={modul} unterpfad={unterpfad} k={k} />
             )}
           </EingebettetKontext.Provider>
         </div>
@@ -369,7 +315,7 @@ function DesktopLayout({
       <main className="desk-karte" aria-hidden={voll}>
         <Suspense fallback={<div className="laden">Karte wird geladen …</div>}>
           <Karte
-            key={k.revierId}
+            key={k.betriebId}
             k={k}
             eingebettet
             panelZiel={modul === 'karte' ? panelEl : null}
@@ -392,39 +338,17 @@ function Sonderseite({
   userId: string;
   kontext: NutzerKontext;
   aktuell: Mitgliedschaft | null;
-  nachAenderung: (neueRevierId?: string | null) => Promise<void>;
+  nachAenderung: (neueBetriebId?: string | null) => Promise<void>;
 }) {
-  if (modul === 'reviermanagement') return <Reviermanagement userId={userId} aktuell={aktuell} nachAenderung={nachAenderung} />;
+  if (modul === 'forstbetrieb') return <Betriebsverwaltung userId={userId} aktuell={aktuell} nachAenderung={nachAenderung} />;
   if (modul === 'masteradmin') return kontext.istMasteradmin ? <Masteradmin userId={userId} nachAenderung={nachAenderung} /> : <Hinweis>Diese Seite gibt es nicht.</Hinweis>;
-  return <Einstellungen kontext={kontext} userId={userId} istInhaber={aktuell?.rolle === 'inhaber'} nachAenderung={nachAenderung} />;
+  return <Einstellungen kontext={kontext} nachAenderung={nachAenderung} />;
 }
 
-function ModulInhalt({ modul, unterpfad, k, breit = false }: { modul: string; unterpfad: string[]; k: RevierKontext; breit?: boolean }) {
+function ModulInhalt({ modul, unterpfad, k }: { modul: string; unterpfad: string[]; k: BetriebKontext }) {
   switch (modul) {
-    case 'jagdzeiten':
-      return <Jagdzeiten k={k} unterpfad={unterpfad} />;
-    case 'freigaben':
-      return <Freigaben k={k} />;
-    case 'zonen':
-      return <Zonen k={k} unterpfad={unterpfad} />;
-    case 'abschuesse':
-      return <Abschuesse k={k} unterpfad={unterpfad} />;
-    case 'erfassung':
-      return <Erfassung k={k} />;
-    case 'zaehlung':
-      return <Zaehlung k={k} sitzungId={unterpfad[0] ?? null} />;
-    case 'monitoring':
-      return <Monitoring k={k} breit={breit} />;
-    case 'wildschaeden':
-      return <Wildschaeden k={k} />;
-    case 'aufgaben':
-      return <Aufgaben k={k} />;
-    case 'bewegungsjagd':
-      return <BewegungsjagdListe k={k} />;
-    case 'begehungsscheine':
-      return <Begehungsscheine k={k} />;
-    case 'import':
-      return <Datenimport k={k} />;
+    case 'bestaende':
+      return <Bestaende k={k} unterpfad={unterpfad} />;
     case 'karte':
       return (
         <Suspense fallback={<div className="laden">Karte wird geladen …</div>}>
@@ -436,73 +360,31 @@ function ModulInhalt({ modul, unterpfad, k, breit = false }: { modul: string; un
   }
 }
 
-function MonitoringFenster({
-  k,
-  kontext,
-  revierId,
-  revierWechseln,
-}: {
-  k: RevierKontext;
-  kontext: NutzerKontext;
-  revierId: string | null;
-  revierWechseln: (id: string) => void;
-}) {
-  return (
-    <div className="monitoring-fenster">
-      <header className="monitoring-fenster-kopf">
-        <Logo />
-        <strong>Hegewerk Monitoring</strong>
-        {kontext.mitgliedschaften.length > 1 ? (
-          <select aria-label="Aktuelles Revier" value={revierId ?? ''} onChange={(e) => revierWechseln(e.target.value)}>
-            {kontext.mitgliedschaften.map((m) => (
-              <option key={m.revier.id} value={m.revier.id}>
-                {m.revier.name}
-              </option>
-            ))}
-          </select>
-        ) : (
-          <span>{k.revierName}</span>
-        )}
-        <span className="abstandhalter" />
-        <button className="knopf knopf-sekundaer klein" onClick={() => window.close()} title="Fenster schließen">
-          Fenster schließen
-        </button>
-        <button className="knopf knopf-ghost klein" onClick={() => navigieren('/monitoring')}>
-          Zurück zur App
-        </button>
-      </header>
-      <main className="monitoring-fenster-inhalt">
-        <Monitoring key={k.revierId} k={k} breit abgedockt />
-      </main>
-    </div>
-  );
-}
-
 function Start({
   aktuell,
   name,
   istMasteradmin,
   neuLaden,
-  revierWechseln,
+  betriebWechseln,
 }: {
   aktuell: Mitgliedschaft | null;
   name: string;
   istMasteradmin: boolean;
   neuLaden: () => Promise<void>;
-  revierWechseln: (id: string) => void;
+  betriebWechseln: (id: string) => void;
 }) {
   if (!aktuell) {
     return (
       <>
         <Hinweis>
           {istMasteradmin
-            ? 'Du bist noch keinem Revier zugeordnet. Reviere legst du im Bereich Masteradmin an.'
-            : 'Du bist noch keinem Revier zugeordnet. Löse einen Einladungscode ein, den du vom Revierinhaber bekommen hast.'}
+            ? 'Du bist noch keinem Forstbetrieb zugeordnet. Forstbetriebe legst du im Bereich Masteradmin an.'
+            : 'Du bist noch keinem Forstbetrieb zugeordnet. Löse einen Einladungscode ein, den du vom Inhaber bekommen hast.'}
         </Hinweis>
         <CodeEinloesen
-          onEingeloest={async (neueRevierId) => {
+          onEingeloest={async (neueBetriebId) => {
             await neuLaden();
-            if (neueRevierId) revierWechseln(neueRevierId);
+            if (neueBetriebId) betriebWechseln(neueBetriebId);
           }}
         />
         {istMasteradmin && (
@@ -517,9 +399,9 @@ function Start({
   return (
     <>
       <header className="start-kopf">
-        <h1>{aktuell.revier.name}</h1>
+        <h1>{aktuell.betrieb.name}</h1>
         <p>
-          {[aktuell.revier.hegering, aktuell.revier.flaeche_ha ? `${aktuell.revier.flaeche_ha.toLocaleString('de-DE')} ha` : null, ROLLEN[aktuell.rolle]]
+          {[aktuell.betrieb.flaeche_ha ? `${aktuell.betrieb.flaeche_ha.toLocaleString('de-DE')} ha` : null, ROLLEN[aktuell.rolle]]
             .filter(Boolean)
             .join(' · ')}
           {name ? ` · ${name}` : ''}
@@ -530,7 +412,7 @@ function Start({
           {MODULE.filter((m) => m.pfad !== 'masteradmin' || istMasteradmin).map((m) => (
             <button key={m.pfad} className="kachel" onClick={() => navigieren(`/${m.pfad}`)}>
               <span className="kachel-symbol" aria-hidden="true">
-                <Symbol name={m.pfad} className="symbol gross" />
+                <Symbol name={m.symbol} className="symbol gross" />
               </span>
               <strong>{m.titel}</strong>
               <span>{m.text}</span>

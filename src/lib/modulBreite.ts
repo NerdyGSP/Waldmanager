@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 
 export type Modulbreite = 'drittel' | 'voll';
-const EREIGNIS = 'hegewerk:breite';
-const schluessel = (modul: string) => `hegewerk.breite.${modul}`;
+const EREIGNIS = 'waldmanager:breite';
+const schluessel = (modul: string) => `waldmanager.breite.${modul}`;
 
 // Die Masteradmin-Tabelle ist breit – dort ist „Voll“ voreingestellt
 const standard = (modul: string): Modulbreite => (modul === 'masteradmin' ? 'voll' : 'drittel');

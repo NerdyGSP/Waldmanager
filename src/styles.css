@@ -1,4 +1,4 @@
-/* Hegewerk – Layout. Farben, Radien und Schrift kommen aus styles/tokens.css */
+/* Waldmanager – Layout. Farben, Radien und Schrift kommen aus styles/tokens.css */
 :root {
   --akzent: var(--color-primary);
   --akzent-hell: var(--color-primary-soft);
@@ -472,7 +472,7 @@ button.kachel:active { transform: scale(0.98); }
 .zone-name small { grid-column: 2; padding-left: 0; width: auto; }
 
 /* ======================================================================
-   Design-Vorgaben (hegewerk-design.md): eckig, ohne Schatten, 40/44 px Bedienelemente
+   Design-Vorgaben: eckig, ohne Schatten, 40/44 px Bedienelemente
    ====================================================================== */
 body { font-feature-settings: 'cv11', 'ss03'; font-weight: 400; }
 strong, b, h1, h2, h3 { font-weight: 500; }
@@ -1146,3 +1146,27 @@ button.kachel:active { transform: none; }
 .feld-daten dt { color: var(--text-leise); }
 .feld-daten dd { margin: 0; overflow-wrap: anywhere; }
 .feld-aendern { display: grid; gap: 8px; margin-top: 10px; }
+
+/* ---------- Waldmanager: Bestände ---------- */
+.zeile-label small { display: block; color: var(--color-text-muted); font-size: var(--fs-sm); }
+.zeile-label .farbpunkt { vertical-align: middle; margin-right: 6px; }
+.baumart-zeile { display: grid; grid-template-columns: minmax(0, 1fr) 64px auto auto; gap: 8px; align-items: center; }
+.baumart-zeile select, .baumart-zeile input { min-height: 40px; min-width: 0; }
+.baumart-zeile input { text-align: right; font-variant-numeric: tabular-nums; }
+.bestand-mischung { display: flex; flex-direction: column; gap: 6px; padding: 6px 0 2px; }
+.mischung-balken { display: flex; height: 10px; border-radius: 2px; overflow: hidden; background: var(--color-border); }
+.mischung-balken span { display: block; height: 100%; background: var(--art, var(--color-primary)); }
+.mischung-balken span + span { border-left: 1px solid var(--color-surface); }
+/* Nadelholz in Grün- und Blautönen, Laubholz in Gelb- und Brauntönen */
+.mischung-balken [data-art="Fi"] { --art: #3c7a58; }
+.mischung-balken [data-art="Ki"] { --art: #869a46; }
+.mischung-balken [data-art="Dgl"] { --art: #2b6c7c; }
+.mischung-balken [data-art="Lä"] { --art: #a7b155; }
+.mischung-balken [data-art="Ta"] { --art: #1e5c3a; }
+.mischung-balken [data-art="Bu"] { --art: #c9a043; }
+.mischung-balken [data-art="Ei"] { --art: #a5773b; }
+.mischung-balken [data-art="BAh"] { --art: #d4b26a; }
+.mischung-balken [data-art="Es"] { --art: #8c6d3f; }
+.mischung-balken [data-art="Hbu"] { --art: #b89860; }
+.mischung-balken [data-art="Bi"] { --art: #e0c98a; }
+.mischung-balken [data-art="Erl"] { --art: #7d5a33; }

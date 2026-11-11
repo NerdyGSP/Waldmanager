@@ -12,8 +12,8 @@ export function AuthScreen() {
     <main className="auth">
       <header className="auth-kopf">
         <Logo />
-        <h1>Hegewerk</h1>
-        <p>Wildtiererfassung und Reviermanagement im Hegering</p>
+        <h1>Waldmanager</h1>
+        <p>Waldmanagement für Privatwaldbesitzer</p>
       </header>
 
       <div className="segment" role="tablist">
@@ -118,7 +118,7 @@ function Registrieren() {
 
   return (
     <form onSubmit={absenden}>
-      <Gruppe fuss="Den Einladungscode bekommst du vom Revierinhaber oder -pächter.">
+      <Gruppe fuss="Den Einladungscode bekommst du vom Inhaber des Forstbetriebs.">
         <Feld
           label="Einladungscode"
           required

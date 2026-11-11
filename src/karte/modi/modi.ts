@@ -1,10 +1,9 @@
 import { KARTEN_MODI, type KartenModus } from '../ebenen/typen';
 
-// Kartenmodi als kleine Zustandsmaschine. Noch nicht an Karte.tsx angeschlossen (AP 1.5):
-// dort regeln heute `modus`, `wte` und `sheetArt` gemeinsam, was sichtbar und klickbar ist.
+// Kartenmodi als kleine Zustandsmaschine. Noch nicht an Karte.tsx angeschlossen.
 
 export type ModusKontext = {
-  /** Inhaber/Pächter des aktuellen Reviers */
+  /** Inhaber des aktuellen Forstbetriebs */
   istInhaber: boolean;
   /** PC oder iPad quer (ab 900 px) */
   breit: boolean;
@@ -13,25 +12,20 @@ export type ModusKontext = {
 export const MODUS_TITEL: Record<KartenModus, string> = {
   ansehen: 'Ansehen',
   erfassen: 'Erfassen',
-  zaehlen: 'Zählen',
   bearbeiten: 'Bearbeiten',
-  jagdtag: 'Jagdtag',
   druck: 'Druck',
 };
 
 /**
- * Wer darf welchen Modus betreten? Regeln aus dem Bestand abgeleitet:
- * Geometrien und Routen schreibt nur der Inhaber, Bewegungsjagd ist Inhabern vorbehalten,
+ * Wer darf welchen Modus betreten? Geometrien schreibt nur der Inhaber,
  * der Layoutdruck braucht die breite Ansicht.
  */
 export function modusErlaubt(modus: KartenModus, k: ModusKontext): boolean {
   switch (modus) {
     case 'ansehen':
     case 'erfassen':
-    case 'zaehlen':
       return true;
     case 'bearbeiten':
-    case 'jagdtag':
       return k.istInhaber;
     case 'druck':
       return k.istInhaber && k.breit;

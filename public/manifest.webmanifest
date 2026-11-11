@@ -1,7 +1,7 @@
 {
-  "name": "Hegewerk",
-  "short_name": "Hegewerk",
-  "description": "Revierverwaltung, Wildzählung und Bewegungsjagd",
+  "name": "Waldmanager",
+  "short_name": "Waldmanager",
+  "description": "Waldmanagement für Privatwaldbesitzer: Bestände, Maßnahmen, Funde",
   "lang": "de",
   "start_url": "/",
   "scope": "/",

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
 // Minimaler Router über die History-API (Cloudflare liefert für jede Unterseite index.html aus)
-const EREIGNIS = 'hegewerk:navigation';
+const EREIGNIS = 'waldmanager:navigation';
 
 export function navigieren(pfad: string, ersetzen = false) {
   if (pfad === window.location.pathname) return;
