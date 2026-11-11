@@ -27,6 +27,7 @@ import { Symbol } from '../../components/symbole';
 import { EBENEN_SCHICHTEN, standardSichtbarkeit, type EbenenId } from '../../karte/ebenen/registry';
 import { EBENEN_SPEICHER, ebenenEinstellungenLesen } from '../../karte/ebenen/einstellungen';
 import { koordinaten, mittelpunkt, naechsterRandpunkt, punktInFlaeche } from '../../karte/kern/geometrie';
+import { flurstueckText } from '../../lib/flurstuecke';
 
 // ---------- Kartengrundlagen ----------
 
@@ -61,6 +62,7 @@ const LEER: FeatureCollection = { type: 'FeatureCollection', features: [] };
 type KartenDaten = {
   grenze: MultiPolygon | null;
   bestaende: Feature[];
+  flurstuecke: Feature[];
   mitte: [number, number] | null;
 };
 
@@ -117,6 +119,7 @@ export default function Karte({
     }
   }, [einst]);
   const [gewaehlt, setGewaehlt] = useState<GewaehlterBestand | null>(null);
+  const [flurstueck, setFlurstueck] = useState<{ id: string; text: string; flaecheHa: number } | null>(null);
 
   const setModus = (m: Modus) => {
     modusRef.current = m;
@@ -133,10 +136,11 @@ export default function Karte({
       setMeldung({ art: 'fehler', text: fehlertext(error) });
       return;
     }
-    const d = (data ?? {}) as { grenze?: MultiPolygon | null; bestaende?: Feature[]; mitte?: { coordinates?: number[] } | null };
+    const d = (data ?? {}) as { grenze?: MultiPolygon | null; bestaende?: Feature[]; flurstuecke?: Feature[]; mitte?: { coordinates?: number[] } | null };
     setDaten({
       grenze: d.grenze ?? null,
       bestaende: d.bestaende ?? [],
+      flurstuecke: d.flurstuecke ?? [],
       mitte: (d.mitte?.coordinates as [number, number] | undefined) ?? null,
     });
   }, [k.betriebId]);
@@ -170,7 +174,23 @@ export default function Karte({
     m.addControl(new ScaleControl({ unit: 'metric' }), 'bottom-right');
 
     m.on('load', () => {
-      for (const id of ['grenze', 'bestaende', 'zeichnung']) m.addSource(id, { type: 'geojson', data: LEER });
+      for (const id of ['grenze', 'bestaende', 'flurstuecke', 'zeichnung']) m.addSource(id, { type: 'geojson', data: LEER });
+      // Flurstücke: dünne gestrichelte Linien, unsichtbare Fläche nur zum Antippen
+      m.addLayer({ id: 'flurstuecke-flaeche', type: 'fill', source: 'flurstuecke', layout: { visibility: 'none' }, paint: { 'fill-color': '#000', 'fill-opacity': 0 } });
+      m.addLayer({
+        id: 'flurstuecke-linie',
+        type: 'line',
+        source: 'flurstuecke',
+        layout: { visibility: 'none' },
+        paint: { 'line-color': '#6b4f9e', 'line-width': 1.2, 'line-dasharray': [3, 2] },
+      });
+      m.addLayer({
+        id: 'flurstuecke-auswahl',
+        type: 'line',
+        source: 'flurstuecke',
+        filter: ['==', ['get', 'id'], ''],
+        paint: { 'line-color': '#6b4f9e', 'line-width': 3.5 },
+      });
       m.addLayer({
         id: 'bestaende-flaeche',
         type: 'fill',
@@ -248,6 +268,7 @@ export default function Karte({
     const setzen = (id: string, fc: FeatureCollection) => (m.getSource(id) as GeoJSONSource | undefined)?.setData(fc);
     setzen('grenze', { type: 'FeatureCollection', features: daten.grenze ? [{ type: 'Feature', geometry: daten.grenze, properties: {} }] : [] });
     setzen('bestaende', { type: 'FeatureCollection', features: daten.bestaende });
+    setzen('flurstuecke', { type: 'FeatureCollection', features: daten.flurstuecke });
     grenzeRef.current = daten.grenze;
 
     // Handy: Luftbild nur für die Betriebsgrenze (+ ca. 150 m Rand); Tablet/PC: für den gesamten Kartenausschnitt
@@ -291,7 +312,7 @@ export default function Karte({
     const m = karte.current;
     if (!m || !daten || gezoomt.current) return;
     gezoomt.current = true;
-    const b = grenzen([...(daten.grenze ? [daten.grenze] : []), ...daten.bestaende.map((f) => f.geometry)]);
+    const b = grenzen([...(daten.grenze ? [daten.grenze] : []), ...daten.bestaende.map((f) => f.geometry), ...daten.flurstuecke.map((f) => f.geometry)]);
     if (b) m.fitBounds(b, { padding: { top: 40, bottom: 60, left: 40, right: 60 }, maxZoom: 16, duration: 0 });
     else
       navigator.geolocation?.getCurrentPosition(
@@ -309,6 +330,7 @@ export default function Karte({
     sichtbar('luftbild', ebenen.luftbild);
     sichtbar('grenze-linie', ebenen.grenze);
     for (const s of EBENEN_SCHICHTEN.bestaende) sichtbar(s, ebenen.bestaende);
+    for (const s of [...EBENEN_SCHICHTEN.flurstuecke, 'flurstuecke-flaeche']) sichtbar(s, ebenen.flurstuecke);
     for (const mk of beschriftungen.current) mk.getElement().style.display = ebenen.bestaende ? '' : 'none';
   }, [ebenen, bereit, daten]);
 
@@ -324,6 +346,7 @@ export default function Karte({
     setze('bestaende-flaeche', 'fill-opacity', d.bestaende * 0.4);
     setze('bestaende-linie', 'line-opacity', Math.min(1, d.bestaende * 1.8));
     setze('grenze-linie', 'line-opacity', d.grenze);
+    setze('flurstuecke-linie', 'line-opacity', d.flurstuecke);
     for (const mk of beschriftungen.current) mk.getElement().style.opacity = String(Math.min(1, d.bestaende * 1.8));
     // von unten nach oben jeweils an die Spitze stellen; Zeichnung bleibt immer ganz oben
     for (const id of [...einst.reihenfolge].reverse()) {
@@ -337,9 +360,13 @@ export default function Karte({
     const m = karte.current;
     if (!m || !bereit || !m.getLayer('bestaende-auswahl')) return;
     m.setFilter('bestaende-auswahl', ['==', ['get', 'id'], gewaehlt?.id ?? '']);
-  }, [gewaehlt, bereit]);
+    if (m.getLayer('flurstuecke-auswahl')) m.setFilter('flurstuecke-auswahl', ['==', ['get', 'id'], flurstueck?.id ?? '']);
+  }, [gewaehlt, flurstueck, bereit]);
   useEffect(() => {
-    if (modus) setGewaehlt(null);
+    if (modus) {
+      setGewaehlt(null);
+      setFlurstueck(null);
+    }
   }, [modus]);
 
   // Zeichnung anzeigen
@@ -372,11 +399,26 @@ export default function Karte({
         return;
       }
       if (aktiv) return;
-      const f = m.queryRenderedFeatures(e.point, { layers: ['bestaende-flaeche'] })[0];
+      const ebenenTreffer = ['bestaende-flaeche', 'flurstuecke-flaeche'].filter((l) => m.getLayer(l) && m.getLayoutProperty(l, 'visibility') !== 'none');
+      const treffer = m.queryRenderedFeatures(e.point, { layers: ebenenTreffer });
+      // Bestände haben Vorrang vor Flurstücken
+      const f = treffer.find((x) => x.layer.id === 'bestaende-flaeche') ?? treffer[0];
       if (!f) {
         setGewaehlt(null);
+        setFlurstueck(null);
         return;
       }
+      if (f.layer.id === 'flurstuecke-flaeche') {
+        const q = f.properties ?? {};
+        setGewaehlt(null);
+        setFlurstueck({
+          id: String(q.id),
+          text: flurstueckText({ gemarkung: (q.gemarkung as string | null) ?? null, flur: (q.flur as string | null) ?? null, nummer: (q.nummer as string | null) ?? null }) || 'Flurstück',
+          flaecheHa: Number(q.flaeche_amtlich_ha ?? q.flaeche_ha ?? 0),
+        });
+        return;
+      }
+      setFlurstueck(null);
       const p = f.properties ?? {};
       // MapLibre liefert verschachtelte Eigenschaften als JSON-Text
       const roh = typeof p.baumarten === 'string' ? (() => { try { return JSON.parse(p.baumarten as string) as unknown; } catch { return []; } })() : p.baumarten;
@@ -606,6 +648,7 @@ export default function Karte({
       gesperrt: ISTHANDY && !daten?.grenze,
     },
     bestaende: { name: 'Bestände', label: `Bestände (${daten?.bestaende.length ?? 0})`, an: ebenen.bestaende },
+    flurstuecke: { name: 'Flurstücke', label: `Flurstücke (${daten?.flurstuecke.length ?? 0})`, an: ebenen.flurstuecke, gesperrt: !daten?.flurstuecke.length },
     grenze: { name: 'Betriebsgrenze', label: 'Betriebsgrenze', an: ebenen.grenze },
   };
   const ohneFlaeche = bestaende.filter((b) => !b.hatGeometrie);
@@ -766,6 +809,21 @@ export default function Karte({
           onSchliessen={() => setGewaehlt(null)}
           onBearbeiten={k.istInhaber ? () => bestandBearbeiten(gewaehlt.id, gewaehlt.name) : undefined}
         />
+      )}
+
+      {flurstueck && !modus && !gewaehlt && (
+        <section className="zonen-info" role="dialog" aria-label={`Flurstück ${flurstueck.text}`}>
+          <header className="zonen-info-kopf">
+            <i className="farbpunkt" style={{ background: '#6b4f9e' }} />
+            <div>
+              <strong>{flurstueck.text}</strong>
+              <small>Flurstück · {flurstueck.flaecheHa.toLocaleString('de-DE', { maximumFractionDigits: 2 })} ha</small>
+            </div>
+            <button className="zonen-info-zu" onClick={() => setFlurstueck(null)} aria-label="Informationsfenster schließen">
+              <Symbol name="schliessen" className="symbol klein" />
+            </button>
+          </header>
+        </section>
       )}
 
       {kartenFehler && (

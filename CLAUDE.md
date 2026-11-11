@@ -39,7 +39,7 @@ npm run test:watch # Tests beim Entwickeln
 
 - Tests liegen neben der Quelle als `name.test.ts` (Vitest, Umgebung `node`, Zeitzone Europe/Berlin). Neue Fachlogik
   ohne Oberfläche bekommt Tests. Module, die `./supabase` importieren, im Test mit `vi.mock('./supabase', …)` entkoppeln.
-- Fachlogik gehört in `src/lib/` (z. B. `forst.ts`) oder `src/karte/`, nicht in Komponenten.
+- Fachlogik gehört in `src/lib/` (z. B. `forst.ts`, `massnahmen.ts`, `flurstuecke.ts`) oder `src/karte/`, nicht in Komponenten.
 - Eigener Router (`src/lib/router.ts`): `navigieren(pfad)`, `usePfad()`. Keine Router-Bibliothek einführen.
 - Geometrien: Schreiben per EWKT oder RPC aus GeoJSON, Lesen per RPC. Speicherung in WGS84.
 - Erfassungen im Feld tragen clientseitige UUIDs und laufen über `src/lib/offline.ts` (`speichernOderMerken`).
@@ -57,7 +57,7 @@ npm run test:watch # Tests beim Entwickeln
 | Pfad | Inhalt |
 | --- | --- |
 | `src/screens/Home.tsx` | Rahmen: Navigation, Seitenleiste, dauerhafte Karte ab 900 px |
-| `src/screens/module/` | Fachmodule: `Karte.tsx`, `Bestaende.tsx`, `BestandInfo.tsx` |
+| `src/screens/module/` | Fachmodule: `Karte.tsx`, `Bestaende.tsx`, `BestandInfo.tsx`, `Massnahmen.tsx`, `Flurstuecke.tsx` |
 | `src/screens/Einstellungen.tsx` | Einstellungen und Betriebsverwaltung (Forstbetrieb, Mitglieder, Code einlösen) |
 | `src/karte/` | Kartenkern: `ebenen/` (Registry), `kern/`, `modi/` |
 | `src/lib/` | Fachlogik, Supabase-Client, Offline-Cache und Warteschlange, `geoimport.ts` (SHP/GeoPackage) |
@@ -65,3 +65,6 @@ npm run test:watch # Tests beim Entwickeln
 | `supabase/migrations/` | Schema-Historie des Waldmanager-Projekts |
 
 Supabase-Projekt: „Waldmanager“, ID `giwqfhatjdhguqnreggg`, Region eu-central-1.
+
+Git: In Cloud-Sitzungen immer im Klon `NerdyGSP/Waldmanager` arbeiten und vor jedem Push `git remote -v` prüfen.
+Der Hegewerk-Klon der Sitzung wird automatisch auf Hegewerk zurückgesetzt.

@@ -6,6 +6,7 @@ import { BAUMARTEN, BESTANDSFARBEN, baumartenText, nameVergeben, useBestaende, t
 import { anteilSumme, baumartenPruefen, bestandesalter, pflanzjahrAusAlter } from '../../lib/forst';
 import { Farbwahl, Feld, Gruppe, Hinweis, Knopf, Leer, Seite, Zeile } from '../../components/ui';
 import type { BetriebKontext } from './kontext';
+import { MassnahmenKurz } from './Massnahmen';
 
 // Modul „Bestände“: Liste aller Bestände, Detail unter /bestaende/<id>
 export function Bestaende({ k, unterpfad = [] }: { k: BetriebKontext; unterpfad?: string[] }) {
@@ -243,6 +244,8 @@ function BestandDetail({ k, bestand, alle, onGeaendert }: { k: BetriebKontext; b
           </Knopf>
         )}
       </form>
+
+      <MassnahmenKurz k={k} bestandId={bestand.id} />
 
       <Knopf variante="ghost" onClick={() => navigieren('/karte')}>
         Auf der Karte ansehen

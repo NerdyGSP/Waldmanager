@@ -6,6 +6,7 @@ import type { EbenenDeklaration, KartenModus } from './typen';
 export const EBENEN = [
   { id: 'grenze', titel: 'Betriebsgrenze', gruppe: 'betrieb', schichten: ['grenze-linie'], standardSichtbar: true, standardDeckkraft: 1, modi: 'alle' },
   { id: 'bestaende', titel: 'Bestände', gruppe: 'betrieb', schichten: ['bestaende-flaeche', 'bestaende-linie', 'bestaende-auswahl'], standardSichtbar: true, standardDeckkraft: 0.55, modi: 'alle' },
+  { id: 'flurstuecke', titel: 'Flurstücke', gruppe: 'recht', schichten: ['flurstuecke-linie', 'flurstuecke-auswahl'], standardSichtbar: false, standardDeckkraft: 0.9, modi: 'alle' },
   { id: 'luftbild', titel: 'Luftbild', gruppe: 'basis', schichten: ['luftbild'], standardSichtbar: false, standardDeckkraft: 1, modi: 'alle' },
 ] as const satisfies readonly EbenenDeklaration[];
 
