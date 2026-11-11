@@ -21,10 +21,10 @@ describe('Ebenen-Registry', () => {
   });
 
   it('hat die Forstebenen in Standardreihenfolge', () => {
-    expect(STANDARD_REIHENFOLGE).toEqual(['grenze', 'bestaende', 'luftbild']);
+    expect(STANDARD_REIHENFOLGE).toEqual(['grenze', 'bestaende', 'flurstuecke', 'luftbild']);
     expect(STANDARD_DECKKRAFT).toMatchObject({ bestaende: 0.55, luftbild: 1 });
     expect(EBENEN_SCHICHTEN.bestaende).toEqual(['bestaende-flaeche', 'bestaende-linie', 'bestaende-auswahl']);
-    expect(standardSichtbarkeit()).toEqual({ grenze: true, bestaende: true, luftbild: false });
+    expect(standardSichtbarkeit()).toEqual({ grenze: true, bestaende: true, flurstuecke: false, luftbild: false });
   });
 
   it('zeigt die Grenze in jedem Modus', () => {
@@ -50,8 +50,8 @@ describe('Ebenen-Einstellungen', () => {
 
   it('fügt in alten Speicherständen fehlende Ebenen an ihrem Standardplatz ein', () => {
     // Speicherstand ohne „Bestände“: sie gehören direkt über das Luftbild
-    expect(reihenfolgeAnpassen(['luftbild', 'grenze'])).toEqual(['bestaende', 'luftbild', 'grenze']);
-    expect(reihenfolgeAnpassen(['grenze', 'luftbild'])).toEqual(['grenze', 'bestaende', 'luftbild']);
+    expect(reihenfolgeAnpassen(['luftbild', 'grenze'])).toEqual(['bestaende', 'flurstuecke', 'luftbild', 'grenze']);
+    expect(reihenfolgeAnpassen(['grenze', 'bestaende', 'luftbild'])).toEqual(['grenze', 'bestaende', 'flurstuecke', 'luftbild']);
   });
 
   it('verwirft unbekannte und doppelte Ebenen', () => {

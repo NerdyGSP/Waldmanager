@@ -15,6 +15,8 @@ import { Masteradmin } from './Masteradmin';
 import { useModulBreite } from '../lib/modulBreite';
 import { Segmente } from '../components/ui';
 import { Bestaende } from './module/Bestaende';
+import { Flurstuecke } from './module/Flurstuecke';
+import { Massnahmen } from './module/Massnahmen';
 import type { BetriebKontext } from './module/kontext';
 
 // Die Karte ist groß (MapLibre) und wird erst bei Bedarf geladen
@@ -25,6 +27,8 @@ const ROLLEN = { inhaber: 'Inhaber', mitarbeiter: 'Mitarbeiter' } as const;
 const MODULE = [
   { pfad: 'karte', titel: 'Karte', text: 'Betriebsgrenze und Bestände auf Karte und Luftbild', symbol: 'karte' },
   { pfad: 'bestaende', titel: 'Bestände', text: 'Bestände anlegen, Baumarten, Alter und Vorrat pflegen', symbol: 'zonen' },
+  { pfad: 'massnahmen', titel: 'Maßnahmen', text: 'Durchforstung, Pflanzung, Käferkontrolle mit Termin und Status', symbol: 'aufgaben' },
+  { pfad: 'flurstuecke', titel: 'Flurstücke', text: 'Kataster-Flurstücke importieren, Betriebsgrenze bilden', symbol: 'import' },
   { pfad: 'forstbetrieb', titel: 'Forstbetrieb', text: 'Betrieb, Mitglieder und Einladungen', symbol: 'reviermanagement' },
   { pfad: 'masteradmin', titel: 'Masteradmin', text: 'Forstbetriebe und Nutzer im Überblick', symbol: 'masteradmin' },
 ];
@@ -171,6 +175,8 @@ export function Home({ session }: { session: Session }) {
 const NAVIGATION = [
   { pfad: 'karte', titel: 'Karte', symbol: 'karte' },
   { pfad: 'bestaende', titel: 'Bestände', symbol: 'zonen' },
+  { pfad: 'massnahmen', titel: 'Maßnahmen', symbol: 'aufgaben' },
+  { pfad: 'flurstuecke', titel: 'Flurstücke', symbol: 'import' },
   { pfad: 'forstbetrieb', titel: 'Forstbetrieb', symbol: 'reviermanagement' },
   { pfad: 'masteradmin', titel: 'Masteradmin', symbol: 'masteradmin' },
   { pfad: 'einstellungen', titel: 'Einstellungen', symbol: 'einstellungen' },
@@ -349,6 +355,10 @@ function ModulInhalt({ modul, unterpfad, k }: { modul: string; unterpfad: string
   switch (modul) {
     case 'bestaende':
       return <Bestaende k={k} unterpfad={unterpfad} />;
+    case 'massnahmen':
+      return <Massnahmen k={k} />;
+    case 'flurstuecke':
+      return <Flurstuecke k={k} />;
     case 'karte':
       return (
         <Suspense fallback={<div className="laden">Karte wird geladen …</div>}>

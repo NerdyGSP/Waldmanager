@@ -651,6 +651,7 @@ export type Database = {
         Args: { p_betrieb_id: string; p_objekte: Json }
         Returns: Json
       }
+      flurstuecke_loeschen: { Args: { p_betrieb_id: string }; Returns: number }
       funde_laden: {
         Args: {
           p_betrieb_id: string

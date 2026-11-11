@@ -1170,3 +1170,26 @@ button.kachel:active { transform: none; }
 .mischung-balken [data-art="Hbu"] { --art: #b89860; }
 .mischung-balken [data-art="Bi"] { --art: #e0c98a; }
 .mischung-balken [data-art="Erl"] { --art: #7d5a33; }
+
+/* ---------- Waldmanager: Maßnahmen ---------- */
+.filter-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 var(--abstand); }
+.filter-chip {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px;
+  border: 1px solid var(--color-border); border-radius: 999px; background: var(--flaeche); color: var(--color-text-muted);
+  font: inherit; font-size: var(--fs-sm); cursor: pointer;
+}
+.filter-chip[aria-pressed='true'] { background: var(--color-primary-soft); border-color: var(--color-primary); color: var(--color-text); font-weight: 600; }
+.filter-chip-zahl { font-variant-numeric: tabular-nums; }
+.massnahmen-tabelle th small { display: block; color: var(--text-leise); font-size: var(--fs-sm); font-weight: 400; white-space: normal; }
+.massnahmen-tabelle tbody th .link { padding: 0; font-weight: 600; text-align: left; }
+.status-pill {
+  display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border: 0; border-radius: 999px;
+  font: inherit; font-size: var(--fs-sm); font-weight: 600; white-space: nowrap; cursor: pointer;
+  color: var(--pill); background: color-mix(in srgb, var(--pill) 14%, transparent);
+}
+.status-pill::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.status-pill:disabled, span.status-pill { cursor: default; }
+.status-geplant { --pill: #2f5e8a; }
+.status-in_arbeit { --pill: #a96d12; }
+.status-erledigt { --pill: #2f7a4f; }
+.status-ueberfaellig { --pill: #b23f2d; }
