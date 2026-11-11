@@ -1,7 +1,7 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   // Muss exakt dem Worker-Namen im Cloudflare-Dashboard entsprechen
-  "name": "hegewerk",
+  "name": "waldmanager",
   "compatibility_date": "2026-10-29",
   "assets": {
     "directory": "./dist",
