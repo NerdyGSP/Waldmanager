@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from './supabase';
 import type { TablesInsert } from './database.types';
+import { fotosHochladen } from './fotos';
 
 // Offline-Warteschlange für Erfassungen im Wald.
 // Datensätze tragen eine clientseitige UUID; das Senden ist per Upsert idempotent.
@@ -67,7 +68,10 @@ export async function warteschlangeAbarbeiten(): Promise<void> {
   if (laeuft || !navigator.onLine) return;
   laeuft = true;
   try {
-    if (lesen().length === 0) return;
+    if (lesen().length === 0) {
+      await fotosHochladen();
+      return;
+    }
     // Erst die Sitzung erneuern (online), sonst scheitert das Senden mit abgelaufenem Token
     const { data: sitzung } = await supabase.auth.getSession();
     if (!sitzung.session) return;
@@ -78,6 +82,8 @@ export async function warteschlangeAbarbeiten(): Promise<void> {
       if (!r.ok && r.netz) rest.push(e);
     }
     schreiben(rest);
+    // Fotos erst nach den Funden, damit der Pfad am Fund eingetragen werden kann
+    await fotosHochladen();
   } finally {
     laeuft = false;
   }

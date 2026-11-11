@@ -1193,3 +1193,35 @@ button.kachel:active { transform: none; }
 .status-in_arbeit { --pill: #a96d12; }
 .status-erledigt { --pill: #2f7a4f; }
 .status-ueberfaellig { --pill: #b23f2d; }
+
+/* ---------- Waldmanager: Funde ---------- */
+.filter-chip .farbpunkt { width: 8px; height: 8px; }
+.fund-aktionen { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.fund-foto { padding: 0 var(--abstand) 12px; }
+.fund-foto img { display: block; max-width: 100%; max-height: 60vh; border-radius: var(--radius-sm); }
+.foto-feld {
+  display: flex; align-items: center; justify-content: center; width: 100%; min-height: 140px;
+  border: 2px dashed var(--color-border); border-radius: var(--radius); background: none;
+  color: var(--text-leise); font: inherit; cursor: pointer; overflow: hidden;
+}
+.foto-feld.mit-foto { border-style: solid; padding: 0; }
+.foto-feld img { display: block; width: 100%; max-height: 260px; object-fit: cover; }
+.merkmal-wahl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; padding: 10px var(--abstand); }
+.merkmal-wahl button {
+  min-height: 44px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--flaeche);
+  font: inherit; color: inherit; cursor: pointer;
+}
+.merkmal-wahl button[aria-checked='true'] { background: var(--color-primary-soft); border-color: var(--color-primary); font-weight: 600; }
+.stepper { display: inline-flex; align-items: center; gap: 12px; }
+.stepper button {
+  width: 44px; height: 44px; border: 1px solid var(--color-border); border-radius: var(--radius-sm);
+  background: var(--flaeche); font: inherit; font-size: 1.2rem; font-weight: 600; color: inherit; cursor: pointer;
+}
+.stepper strong { min-width: 3.5em; text-align: center; font-variant-numeric: tabular-nums; }
+.heat-filter { display: flex; flex-direction: column; gap: 8px; }
+.heat-legende { height: 8px; border-radius: 2px; background: linear-gradient(90deg, rgba(250, 220, 80, 0.3), #f5be3c, #eb7823, #c32319); }
+.heat-legende-text { display: flex; justify-content: space-between; color: var(--text-leise); font-size: var(--fs-sm); }
+.heat-rang { display: grid; grid-template-columns: 3.5em minmax(0, 1fr) 2.5em; gap: 8px; align-items: center; font-size: var(--fs-sm); }
+.heat-rang .balken { height: 8px; border-radius: 2px; background: var(--color-border); overflow: hidden; }
+.heat-rang .balken span { display: block; height: 100%; background: #b23f2d; }
+.heat-rang .zahl { text-align: right; font-variant-numeric: tabular-nums; }

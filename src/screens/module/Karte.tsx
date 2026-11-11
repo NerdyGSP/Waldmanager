@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Einklappbar } from '../../components/ui';
 import { BestandInfo, type GewaehlterBestand } from './BestandInfo';
 import { createPortal } from 'react-dom';
@@ -28,6 +28,10 @@ import { EBENEN_SCHICHTEN, standardSichtbarkeit, type EbenenId } from '../../kar
 import { EBENEN_SPEICHER, ebenenEinstellungenLesen } from '../../karte/ebenen/einstellungen';
 import { koordinaten, mittelpunkt, naechsterRandpunkt, punktInFlaeche } from '../../karte/kern/geometrie';
 import { flurstueckText } from '../../lib/flurstuecke';
+import { FUND_TYPEN, ZEITRAEUME, gewicht, imZeitraum, jeBestand, mengeText, merkmalLabel, typFarbe, typLabel, zeitraumBeginn, type FundTyp, type Zeitraum } from '../../lib/funde';
+import { useWarteschlange, wartendeFunde } from '../../lib/offline';
+import { navigieren } from '../../lib/router';
+import { datumZeitDE } from '../../lib/zeit';
 
 // ---------- Kartengrundlagen ----------
 
@@ -120,6 +124,12 @@ export default function Karte({
   }, [einst]);
   const [gewaehlt, setGewaehlt] = useState<GewaehlterBestand | null>(null);
   const [flurstueck, setFlurstueck] = useState<{ id: string; text: string; flaecheHa: number } | null>(null);
+  // Funde: einmal alle laden, Typ und Zeitraum filtern im Browser (auch offline aus dem Cache)
+  const [funde, setFunde] = useState<Feature[]>([]);
+  const [fundTyp, setFundTyp] = useState<'' | FundTyp>('kaeferbaum');
+  const [zeitraum, setZeitraum] = useState<Zeitraum>('saison');
+  const [fund, setFund] = useState<Record<string, unknown> | null>(null);
+  const wartend = useWarteschlange();
 
   const setModus = (m: Modus) => {
     modusRef.current = m;
@@ -144,6 +154,25 @@ export default function Karte({
       mitte: (d.mitte?.coordinates as [number, number] | undefined) ?? null,
     });
   }, [k.betriebId]);
+
+  const fundeLaden = useCallback(async () => {
+    const { data } = await supabase.rpc('funde_laden', { p_betrieb_id: k.betriebId });
+    const server = ((data as { features?: Feature[] } | null)?.features ?? []) as Feature[];
+    // Noch nicht übertragene Funde dieses Geräts (Geometrie als EWKT gespeichert)
+    const lokal: Feature[] = wartendeFunde(k.betriebId).flatMap((w) => {
+      const m = /POINT\(([-\d.]+) ([-\d.]+)\)/.exec(String(w.geom ?? ''));
+      if (!m || server.some((s) => s.properties?.id === w.id)) return [];
+      return [{ type: 'Feature', geometry: { type: 'Point', coordinates: [Number(m[1]), Number(m[2])] }, properties: { id: w.id, typ: w.typ, merkmal: w.merkmal ?? null, anzahl: w.anzahl ?? 1, menge_fm: w.menge_fm ?? null, bestand_id: w.bestand_id ?? null, status: 'offen', beobachtet_am: w.beobachtet_am ?? new Date().toISOString(), wartet: true } }];
+    });
+    setFunde([...server, ...lokal]);
+  }, [k.betriebId]);
+
+  const sichtbareFunde = useMemo(() => {
+    const beginn = zeitraumBeginn(zeitraum);
+    return funde
+      .filter((f) => (!fundTyp || f.properties?.typ === fundTyp) && imZeitraum(String(f.properties?.beobachtet_am ?? ''), beginn))
+      .map((f): Feature => ({ ...f, properties: { ...f.properties, gewicht: gewicht({ typ: String(f.properties?.typ), anzahl: Number(f.properties?.anzahl ?? 1) }), farbe: typFarbe(String(f.properties?.typ)) } }));
+  }, [funde, fundTyp, zeitraum]);
 
   // Karte initialisieren
   useEffect(() => {
@@ -174,7 +203,7 @@ export default function Karte({
     m.addControl(new ScaleControl({ unit: 'metric' }), 'bottom-right');
 
     m.on('load', () => {
-      for (const id of ['grenze', 'bestaende', 'flurstuecke', 'zeichnung']) m.addSource(id, { type: 'geojson', data: LEER });
+      for (const id of ['grenze', 'bestaende', 'flurstuecke', 'funde', 'zeichnung']) m.addSource(id, { type: 'geojson', data: LEER });
       // Flurstücke: dünne gestrichelte Linien, unsichtbare Fläche nur zum Antippen
       m.addLayer({ id: 'flurstuecke-flaeche', type: 'fill', source: 'flurstuecke', layout: { visibility: 'none' }, paint: { 'fill-color': '#000', 'fill-opacity': 0 } });
       m.addLayer({
@@ -211,6 +240,33 @@ export default function Karte({
         paint: { 'line-color': '#f26a1b', 'line-width': 4 },
       });
       m.addLayer({ id: 'grenze-linie', type: 'line', source: 'grenze', paint: { 'line-color': '#e4572e', 'line-width': 3 } });
+      // Heatmap: Kerndichte über alle Funde des Betriebs, unabhängig von Flurstücks- und Bestandsgrenzen
+      m.addLayer({
+        id: 'heatmap',
+        type: 'heatmap',
+        source: 'funde',
+        layout: { visibility: 'none' },
+        paint: {
+          'heatmap-weight': ['interpolate', ['linear'], ['get', 'gewicht'], 1, 0.4, 20, 1],
+          // Radius wächst mit dem Zoom, damit er im Gelände etwa gleich groß bleibt (≈ 40–60 m)
+          'heatmap-radius': ['interpolate', ['exponential', 2], ['zoom'], 12, 6, 15, 30, 18, 160],
+          'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 12, 0.8, 17, 2],
+          'heatmap-color': ['interpolate', ['linear'], ['heatmap-density'], 0, 'rgba(250,220,80,0)', 0.2, 'rgba(250,220,80,0.45)', 0.5, '#f5be3c', 0.75, '#eb7823', 1, '#c32319'],
+          'heatmap-opacity': 0.8,
+        },
+      });
+      m.addLayer({
+        id: 'funde-punkt',
+        type: 'circle',
+        source: 'funde',
+        paint: {
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 3, 17, 7],
+          'circle-color': ['get', 'farbe'],
+          'circle-stroke-color': '#fff',
+          'circle-stroke-width': ['case', ['==', ['get', 'wartet'], true], 2.5, 1.5],
+          'circle-opacity': ['case', ['==', ['get', 'status'], 'erledigt'], 0.4, 1],
+        },
+      });
       m.addLayer({
         id: 'zeichnung-flaeche',
         type: 'fill',
@@ -269,6 +325,7 @@ export default function Karte({
     setzen('grenze', { type: 'FeatureCollection', features: daten.grenze ? [{ type: 'Feature', geometry: daten.grenze, properties: {} }] : [] });
     setzen('bestaende', { type: 'FeatureCollection', features: daten.bestaende });
     setzen('flurstuecke', { type: 'FeatureCollection', features: daten.flurstuecke });
+    void fundeLaden();
     grenzeRef.current = daten.grenze;
 
     // Handy: Luftbild nur für die Betriebsgrenze (+ ca. 150 m Rand); Tablet/PC: für den gesamten Kartenausschnitt
@@ -306,6 +363,18 @@ export default function Karte({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [daten, bereit]);
 
+  // Gefilterte Funde in die Karte (Punkte und Heatmap teilen sich die Quelle)
+  useEffect(() => {
+    const m = karte.current;
+    if (!m || !bereit) return;
+    (m.getSource('funde') as GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features: sichtbareFunde });
+  }, [sichtbareFunde, bereit]);
+
+  // Nach dem Übertragen wartender Meldungen neu laden
+  useEffect(() => {
+    if (bereit) void fundeLaden();
+  }, [wartend, bereit, fundeLaden]);
+
   // Beim ersten Laden auf den Betrieb zoomen, sonst auf den eigenen Standort
   const gezoomt = useRef(false);
   useEffect(() => {
@@ -331,6 +400,8 @@ export default function Karte({
     sichtbar('grenze-linie', ebenen.grenze);
     for (const s of EBENEN_SCHICHTEN.bestaende) sichtbar(s, ebenen.bestaende);
     for (const s of [...EBENEN_SCHICHTEN.flurstuecke, 'flurstuecke-flaeche']) sichtbar(s, ebenen.flurstuecke);
+    sichtbar('funde-punkt', ebenen.funde);
+    sichtbar('heatmap', ebenen.heatmap);
     for (const mk of beschriftungen.current) mk.getElement().style.display = ebenen.bestaende ? '' : 'none';
   }, [ebenen, bereit, daten]);
 
@@ -347,6 +418,8 @@ export default function Karte({
     setze('bestaende-linie', 'line-opacity', Math.min(1, d.bestaende * 1.8));
     setze('grenze-linie', 'line-opacity', d.grenze);
     setze('flurstuecke-linie', 'line-opacity', d.flurstuecke);
+    setze('heatmap', 'heatmap-opacity', d.heatmap);
+    setze('funde-punkt', 'circle-stroke-opacity', d.funde);
     for (const mk of beschriftungen.current) mk.getElement().style.opacity = String(Math.min(1, d.bestaende * 1.8));
     // von unten nach oben jeweils an die Spitze stellen; Zeichnung bleibt immer ganz oben
     for (const id of [...einst.reihenfolge].reverse()) {
@@ -399,15 +472,23 @@ export default function Karte({
         return;
       }
       if (aktiv) return;
-      const ebenenTreffer = ['bestaende-flaeche', 'flurstuecke-flaeche'].filter((l) => m.getLayer(l) && m.getLayoutProperty(l, 'visibility') !== 'none');
+      const ebenenTreffer = ['funde-punkt', 'bestaende-flaeche', 'flurstuecke-flaeche'].filter((l) => m.getLayer(l) && m.getLayoutProperty(l, 'visibility') !== 'none');
       const treffer = m.queryRenderedFeatures(e.point, { layers: ebenenTreffer });
-      // Bestände haben Vorrang vor Flurstücken
-      const f = treffer.find((x) => x.layer.id === 'bestaende-flaeche') ?? treffer[0];
+      // Funde vor Beständen, Bestände vor Flurstücken
+      const f = treffer.find((x) => x.layer.id === 'funde-punkt') ?? treffer.find((x) => x.layer.id === 'bestaende-flaeche') ?? treffer[0];
       if (!f) {
         setGewaehlt(null);
         setFlurstueck(null);
+        setFund(null);
         return;
       }
+      if (f.layer.id === 'funde-punkt') {
+        setGewaehlt(null);
+        setFlurstueck(null);
+        setFund({ ...(f.properties ?? {}) });
+        return;
+      }
+      setFund(null);
       if (f.layer.id === 'flurstuecke-flaeche') {
         const q = f.properties ?? {};
         setGewaehlt(null);
@@ -649,6 +730,8 @@ export default function Karte({
     },
     bestaende: { name: 'Bestände', label: `Bestände (${daten?.bestaende.length ?? 0})`, an: ebenen.bestaende },
     flurstuecke: { name: 'Flurstücke', label: `Flurstücke (${daten?.flurstuecke.length ?? 0})`, an: ebenen.flurstuecke, gesperrt: !daten?.flurstuecke.length },
+    funde: { name: 'Funde', label: `Funde (${sichtbareFunde.length})`, an: ebenen.funde },
+    heatmap: { name: 'Heatmap', label: 'Heatmap', an: ebenen.heatmap },
     grenze: { name: 'Betriebsgrenze', label: 'Betriebsgrenze', an: ebenen.grenze },
   };
   const ohneFlaeche = bestaende.filter((b) => !b.hatGeometrie);
@@ -711,6 +794,64 @@ export default function Karte({
             : 'Das Luftbild wird für den gesamten Kartenausschnitt geladen und auf dem Gerät zwischengespeichert.'}
         </p>
       </Abschnitt>
+      <Abschnitt titel="Funde & Heatmap" offen>
+        <div className="heat-filter">
+          <label className="transparenz">
+            <span>Fundtyp</span>
+            <select value={fundTyp} onChange={(e) => setFundTyp(e.target.value as '' | FundTyp)} aria-label="Fundtyp">
+              <option value="">Alle Typen</option>
+              {FUND_TYPEN.map((t) => (
+                <option key={t.wert} value={t.wert}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="transparenz">
+            <span>Zeitraum</span>
+            <select value={zeitraum} onChange={(e) => setZeitraum(e.target.value as Zeitraum)} aria-label="Zeitraum">
+              {ZEITRAEUME.map((z) => (
+                <option key={z.wert} value={z.wert}>
+                  {z.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          {ebenen.heatmap && (
+            <div>
+              <div className="heat-legende" aria-hidden="true" />
+              <div className="heat-legende-text">
+                <span>wenige</span>
+                <span>viele Funde</span>
+              </div>
+            </div>
+          )}
+          {(() => {
+            const rang = jeBestand(sichtbareFunde.map((f) => ({ bestand_id: (f.properties?.bestand_id as string | null) ?? null, typ: String(f.properties?.typ), anzahl: Number(f.properties?.anzahl ?? 1) }))).slice(0, 5);
+            if (!rang.length) return <p className="leer" style={{ margin: 0 }}>Keine Funde in diesem Zeitraum.</p>;
+            const max = rang[0]!.summe;
+            const name = (id: string) => (id ? String(daten?.bestaende.find((b) => String(b.properties?.id) === id)?.properties?.name ?? '?') : 'ohne');
+            return (
+              <>
+                <span className="leer" style={{ margin: 0 }}>Schwerpunkte nach Bestand</span>
+                {rang.map((r) => (
+                  <div key={r.bestandId || 'ohne'} className="heat-rang">
+                    <span>{name(r.bestandId)}</span>
+                    <span className="balken">
+                      <span style={{ width: `${(r.summe / max) * 100}%` }} />
+                    </span>
+                    <span className="zahl">{r.summe}</span>
+                  </div>
+                ))}
+              </>
+            );
+          })()}
+          <p className="leer" style={{ margin: 0 }}>
+            Die Heatmap verteilt jeden Fund flächig über den ganzen Betrieb (Kerndichte), Käferbäume nach Anzahl gewichtet.
+            {wartend > 0 ? ` ${wartend} Meldung(en) warten noch auf Netz.` : ''}
+          </p>
+        </div>
+      </Abschnitt>
       {ohneFlaeche.length > 0 && (
         <p className="leer">
           Noch ohne Fläche: {ohneFlaeche.map((b) => b.name).join(', ')}. Über „+ NEU“ → „Bestand zeichnen“ zuordnen.
@@ -724,7 +865,7 @@ export default function Karte({
     <div className="karte-seite">
       <div ref={container} className="karte" />
 
-      {!zeichnet && k.istInhaber && (
+      {!zeichnet && (
         <div className="karte-chips">
           <div className="karte-chip-reihe">
             <button type="button" className="karte-chip chip-knopf" aria-haspopup="menu" aria-expanded={menueOffen} onClick={() => setMenueOffen((o) => !o)}>
@@ -736,8 +877,12 @@ export default function Karte({
 
       {menueOffen && !zeichnet && (
         <div className="wte-menue" role="menu" aria-label="Neu">
-          <p className="menue-gruppe">Zeichnen</p>
-          <button
+          <p className="menue-gruppe">Erfassen</p>
+          <button type="button" role="menuitem" onClick={() => navigieren('/funde/neu')}>
+            Fund melden
+          </button>
+          {k.istInhaber && <p className="menue-gruppe">Zeichnen</p>}
+          {k.istInhaber && <button
             type="button"
             role="menuitem"
             onClick={() => {
@@ -746,8 +891,8 @@ export default function Karte({
             }}
           >
             {daten?.grenze ? 'Betriebsgrenze neu zeichnen' : 'Betriebsgrenze zeichnen'}
-          </button>
-          <button
+          </button>}
+          {k.istInhaber && <button
             type="button"
             role="menuitem"
             onClick={() => {
@@ -756,7 +901,7 @@ export default function Karte({
             }}
           >
             Bestand zeichnen
-          </button>
+          </button>}
         </div>
       )}
 
@@ -809,6 +954,37 @@ export default function Karte({
           onSchliessen={() => setGewaehlt(null)}
           onBearbeiten={k.istInhaber ? () => bestandBearbeiten(gewaehlt.id, gewaehlt.name) : undefined}
         />
+      )}
+
+      {fund && !modus && (
+        <section className="zonen-info" role="dialog" aria-label={`Fund ${typLabel(String(fund.typ))}`}>
+          <header className="zonen-info-kopf">
+            <i className="farbpunkt" style={{ background: typFarbe(String(fund.typ)) }} />
+            <div>
+              <strong>
+                {typLabel(String(fund.typ))}
+                {fund.bestand_id ? ` · Bestand ${String(daten?.bestaende.find((b) => String(b.properties?.id) === fund.bestand_id)?.properties?.name ?? '')}` : ''}
+              </strong>
+              <small>
+                {[
+                  datumZeitDE(String(fund.beobachtet_am)),
+                  merkmalLabel(String(fund.typ), (fund.merkmal as string | null) ?? null),
+                  mengeText({ typ: String(fund.typ), anzahl: Number(fund.anzahl ?? 1), menge_fm: fund.menge_fm != null ? Number(fund.menge_fm) : null }) || null,
+                  fund.status === 'erledigt' ? 'erledigt' : null,
+                  fund.wartet ? 'wartet auf Netz' : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </small>
+            </div>
+            <button className="knopf knopf-ghost klein" onClick={() => navigieren('/funde')}>
+              Alle Funde
+            </button>
+            <button className="zonen-info-zu" onClick={() => setFund(null)} aria-label="Informationsfenster schließen">
+              <Symbol name="schliessen" className="symbol klein" />
+            </button>
+          </header>
+        </section>
       )}
 
       {flurstueck && !modus && !gewaehlt && (
