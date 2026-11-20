@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LUFTBILDER, LUFTBILD_IDS, kachelBbox3857, kachelBboxGrad, kachelQuellen, kachelUrl, luftbildFuer, luftbildQuelle, luftbildWahlAusRoh } from './luftbild';
+import { HANDY_RAND_M, umRandErweitert, LUFTBILDER, LUFTBILD_IDS, kachelBbox3857, kachelBboxGrad, kachelQuellen, kachelUrl, luftbildFuer, luftbildQuelle, luftbildWahlAusRoh } from './luftbild';
 
 // XYZ-Kachel, die einen Punkt enthält
 function kachel(lon: number, lat: number, z: number): [number, number, number] {
@@ -107,5 +107,17 @@ describe('kachelQuellen', () => {
 
   it('braucht außerhalb aller Länder keinen Dienst', () => {
     expect(kachelQuellen(...kachel(11.58, 48.14, 15), 'ni')).toEqual([]); // München
+  });
+});
+
+describe('umRandErweitert', () => {
+  it('erweitert um rund 1 km in jede Richtung', () => {
+    const [w, s, o, n] = umRandErweitert([8.6, 51.2, 8.7, 51.3], HANDY_RAND_M);
+    const kmLat = 111.32;
+    const kmLon = 111.32 * Math.cos((51.25 * Math.PI) / 180);
+    expect((51.2 - s) * kmLat).toBeCloseTo(1, 2);
+    expect((n - 51.3) * kmLat).toBeCloseTo(1, 2);
+    expect((8.6 - w) * kmLon).toBeCloseTo(1, 2);
+    expect((o - 8.7) * kmLon).toBeCloseTo(1, 2);
   });
 });
