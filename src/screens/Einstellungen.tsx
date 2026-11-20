@@ -29,7 +29,7 @@ export function Einstellungen({
       <DarstellungWahl />
       <KartenSpeicher />
       <Gruppe titel="Lizenzen" fuss="Navigationsicons: Material Symbols (Google, Apache 2.0).">
-        <Zeile label="Kartendaten © OpenStreetMap-Mitwirkende, Luftbild © GeoBasis-DE/LGLN, Daten geändert" />
+        <Zeile label="Kartendaten © OpenStreetMap-Mitwirkende; Luftbilder © GeoBasis-DE/LGLN (Daten geändert), © Geobasis NRW, © HVBG" />
       </Gruppe>
 
       <Knopf variante="gefahr" onClick={() => supabase.auth.signOut()}>

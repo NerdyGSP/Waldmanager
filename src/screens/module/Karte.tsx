@@ -33,15 +33,12 @@ import { FUND_TYPEN, ZEITRAEUME, gewicht, imZeitraum, jeBestand, mengeText, merk
 import { useWarteschlange, wartendeFunde } from '../../lib/offline';
 import { navigieren } from '../../lib/router';
 import { datumZeitDE } from '../../lib/zeit';
+import { LUFTBILDER, LUFTBILD_IDS, luftbildFuer, luftbildQuelle, luftbildWahlLesen, luftbildWahlSpeichern, type LuftbildWahl } from '../../karte/luftbild';
 
 // ---------- Kartengrundlagen ----------
 
 // MapLibre 6 sucht seinen Web-Worker neben der Bibliothek; nach dem Bündeln liegt er als eigene Datei vor
 setWorkerUrl(kartenWorkerUrl);
-
-const LUFTBILD_URL =
-  'https://opendata.lgln.niedersachsen.de/doorman/noauth/dop_wms?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap' +
-  '&FORMAT=image/jpeg&LAYERS=ni_dop20&STYLES=&CRS=EPSG:3857&WIDTH=256&HEIGHT=256&BBOX={bbox-epsg-3857}';
 
 const STIL: StyleSpecification = {
   version: 8,
@@ -133,6 +130,11 @@ export default function Karte({
   const [reglerOffen, setReglerOffen] = useState<string[]>([]);
   const grenzeRef = useRef<MultiPolygon | null>(null);
   const luftbildSchluessel = useRef('');
+  // Luftbildquelle: automatisch nach Lage des Betriebs (NI, NW, HE) oder von Hand, je Gerät und Betrieb gemerkt
+  const [luftbildWahl, setLuftbildWahl] = useState<LuftbildWahl>(() => luftbildWahlLesen(k.betriebId));
+  useEffect(() => setLuftbildWahl(luftbildWahlLesen(k.betriebId)), [k.betriebId]);
+  const betriebsMitte = daten ? (daten.mitte ?? mitteVon(betriebsAusdehnung(daten))) : null;
+  const luftbild = luftbildQuelle(luftbildWahl, betriebsMitte);
   const [einst, setEinst] = useState(ebenenEinstellungenLesen);
   useEffect(() => {
     try {
@@ -349,32 +351,6 @@ export default function Karte({
     void fundeLaden();
     grenzeRef.current = daten.grenze;
 
-    // Handy: Luftbild nur für die Betriebsgrenze (+ ca. 150 m Rand); Tablet/PC: für den gesamten Kartenausschnitt
-    // Nur neu aufbauen, wenn sich die Ausdehnung wirklich geändert hat – sonst lädt der Browser alle Kacheln erneut
-    // Ausdehnung des Betriebs: Grenze, sonst Flurstücke, sonst Bestände
-    const bb = daten.grenze
-      ? grenzen([daten.grenze])
-      : grenzen([...daten.flurstuecke.map((f) => f.geometry), ...daten.bestaende.map((f) => f.geometry)]);
-    const schluessel = ISTHANDY ? (bb ? 'handy:' + [bb.getWest(), bb.getSouth(), bb.getEast(), bb.getNorth()].map((v) => v.toFixed(5)).join(',') : '') : 'voll';
-    if (schluessel !== luftbildSchluessel.current || ((bb || !ISTHANDY) && !m.getLayer('luftbild'))) {
-      luftbildSchluessel.current = schluessel;
-      if (m.getLayer('luftbild')) m.removeLayer('luftbild');
-      if (m.getSource('luftbild')) m.removeSource('luftbild');
-      if (bb || !ISTHANDY) {
-        const rand = 0.002;
-        m.addSource('luftbild', {
-          type: 'raster',
-          tiles: [LUFTBILD_URL],
-          tileSize: 256,
-          // Handy: gröbere Auflösung spart Daten (Zoom 18 ≈ 0,4 m/Pixel); Tablet/PC bis zur Originalauflösung des Orthofotos
-          maxzoom: ISTHANDY ? 18 : 19,
-          ...(ISTHANDY && bb ? { bounds: [bb.getWest() - rand, bb.getSouth() - rand, bb.getEast() + rand, bb.getNorth() + rand] as [number, number, number, number] } : {}),
-          attribution: `Luftbild © GeoBasis-DE/LGLN ${new Date().getFullYear()}, Daten geändert`,
-        });
-        m.addLayer({ id: 'luftbild', type: 'raster', source: 'luftbild', layout: { visibility: ebenen.luftbild ? 'visible' : 'none' } }, 'bestaende-flaeche');
-      }
-    }
-
     // Bestandsnamen als HTML-Beschriftung (kommt ohne Schrift-Server aus)
     for (const mk of beschriftungen.current) mk.remove();
     beschriftungen.current = daten.bestaende.map((f) => {
@@ -386,6 +362,34 @@ export default function Karte({
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [daten, bereit]);
+
+  // Luftbild der passenden Landesvermessung.
+  // Handy: nur für die Betriebsgrenze (+ ca. 150 m Rand); Tablet/PC: für den gesamten Kartenausschnitt innerhalb des Landes.
+  // Nur neu aufbauen, wenn sich Quelle oder Ausdehnung wirklich geändert haben – sonst lädt der Browser alle Kacheln erneut
+  useEffect(() => {
+    const m = karte.current;
+    if (!m || !bereit || !daten) return;
+    const bb = betriebsAusdehnung(daten);
+    const ausdehnung = ISTHANDY ? (bb ? [bb.getWest(), bb.getSouth(), bb.getEast(), bb.getNorth()].map((v) => v.toFixed(5)).join(',') : '') : 'voll';
+    const schluessel = ausdehnung ? `${luftbild.id}:${ausdehnung}` : '';
+    if (schluessel === luftbildSchluessel.current && (!schluessel || m.getLayer('luftbild'))) return;
+    luftbildSchluessel.current = schluessel;
+    if (m.getLayer('luftbild')) m.removeLayer('luftbild');
+    if (m.getSource('luftbild')) m.removeSource('luftbild');
+    if (!schluessel) return;
+    const rand = 0.002;
+    m.addSource('luftbild', {
+      type: 'raster',
+      tiles: [luftbild.url],
+      tileSize: 256,
+      // Handy: gröbere Auflösung spart Daten (Zoom 18 ≈ 0,4 m/Pixel); Tablet/PC bis zur Originalauflösung des Orthofotos
+      maxzoom: ISTHANDY ? 18 : luftbild.maxzoom,
+      bounds: ISTHANDY && bb ? [bb.getWest() - rand, bb.getSouth() - rand, bb.getEast() + rand, bb.getNorth() + rand] : luftbild.bounds,
+      attribution: luftbild.attribution,
+    });
+    m.addLayer({ id: 'luftbild', type: 'raster', source: 'luftbild', layout: { visibility: ebenen.luftbild ? 'visible' : 'none' } }, 'bestaende-flaeche');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [daten, bereit, luftbild.id]);
 
   // Gefilterte Funde in die Karte (Punkte und Heatmap teilen sich die Quelle)
   useEffect(() => {
@@ -442,7 +446,7 @@ export default function Karte({
     sichtbar('funde-punkt', ebenen.funde);
     sichtbar('heatmap', ebenen.heatmap);
     for (const mk of beschriftungen.current) mk.getElement().style.display = ebenen.bestaende ? '' : 'none';
-  }, [ebenen, bereit, daten]);
+  }, [ebenen, bereit, daten, luftbild.id]);
 
   // Reihenfolge und Transparenz der Ebenen
   useEffect(() => {
@@ -465,7 +469,7 @@ export default function Karte({
       for (const schicht of EBENEN_SCHICHTEN[id]) if (m.getLayer(schicht)) m.moveLayer(schicht);
     }
     for (const schicht of ['zeichnung-flaeche', 'zeichnung-linie', 'zeichnung-punkte']) if (m.getLayer(schicht)) m.moveLayer(schicht);
-  }, [einst, bereit, daten]);
+  }, [einst, bereit, daten, luftbild.id]);
 
   // Ausgewählten Bestand hervorheben
   useEffect(() => {
@@ -769,7 +773,7 @@ export default function Karte({
   const ebenenInfo: Record<EbenenId, { name: string; label: string; an: boolean; gesperrt?: boolean }> = {
     luftbild: {
       name: 'Luftbild',
-      label: ISTHANDY ? (betriebsflaeche ? 'Luftbild (LGLN, nur Betriebsbereich)' : 'Luftbild – erst Grenze, Flurstücke oder Bestand anlegen') : 'Luftbild (LGLN)',
+      label: ISTHANDY ? (betriebsflaeche ? `Luftbild (${luftbild.kurz}, nur Betriebsbereich)` : 'Luftbild – erst Grenze, Flurstücke oder Bestand anlegen') : `Luftbild (${luftbild.kurz})`,
       an: ebenen.luftbild && (!ISTHANDY || betriebsflaeche),
       gesperrt: ISTHANDY && !betriebsflaeche,
     },
@@ -833,6 +837,25 @@ export default function Karte({
             );
           })}
         </ul>
+        <label className="transparenz">
+          <span>Luftbild</span>
+          <select
+            value={luftbildWahl}
+            aria-label="Luftbildquelle"
+            onChange={(e) => {
+              const w = e.target.value as LuftbildWahl;
+              setLuftbildWahl(w);
+              luftbildWahlSpeichern(k.betriebId, w);
+            }}
+          >
+            <option value="auto">Automatisch ({LUFTBILDER[luftbildFuer(betriebsMitte) ?? 'ni'].land})</option>
+            {LUFTBILD_IDS.map((id) => (
+              <option key={id} value={id}>
+                {LUFTBILDER[id].land}
+              </option>
+            ))}
+          </select>
+        </label>
         <p className="leer" style={{ margin: 0 }}>
           {ISTHANDY
             ? 'Mobil wird das Luftbild nur für den Betriebsbereich geladen und auf dem Gerät zwischengespeichert, um Daten zu sparen.'
@@ -1158,6 +1181,15 @@ function BestandZuordnen({
 }
 
 // ---------- Geometrie-Helfer (weitere in src/karte/kern/geometrie.ts) ----------
+
+/** Ausdehnung des Betriebs: Grenze, sonst Flurstücke, sonst Bestände */
+function betriebsAusdehnung(d: KartenDaten): LngLatBounds | null {
+  return d.grenze ? grenzen([d.grenze]) : grenzen([...d.flurstuecke.map((f) => f.geometry), ...d.bestaende.map((f) => f.geometry)]);
+}
+
+function mitteVon(b: LngLatBounds | null): [number, number] | null {
+  return b ? [(b.getWest() + b.getEast()) / 2, (b.getSouth() + b.getNorth()) / 2] : null;
+}
 
 function grenzen(geometrien: Geometry[]): LngLatBounds | null {
   const alle = geometrien.flatMap(koordinaten);
