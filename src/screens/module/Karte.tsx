@@ -33,12 +33,23 @@ import { FUND_TYPEN, ZEITRAEUME, gewicht, imZeitraum, jeBestand, mengeText, merk
 import { useWarteschlange, wartendeFunde } from '../../lib/offline';
 import { navigieren } from '../../lib/router';
 import { datumZeitDE } from '../../lib/zeit';
+import { luftbildProtokollRegistrieren } from '../../karte/luftbildProtokoll';
 import { LUFTBILDER, LUFTBILD_IDS, luftbildFuer, luftbildQuelle, luftbildWahlLesen, luftbildWahlSpeichern, type LuftbildWahl } from '../../karte/luftbild';
 
 // ---------- Kartengrundlagen ----------
 
 // MapLibre 6 sucht seinen Web-Worker neben der Bibliothek; nach dem Bündeln liegt er als eigene Datei vor
 setWorkerUrl(kartenWorkerUrl);
+// Luftbild-Kacheln: im Landesinneren ein Dienst, an Landesgrenzen mehrere übereinander
+luftbildProtokollRegistrieren();
+
+// Ausdehnung aller angebundenen Länder – außerhalb fragt die Karte keine Luftbild-Kacheln an
+const LUFTBILD_GESAMT: [number, number, number, number] = [
+  Math.min(...LUFTBILD_IDS.map((id) => LUFTBILDER[id].bounds[0])),
+  Math.min(...LUFTBILD_IDS.map((id) => LUFTBILDER[id].bounds[1])),
+  Math.max(...LUFTBILD_IDS.map((id) => LUFTBILDER[id].bounds[2])),
+  Math.max(...LUFTBILD_IDS.map((id) => LUFTBILDER[id].bounds[3])),
+];
 
 const STIL: StyleSpecification = {
   version: 8,
@@ -380,12 +391,13 @@ export default function Karte({
     const rand = 0.002;
     m.addSource('luftbild', {
       type: 'raster',
-      tiles: [luftbild.url],
+      // Vorrang-Quelle steckt in der Adresse, damit ein Wechsel neue Kacheln anfordert
+      tiles: [`luftbild://${luftbild.id}/{z}/{x}/{y}`],
       tileSize: 256,
       // Handy: gröbere Auflösung spart Daten (Zoom 18 ≈ 0,4 m/Pixel); Tablet/PC bis zur Originalauflösung des Orthofotos
       maxzoom: ISTHANDY ? 18 : luftbild.maxzoom,
-      bounds: ISTHANDY && bb ? [bb.getWest() - rand, bb.getSouth() - rand, bb.getEast() + rand, bb.getNorth() + rand] : luftbild.bounds,
-      attribution: luftbild.attribution,
+      bounds: ISTHANDY && bb ? [bb.getWest() - rand, bb.getSouth() - rand, bb.getEast() + rand, bb.getNorth() + rand] : LUFTBILD_GESAMT,
+      attribution: LUFTBILD_IDS.map((id) => LUFTBILDER[id].attribution).join(' · '),
     });
     m.addLayer({ id: 'luftbild', type: 'raster', source: 'luftbild', layout: { visibility: ebenen.luftbild ? 'visible' : 'none' } }, 'bestaende-flaeche');
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -838,10 +850,10 @@ export default function Karte({
           })}
         </ul>
         <label className="transparenz">
-          <span>Luftbild</span>
+          <span>Luftbild-Vorrang</span>
           <select
             value={luftbildWahl}
-            aria-label="Luftbildquelle"
+            aria-label="Luftbild-Vorrang an Landesgrenzen"
             onChange={(e) => {
               const w = e.target.value as LuftbildWahl;
               setLuftbildWahl(w);
@@ -860,6 +872,7 @@ export default function Karte({
           {ISTHANDY
             ? 'Mobil wird das Luftbild nur für den Betriebsbereich geladen und auf dem Gerät zwischengespeichert, um Daten zu sparen.'
             : 'Das Luftbild wird für den gesamten Kartenausschnitt geladen und auf dem Gerät zwischengespeichert.'}
+          {' An Landesgrenzen werden die Luftbilder beider Länder zusammengesetzt; der Vorrang bestimmt, welches oben liegt.'}
         </p>
       </Abschnitt>
       <Abschnitt titel="Funde & Heatmap" offen>
