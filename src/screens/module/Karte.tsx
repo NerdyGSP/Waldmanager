@@ -34,7 +34,7 @@ import { useWarteschlange, wartendeFunde } from '../../lib/offline';
 import { navigieren } from '../../lib/router';
 import { datumZeitDE } from '../../lib/zeit';
 import { luftbildProtokollRegistrieren } from '../../karte/luftbildProtokoll';
-import { LUFTBILDER, LUFTBILD_IDS, luftbildFuer, luftbildQuelle, luftbildWahlLesen, luftbildWahlSpeichern, type LuftbildWahl } from '../../karte/luftbild';
+import { HANDY_RAND_M, luftbildVollLesen, luftbildVollSpeichern, umRandErweitert, LUFTBILDER, LUFTBILD_IDS, luftbildFuer, luftbildQuelle, luftbildWahlLesen, luftbildWahlSpeichern, type LuftbildWahl } from '../../karte/luftbild';
 
 // ---------- Kartengrundlagen ----------
 
@@ -146,6 +146,9 @@ export default function Karte({
   useEffect(() => setLuftbildWahl(luftbildWahlLesen(k.betriebId)), [k.betriebId]);
   const betriebsMitte = daten ? (daten.mitte ?? mitteVon(betriebsAusdehnung(daten))) : null;
   const luftbild = luftbildQuelle(luftbildWahl, betriebsMitte);
+  // Handy: standardmäßig nur Betriebsbereich + 1 km, auf Wunsch der ganze Kartenausschnitt (je Gerät gemerkt)
+  const [luftbildVoll, setLuftbildVoll] = useState(luftbildVollLesen);
+  const nurBetrieb = ISTHANDY && !luftbildVoll;
   const [einst, setEinst] = useState(ebenenEinstellungenLesen);
   useEffect(() => {
     try {
@@ -375,20 +378,19 @@ export default function Karte({
   }, [daten, bereit]);
 
   // Luftbild der passenden Landesvermessung.
-  // Handy: nur für die Betriebsgrenze (+ ca. 150 m Rand); Tablet/PC: für den gesamten Kartenausschnitt innerhalb des Landes.
+  // Handy: nur für den Betriebsbereich (+ 1 km Rand), außer „ganzer Ausschnitt“ ist an; Tablet/PC: gesamter Kartenausschnitt.
   // Nur neu aufbauen, wenn sich Quelle oder Ausdehnung wirklich geändert haben – sonst lädt der Browser alle Kacheln erneut
   useEffect(() => {
     const m = karte.current;
     if (!m || !bereit || !daten) return;
     const bb = betriebsAusdehnung(daten);
-    const ausdehnung = ISTHANDY ? (bb ? [bb.getWest(), bb.getSouth(), bb.getEast(), bb.getNorth()].map((v) => v.toFixed(5)).join(',') : '') : 'voll';
+    const ausdehnung = nurBetrieb ? (bb ? [bb.getWest(), bb.getSouth(), bb.getEast(), bb.getNorth()].map((v) => v.toFixed(5)).join(',') : '') : 'voll';
     const schluessel = ausdehnung ? `${luftbild.id}:${ausdehnung}` : '';
     if (schluessel === luftbildSchluessel.current && (!schluessel || m.getLayer('luftbild'))) return;
     luftbildSchluessel.current = schluessel;
     if (m.getLayer('luftbild')) m.removeLayer('luftbild');
     if (m.getSource('luftbild')) m.removeSource('luftbild');
     if (!schluessel) return;
-    const rand = 0.002;
     m.addSource('luftbild', {
       type: 'raster',
       // Vorrang-Quelle steckt in der Adresse, damit ein Wechsel neue Kacheln anfordert
@@ -396,12 +398,12 @@ export default function Karte({
       tileSize: 256,
       // Handy: gröbere Auflösung spart Daten (Zoom 18 ≈ 0,4 m/Pixel); Tablet/PC bis zur Originalauflösung des Orthofotos
       maxzoom: ISTHANDY ? 18 : luftbild.maxzoom,
-      bounds: ISTHANDY && bb ? [bb.getWest() - rand, bb.getSouth() - rand, bb.getEast() + rand, bb.getNorth() + rand] : LUFTBILD_GESAMT,
+      bounds: nurBetrieb && bb ? umRandErweitert([bb.getWest(), bb.getSouth(), bb.getEast(), bb.getNorth()], HANDY_RAND_M) : LUFTBILD_GESAMT,
       attribution: LUFTBILD_IDS.map((id) => LUFTBILDER[id].attribution).join(' · '),
     });
     m.addLayer({ id: 'luftbild', type: 'raster', source: 'luftbild', layout: { visibility: ebenen.luftbild ? 'visible' : 'none' } }, 'bestaende-flaeche');
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [daten, bereit, luftbild.id]);
+  }, [daten, bereit, luftbild.id, nurBetrieb]);
 
   // Gefilterte Funde in die Karte (Punkte und Heatmap teilen sich die Quelle)
   useEffect(() => {
@@ -785,9 +787,9 @@ export default function Karte({
   const ebenenInfo: Record<EbenenId, { name: string; label: string; an: boolean; gesperrt?: boolean }> = {
     luftbild: {
       name: 'Luftbild',
-      label: ISTHANDY ? (betriebsflaeche ? `Luftbild (${luftbild.kurz}, nur Betriebsbereich)` : 'Luftbild – erst Grenze, Flurstücke oder Bestand anlegen') : `Luftbild (${luftbild.kurz})`,
-      an: ebenen.luftbild && (!ISTHANDY || betriebsflaeche),
-      gesperrt: ISTHANDY && !betriebsflaeche,
+      label: nurBetrieb ? (betriebsflaeche ? `Luftbild (${luftbild.kurz}, Betriebsbereich)` : 'Luftbild – erst Grenze, Flurstücke oder Bestand anlegen') : `Luftbild (${luftbild.kurz})`,
+      an: ebenen.luftbild && (!nurBetrieb || betriebsflaeche),
+      gesperrt: nurBetrieb && !betriebsflaeche,
     },
     bestaende: { name: 'Bestände', label: `Bestände (${daten?.bestaende.length ?? 0})`, an: ebenen.bestaende },
     flurstuecke: { name: 'Flurstücke', label: `Flurstücke (${daten?.flurstuecke.length ?? 0})`, an: ebenen.flurstuecke, gesperrt: !daten?.flurstuecke.length },
@@ -868,10 +870,22 @@ export default function Karte({
             ))}
           </select>
         </label>
+        {ISTHANDY && (
+          <EbenenSchalter
+            label="Luftbild für ganzen Ausschnitt"
+            an={luftbildVoll}
+            onAendern={(an) => {
+              setLuftbildVoll(an);
+              luftbildVollSpeichern(an);
+            }}
+          />
+        )}
         <p className="leer" style={{ margin: 0 }}>
-          {ISTHANDY
-            ? 'Mobil wird das Luftbild nur für den Betriebsbereich geladen und auf dem Gerät zwischengespeichert, um Daten zu sparen.'
-            : 'Das Luftbild wird für den gesamten Kartenausschnitt geladen und auf dem Gerät zwischengespeichert.'}
+          {nurBetrieb
+            ? 'Mobil wird das Luftbild nur für den Betriebsbereich mit 1 km Rand geladen und auf dem Gerät zwischengespeichert, um Daten zu sparen. Im WLAN lohnt sich „ganzer Ausschnitt“.'
+            : ISTHANDY
+              ? 'Das Luftbild wird für den gesamten Kartenausschnitt geladen – das verbraucht unterwegs deutlich mehr Daten.'
+              : 'Das Luftbild wird für den gesamten Kartenausschnitt geladen und auf dem Gerät zwischengespeichert.'}
           {' An Landesgrenzen werden die Luftbilder beider Länder zusammengesetzt; der Vorrang bestimmt, welches oben liegt.'}
         </p>
       </Abschnitt>

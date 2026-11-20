@@ -220,3 +220,36 @@ export function luftbildWahlSpeichern(betriebId: string, wahl: LuftbildWahl): vo
     /* ohne Speicher gilt die Wahl nur für diese Sitzung */
   }
 }
+
+// ---------- Handy: Ausschnitt ----------
+
+/** Rand um den Betrieb, für den das Handy das Luftbild lädt */
+export const HANDY_RAND_M = 1000;
+
+/** Betriebsausdehnung [W, S, O, N] um einen Rand in Metern erweitern */
+export function umRandErweitert(b: [number, number, number, number], meter: number): [number, number, number, number] {
+  const [w, s, o, n] = b;
+  const dLat = meter / 111320;
+  const dLon = dLat / Math.max(0.01, Math.cos((((s + n) / 2) * Math.PI) / 180));
+  return [w - dLon, s - dLat, o + dLon, n + dLat];
+}
+
+// Handy: Luftbild für den ganzen Kartenausschnitt statt nur für den Betrieb (je Gerät)
+export const LUFTBILD_VOLL_SPEICHER = 'waldmanager.karte.luftbildVoll';
+
+export function luftbildVollLesen(): boolean {
+  try {
+    return localStorage.getItem(LUFTBILD_VOLL_SPEICHER) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function luftbildVollSpeichern(voll: boolean): void {
+  try {
+    if (voll) localStorage.setItem(LUFTBILD_VOLL_SPEICHER, '1');
+    else localStorage.removeItem(LUFTBILD_VOLL_SPEICHER);
+  } catch {
+    /* ohne Speicher gilt die Wahl nur für diese Sitzung */
+  }
+}
