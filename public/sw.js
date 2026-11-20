@@ -6,7 +6,7 @@ const APP_CACHE = `waldmanager-app-${VERSION}`;
 const KACHEL_CACHE = 'waldmanager-karten-v1';
 const MAX_EINTRAEGE = 5000;
 const MAX_ALTER_MS = 60 * 24 * 3600 * 1000;
-const HOSTS = ['opendata.lgln.niedersachsen.de', 'tile.openstreetmap.org'];
+const HOSTS = ['opendata.lgln.niedersachsen.de', 'www.wms.nrw.de', 'www.gds-srv.hessen.de', 'tile.openstreetmap.org'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
