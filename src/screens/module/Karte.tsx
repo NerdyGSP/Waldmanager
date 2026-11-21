@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Einklappbar } from '../../components/ui';
 import { BestandInfo, type GewaehlterBestand } from './BestandInfo';
+import { ZoneInfo } from './ZoneInfo';
+import { WUCHSSTADIEN } from '../../lib/forst';
+import { naechsterZonenName, zoneLesen, zonenFuerKarte, type Zone } from '../../lib/zonen';
 import { createPortal } from 'react-dom';
 import {
   GeolocateControl,
@@ -31,7 +34,7 @@ import { beiFundeGeaendert, beiPolterGeaendert, positionMelden, positionWahlAkti
 import { flurstueckText } from '../../lib/flurstuecke';
 import { FUND_TYPEN, ZEITRAEUME, gewicht, imZeitraum, jeBestand, mengeText, merkmalLabel, typFarbe, typLabel, zeitraumBeginn, type FundTyp, type Zeitraum } from '../../lib/funde';
 import { useWarteschlange, wartendeFunde, wartendePolter } from '../../lib/offline';
-import { POLTER_FARBE, POLTER_FARBE_UEBERFAELLIG, istUeberfaellig, liegtSeitText, polterText } from '../../lib/polter';
+import { POLTER_FARBE, POLTER_FARBE_UEBERFAELLIG, fristText, istUeberfaellig, liegtSeitText, polterText } from '../../lib/polter';
 import { navigieren } from '../../lib/router';
 import { datumZeitDE } from '../../lib/zeit';
 import { luftbildProtokollRegistrieren } from '../../karte/luftbildProtokoll';
@@ -79,12 +82,18 @@ type KartenDaten = {
   grenze: MultiPolygon | null;
   bestaende: Feature[];
   flurstuecke: Feature[];
+  zonen: Feature[];
   mitte: [number, number] | null;
 };
 
 type Ebenen = Record<EbenenId, boolean>;
 
-type Modus = { art: 'grenze' } | { art: 'bestand'; bestandId: string | null; name: string; bearbeiten?: boolean } | null;
+type Modus =
+  | { art: 'grenze' }
+  | { art: 'bestand'; bestandId: string | null; name: string; bearbeiten?: boolean }
+  // Zone (Teilfläche) eines Bestands: neu (zoneId null) oder Punkte bearbeiten
+  | { art: 'zone'; bestandId: string; bestandName: string; zoneId: string | null; name: string; bearbeiten?: boolean }
+  | null;
 
 // ---------- Komponente ----------
 
@@ -162,6 +171,7 @@ export default function Karte({
     }
   }, [einst]);
   const [gewaehlt, setGewaehlt] = useState<GewaehlterBestand | null>(null);
+  const [zone, setZone] = useState<Zone | null>(null);
   const [flurstueck, setFlurstueck] = useState<{ id: string; text: string; flaecheHa: number } | null>(null);
   // Funde: einmal alle laden, Typ und Zeitraum filtern im Browser (auch offline aus dem Cache)
   const [funde, setFunde] = useState<Feature[]>([]);
@@ -190,11 +200,12 @@ export default function Karte({
       setMeldung({ art: 'fehler', text: fehlertext(error) });
       return;
     }
-    const d = (data ?? {}) as { grenze?: MultiPolygon | null; bestaende?: Feature[]; flurstuecke?: Feature[]; mitte?: { coordinates?: number[] } | null };
+    const d = (data ?? {}) as { grenze?: MultiPolygon | null; bestaende?: Feature[]; flurstuecke?: Feature[]; zonen?: Feature[]; mitte?: { coordinates?: number[] } | null };
     setDaten({
       grenze: d.grenze ?? null,
       bestaende: d.bestaende ?? [],
       flurstuecke: d.flurstuecke ?? [],
+      zonen: d.zonen ?? [],
       mitte: (d.mitte?.coordinates as [number, number] | undefined) ?? null,
     });
   }, [k.betriebId]);
@@ -217,13 +228,13 @@ export default function Karte({
     const lokal: Feature[] = wartendePolter(k.betriebId).flatMap((w) => {
       const m = /POINT\(([-\d.]+) ([-\d.]+)\)/.exec(String(w.geom ?? ''));
       if (!m || server.some((s) => s.properties?.id === w.id)) return [];
-      return [{ type: 'Feature', geometry: { type: 'Point', coordinates: [Number(m[1]), Number(m[2])] }, properties: { id: w.id, baumart: w.baumart ?? null, stueck: w.stueck ?? null, menge_fm: w.menge_fm ?? null, bestand_id: w.bestand_id ?? null, status: 'liegt', abgelegt_am: w.abgelegt_am ?? new Date().toISOString(), wartet: true } }];
+      return [{ type: 'Feature', geometry: { type: 'Point', coordinates: [Number(m[1]), Number(m[2])] }, properties: { id: w.id, baumart: w.baumart ?? null, stueck: w.stueck ?? null, menge_fm: w.menge_fm ?? null, bestand_id: w.bestand_id ?? null, status: 'liegt', abgelegt_am: w.abgelegt_am ?? new Date().toISOString(), frist_tage: w.frist_tage ?? null, wartet: true } }];
     });
     // Auf der Karte nur, was noch liegt
     setPolter(
       [...server, ...lokal]
         .filter((f) => f.properties?.status === 'liegt')
-        .map((f): Feature => ({ ...f, properties: { ...f.properties, ueberfaellig: istUeberfaellig({ status: 'liegt', abgelegt_am: String(f.properties?.abgelegt_am ?? '') }) } })),
+        .map((f): Feature => ({ ...f, properties: { ...f.properties, ueberfaellig: istUeberfaellig({ status: 'liegt', abgelegt_am: String(f.properties?.abgelegt_am ?? ''), frist_tage: f.properties?.frist_tage != null ? Number(f.properties.frist_tage) : null }) } })),
     );
   }, [k.betriebId]);
 
@@ -263,7 +274,7 @@ export default function Karte({
     m.addControl(new ScaleControl({ unit: 'metric' }), 'bottom-right');
 
     m.on('load', () => {
-      for (const id of ['grenze', 'bestaende', 'flurstuecke', 'funde', 'polter', 'zeichnung', 'waldwege']) m.addSource(id, { type: 'geojson', data: LEER });
+      for (const id of ['grenze', 'bestaende', 'zonen', 'flurstuecke', 'funde', 'polter', 'zeichnung', 'waldwege']) m.addSource(id, { type: 'geojson', data: LEER });
       // OSM-Waldwege: Fahrwege braun mit hellem Rand (auch auf dem Luftbild lesbar), Pfade gestrichelt
       m.addLayer({
         id: 'waldwege-pfad',
@@ -327,6 +338,26 @@ export default function Karte({
         source: 'bestaende',
         filter: ['==', ['get', 'id'], ''],
         paint: { 'line-color': '#f26a1b', 'line-width': 4 },
+      });
+      // Zonen: Fläche nach Wuchsstadium eingefärbt, gestrichelter Rand
+      m.addLayer({
+        id: 'zonen-flaeche',
+        type: 'fill',
+        source: 'zonen',
+        paint: { 'fill-color': ['coalesce', ['get', 'stadium_farbe'], '#9aa5a0'], 'fill-opacity': 0.45 },
+      });
+      m.addLayer({
+        id: 'zonen-linie',
+        type: 'line',
+        source: 'zonen',
+        paint: { 'line-color': '#1f3d2b', 'line-width': 1.2, 'line-dasharray': [2, 1.5] },
+      });
+      m.addLayer({
+        id: 'zonen-auswahl',
+        type: 'line',
+        source: 'zonen',
+        filter: ['==', ['get', 'id'], ''],
+        paint: { 'line-color': '#f26a1b', 'line-width': 3 },
       });
       m.addLayer({ id: 'grenze-linie', type: 'line', source: 'grenze', paint: { 'line-color': '#e4572e', 'line-width': 3 } });
       // Heatmap: Kerndichte über alle Funde des Betriebs, unabhängig von Flurstücks- und Bestandsgrenzen
@@ -426,6 +457,7 @@ export default function Karte({
     setzen('grenze', { type: 'FeatureCollection', features: daten.grenze ? [{ type: 'Feature', geometry: daten.grenze, properties: {} }] : [] });
     setzen('bestaende', { type: 'FeatureCollection', features: daten.bestaende });
     setzen('flurstuecke', { type: 'FeatureCollection', features: daten.flurstuecke });
+    setzen('zonen', { type: 'FeatureCollection', features: zonenFuerKarte(daten.zonen) });
     void fundeLaden();
     grenzeRef.current = daten.grenze;
 
@@ -560,6 +592,7 @@ export default function Karte({
     sichtbar('luftbild', ebenen.luftbild);
     sichtbar('grenze-linie', ebenen.grenze);
     for (const s of EBENEN_SCHICHTEN.bestaende) sichtbar(s, ebenen.bestaende);
+    for (const s of EBENEN_SCHICHTEN.zonen) sichtbar(s, ebenen.zonen);
     for (const s of [...EBENEN_SCHICHTEN.flurstuecke, 'flurstuecke-flaeche']) sichtbar(s, ebenen.flurstuecke);
     sichtbar('funde-punkt', ebenen.funde);
     sichtbar('polter-punkt', ebenen.polter);
@@ -580,6 +613,8 @@ export default function Karte({
     setze('bestaende-flaeche', 'fill-opacity', d.bestaende * 0.4);
     setze('bestaende-linie', 'line-opacity', Math.min(1, d.bestaende * 1.8));
     setze('grenze-linie', 'line-opacity', d.grenze);
+    setze('zonen-flaeche', 'fill-opacity', d.zonen * 0.65);
+    setze('zonen-linie', 'line-opacity', Math.min(1, d.zonen * 1.4));
     setze('flurstuecke-linie', 'line-opacity', d.flurstuecke);
     setze('heatmap', 'heatmap-opacity', d.heatmap);
     setze('waldwege-linie', 'line-opacity', d.waldwege);
@@ -601,11 +636,13 @@ export default function Karte({
     const m = karte.current;
     if (!m || !bereit || !m.getLayer('bestaende-auswahl')) return;
     m.setFilter('bestaende-auswahl', ['==', ['get', 'id'], gewaehlt?.id ?? '']);
+    if (m.getLayer('zonen-auswahl')) m.setFilter('zonen-auswahl', ['==', ['get', 'id'], zone?.id ?? '']);
     if (m.getLayer('flurstuecke-auswahl')) m.setFilter('flurstuecke-auswahl', ['==', ['get', 'id'], flurstueck?.id ?? '']);
-  }, [gewaehlt, flurstueck, bereit]);
+  }, [gewaehlt, flurstueck, zone, bereit]);
   useEffect(() => {
     if (modus) {
       setGewaehlt(null);
+      setZone(null);
       setFlurstueck(null);
     }
   }, [modus]);
@@ -627,7 +664,7 @@ export default function Karte({
     const klick = (e: MapMouseEvent) => {
       const aktiv = modusRef.current;
       const pos: Position = [e.lngLat.lng, e.lngLat.lat];
-      if (aktiv?.art === 'bestand' && aktiv.bearbeiten) return; // eigener Handler (Punkte ziehen/einfügen)
+      if ((aktiv?.art === 'bestand' || aktiv?.art === 'zone') && aktiv.bearbeiten) return; // eigener Handler (Punkte ziehen/einfügen)
       // Fundmeldung in der Seitenleiste wartet auf eine Position
       if (!aktiv && positionWahlAktiv()) {
         positionMelden({ lon: pos[0]!, lat: pos[1]! });
@@ -641,15 +678,37 @@ export default function Karte({
           setMeldung({ art: 'info', text: 'Punkt lag außerhalb und wurde auf die Betriebsgrenze gesetzt.' });
           return;
         }
+        if (aktiv.art === 'zone') {
+          // Zonen liegen im Bestand: Punkte außerhalb auf den Bestandsrand setzen
+          const flaeche = bestandFlaecheRef.current;
+          if (flaeche && !punktInFlaeche(pos, flaeche)) {
+            setPunkte((alt) => [...alt, naechsterRandpunkt(pos, flaeche)]);
+            setMeldung({ art: 'info', text: 'Punkt lag außerhalb und wurde auf den Bestandsrand gesetzt.' });
+            return;
+          }
+        }
         setPunkte((alt) => [...alt, pos]);
         return;
       }
       if (aktiv) return;
-      const ebenenTreffer = ['polter-punkt', 'funde-punkt', 'bestaende-flaeche', 'flurstuecke-flaeche'].filter((l) => m.getLayer(l) && m.getLayoutProperty(l, 'visibility') !== 'none');
+      const ebenenTreffer = ['polter-punkt', 'funde-punkt', 'zonen-flaeche', 'bestaende-flaeche', 'flurstuecke-flaeche'].filter((l) => m.getLayer(l) && m.getLayoutProperty(l, 'visibility') !== 'none');
       const treffer = m.queryRenderedFeatures(e.point, { layers: ebenenTreffer });
-      // Polter und Funde vor Beständen, Bestände vor Flurstücken
-      const f = treffer.find((x) => x.layer.id === 'polter-punkt') ?? treffer.find((x) => x.layer.id === 'funde-punkt') ?? treffer.find((x) => x.layer.id === 'bestaende-flaeche') ?? treffer[0];
+      // Polter und Funde vor Zonen, Zonen vor Beständen, Bestände vor Flurstücken
+      const f =
+        treffer.find((x) => x.layer.id === 'polter-punkt') ??
+        treffer.find((x) => x.layer.id === 'funde-punkt') ??
+        treffer.find((x) => x.layer.id === 'zonen-flaeche') ??
+        treffer.find((x) => x.layer.id === 'bestaende-flaeche') ??
+        treffer[0];
       setPolterInfo(null);
+      setZone(null);
+      if (f?.layer.id === 'zonen-flaeche') {
+        setGewaehlt(null);
+        setFlurstueck(null);
+        setFund(null);
+        setZone(zoneLesen({ ...(f.properties ?? {}) }));
+        return;
+      }
       if (!f) {
         setGewaehlt(null);
         setFlurstueck(null);
@@ -704,7 +763,7 @@ export default function Karte({
   }, [bereit, modus, zuordnen]);
 
   // Bestand bearbeiten: Eckpunkte ziehen, Linie antippen = Punkt einfügen, Punkt antippen = markieren
-  const bearbeitet = modus?.art === 'bestand' && !!modus.bearbeiten;
+  const bearbeitet = (modus?.art === 'bestand' || modus?.art === 'zone') && !!modus.bearbeiten;
   useEffect(() => {
     const m = karte.current;
     if (!m || !bereit || !bearbeitet) return;
@@ -800,13 +859,54 @@ export default function Karte({
     };
   }, [bereit, bearbeitet]);
 
-  // Vorhandenen Bestand zur Bearbeitung der Eckpunkte laden (größte Teilfläche; weitere Teile und Löcher bleiben erhalten)
-  function bestandBearbeiten(bestandId: string, name: string) {
-    const f = daten?.bestaende.find((b) => String((b.properties as { id?: string } | null)?.id ?? b.id) === bestandId);
-    const g = f?.geometry;
-    if (!g || (g.type !== 'Polygon' && g.type !== 'MultiPolygon')) {
+  // Fläche eines Bestands als MultiPolygon (für das Einrasten der Zonenpunkte)
+  const bestandFlaecheRef = useRef<MultiPolygon | null>(null);
+  const bestandFlaeche = (bestandId: string): MultiPolygon | null => {
+    const g = daten?.bestaende.find((b) => String((b.properties as { id?: string } | null)?.id ?? b.id) === bestandId)?.geometry;
+    if (!g || (g.type !== 'Polygon' && g.type !== 'MultiPolygon')) return null;
+    return g.type === 'Polygon' ? { type: 'MultiPolygon', coordinates: [g.coordinates] } : g;
+  };
+
+  // Neue Zone im Bestand einzeichnen; Name wird vorgeschlagen und ist im Bestandsdetail änderbar
+  function zoneZeichnen(bestandId: string, bestandName: string) {
+    const flaeche = bestandFlaeche(bestandId);
+    if (!flaeche) {
       setMeldung({ art: 'fehler', text: 'Dieser Bestand hat noch keine Fläche.' });
       return;
+    }
+    bestandFlaecheRef.current = flaeche;
+    const vorhandene = (daten?.zonen ?? []).filter((z) => String(z.properties?.bestand_id) === bestandId).map((z) => String(z.properties?.name ?? ''));
+    setModus({ art: 'zone', bestandId, bestandName, zoneId: null, name: naechsterZonenName(vorhandene) });
+    setMeldung({ art: 'info', text: 'Eckpunkte der Zone antippen. Punkte außerhalb landen auf dem Bestandsrand.' });
+  }
+
+  // Vorhandene Zone zur Bearbeitung der Eckpunkte laden
+  function zoneBearbeiten(z: Zone) {
+    const f = daten?.zonen.find((x) => String(x.properties?.id ?? x.id) === z.id);
+    const bestandName = String(daten?.bestaende.find((b) => String(b.properties?.id) === z.bestandId)?.properties?.name ?? '');
+    const r = flaecheZerlegen(f?.geometry);
+    if (!r) return;
+    bestandFlaecheRef.current = bestandFlaeche(z.bestandId);
+    setModus({ art: 'zone', bestandId: z.bestandId, bestandName, zoneId: z.id, name: z.name, bearbeiten: true });
+    bearbeitungStarten(r);
+  }
+
+  // Vorhandenen Bestand zur Bearbeitung der Eckpunkte laden
+  function bestandBearbeiten(bestandId: string, name: string) {
+    const f = daten?.bestaende.find((b) => String((b.properties as { id?: string } | null)?.id ?? b.id) === bestandId);
+    const r = flaecheZerlegen(f?.geometry);
+    if (!r) return;
+    setModus({ art: 'bestand', bestandId, name, bearbeiten: true });
+    bearbeitungStarten(r);
+  }
+
+  type Zerlegt = { ring: Position[]; teile: Position[][][]; loecher: Position[][] };
+
+  // Größte Teilfläche wird bearbeitet; weitere Teile und Löcher bleiben erhalten
+  function flaecheZerlegen(g: Geometry | null | undefined): Zerlegt | null {
+    if (!g || (g.type !== 'Polygon' && g.type !== 'MultiPolygon')) {
+      setMeldung({ art: 'fehler', text: 'Diese Fläche hat noch keine Geometrie.' });
+      return null;
     }
     const teile: Position[][][] = g.type === 'Polygon' ? [g.coordinates] : g.coordinates;
     const flaeche = (ring: Position[]) => {
@@ -818,10 +918,13 @@ export default function Karte({
     teile.forEach((t, i) => {
       if (flaeche(t[0]!) > flaeche(teile[wahl]![0]!)) wahl = i;
     });
-    const ring = teile[wahl]![0]!.slice(0, -1);
-    setModus({ art: 'bestand', bestandId, name, bearbeiten: true });
-    flaechenRest.current = { teile: teile.filter((_, i) => i !== wahl), loecher: teile[wahl]!.slice(1) };
-    setPunkte(ring);
+    return { ring: teile[wahl]![0]!.slice(0, -1), teile: teile.filter((_, i) => i !== wahl), loecher: teile[wahl]!.slice(1) };
+  }
+
+  // Nach setModus aufrufen – setModus leert die Punkte
+  function bearbeitungStarten(r: Zerlegt) {
+    flaechenRest.current = { teile: r.teile, loecher: r.loecher };
+    setPunkte(r.ring);
     setMeldung({ art: 'info', text: 'Punkte ziehen · auf eine Linie tippen fügt einen Punkt ein · Punkt antippen und „Punkt löschen“.' });
   }
 
@@ -842,6 +945,22 @@ export default function Karte({
     void zeichnungSpeichern(modus.art === 'bestand' ? { bestandId: modus.bestandId, name: modus.name } : undefined);
   }
 
+  async function zoneSpeichern(geojson: Json) {
+    if (modus?.art !== 'zone') return;
+    const { data, error } = await supabase.rpc('zone_speichern', {
+      p_bestand_id: modus.bestandId,
+      p_zone_id: modus.zoneId as string,
+      p_name: modus.name,
+      p_geojson: geojson,
+    });
+    if (error) throw error;
+    const ha = Number((data as { flaeche_ha?: number } | null)?.flaeche_ha ?? 0);
+    setMeldung({
+      art: 'erfolg',
+      text: `${modus.zoneId ? 'Zone' : `Neue Zone „${modus.name}“`} in Bestand ${modus.bestandName} gespeichert · ${ha.toLocaleString('de-DE')} ha${modus.zoneId ? '' : ' – Pflanzjahr und Mischung unter „Zonendaten“ eintragen'}`,
+    });
+  }
+
   async function zeichnungSpeichern(ziel?: { bestandId: string | null; name: string }) {
     if (!modus) return;
     setMeldung(null);
@@ -849,13 +968,15 @@ export default function Karte({
     try {
       const aussen = [...punkte, punkte[0]!];
       const geojson = (
-        modus.art === 'bestand' && modus.bearbeiten
+        (modus.art === 'bestand' || modus.art === 'zone') && modus.bearbeiten
           ? flaechenRest.current.teile.length
             ? { type: 'MultiPolygon', coordinates: [[aussen, ...flaechenRest.current.loecher], ...flaechenRest.current.teile] }
             : { type: 'Polygon', coordinates: [aussen, ...flaechenRest.current.loecher] }
           : { type: 'Polygon', coordinates: [aussen] }
       ) as unknown as Json;
-      if (modus.art === 'grenze') {
+      if (modus.art === 'zone') {
+        await zoneSpeichern(geojson);
+      } else if (modus.art === 'grenze') {
         const { data, error } = await supabase.rpc('grenze_setzen', { p_betrieb_id: k.betriebId, p_geojson: geojson });
         if (error) throw error;
         setMeldung({ art: 'erfolg', text: `Betriebsgrenze gespeichert · ${Number(data).toLocaleString('de-DE')} ha` });
@@ -916,6 +1037,7 @@ export default function Karte({
     heatmap: { name: 'Heatmap', label: 'Heatmap', an: ebenen.heatmap },
     grenze: { name: 'Betriebsgrenze', label: 'Betriebsgrenze', an: ebenen.grenze },
     polter: { name: 'Polter', label: `Polter (${polter.length})`, an: ebenen.polter },
+    zonen: { name: 'Zonen', label: `Zonen nach Wuchsstadium (${daten?.zonen.length ?? 0})`, an: ebenen.zonen },
     waldwege: {
       name: 'Waldwege (OSM)',
       label: ebenen.waldwege
@@ -978,6 +1100,15 @@ export default function Karte({
             );
           })}
         </ul>
+        {ebenen.zonen && (daten?.zonen.length ?? 0) > 0 && (
+          <p className="stadien-legende" aria-label="Legende Wuchsstadien">
+            {WUCHSSTADIEN.map((st) => (
+              <span key={st.wert}>
+                <i className="farbpunkt" style={{ background: st.farbe }} /> {st.label}
+              </span>
+            ))}
+          </p>
+        )}
         <label className="transparenz">
           <span>Luftbild-Vorrang</span>
           <select
@@ -1150,8 +1281,10 @@ export default function Karte({
             {modus.art === 'grenze' && 'Betriebsgrenze: Eckpunkte antippen'}
             {modus.art === 'bestand' && modus.bearbeiten && `Bestand „${modus.name}“ bearbeiten: Punkte ziehen, Linie antippen = Punkt einfügen`}
             {modus.art === 'bestand' && !modus.bearbeiten && 'Neuer Bestand: Eckpunkte antippen'}
+            {modus.art === 'zone' && modus.bearbeiten && `${modus.name} (Bestand ${modus.bestandName}) bearbeiten: Punkte ziehen, Linie antippen = Punkt einfügen`}
+            {modus.art === 'zone' && !modus.bearbeiten && `${modus.name} in Bestand ${modus.bestandName}: Eckpunkte antippen`}
           </span>
-          {modus.art === 'bestand' && modus.bearbeiten ? (
+          {(modus.art === 'bestand' || modus.art === 'zone') && modus.bearbeiten ? (
             <button
               className="knopf knopf-sekundaer klein"
               onClick={() => {
@@ -1192,6 +1325,17 @@ export default function Karte({
           bestand={gewaehlt}
           onSchliessen={() => setGewaehlt(null)}
           onBearbeiten={k.istInhaber ? () => bestandBearbeiten(gewaehlt.id, gewaehlt.name) : undefined}
+          onZoneZeichnen={k.istInhaber ? () => zoneZeichnen(gewaehlt.id, gewaehlt.name) : undefined}
+        />
+      )}
+
+      {zone && !modus && (
+        <ZoneInfo
+          zone={zone}
+          bestandName={String(daten?.bestaende.find((b) => String(b.properties?.id) === zone.bestandId)?.properties?.name ?? '')}
+          onSchliessen={() => setZone(null)}
+          onBearbeiten={k.istInhaber ? () => zoneBearbeiten(zone) : undefined}
+          onWeitereZone={k.istInhaber ? () => zoneZeichnen(zone.bestandId, String(daten?.bestaende.find((b) => String(b.properties?.id) === zone.bestandId)?.properties?.name ?? '')) : undefined}
         />
       )}
 
@@ -1243,7 +1387,7 @@ export default function Karte({
                     menge_fm: polterInfo.menge_fm != null ? Number(polterInfo.menge_fm) : null,
                   }) || null,
                   liegtSeitText(String(polterInfo.abgelegt_am ?? '')),
-                  polterInfo.ueberfaellig ? 'überfällig' : null,
+                  fristText({ status: 'liegt', abgelegt_am: String(polterInfo.abgelegt_am ?? ''), frist_tage: polterInfo.frist_tage != null ? Number(polterInfo.frist_tage) : null }),
                   (polterInfo.notiz as string | null) || null,
                   polterInfo.wartet ? 'wartet auf Netz' : null,
                 ]

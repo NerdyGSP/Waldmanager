@@ -1,9 +1,11 @@
 import { baumartName } from './stammdaten';
 
 // Polter: aufgearbeitetes Holz am Weg, das noch abgefahren werden muss.
-// Nach FRIST_TAGE gilt ein liegendes Polter als überfällig (Käfer, Entwertung, Vergessen).
+// Nach seiner Frist (je Polter, Standard FRIST_TAGE) gilt ein liegendes Polter als überfällig (Käfer, Entwertung, Vergessen).
 
 export const FRIST_TAGE = 28;
+/** Auswahl im Formular; frei einstellbar 1–365 Tage */
+export const FRIST_VORSCHLAEGE = [7, 14, 28, 56, 90] as const;
 export const POLTER_FARBE = '#8a5a2b';
 export const POLTER_FARBE_UEBERFAELLIG = '#c32319';
 
@@ -16,7 +18,25 @@ export type PolterKern = {
   baumart?: string | null;
   stueck?: number | null;
   menge_fm?: number | null;
+  /** Tage bis „überfällig“; fehlt bei alten Ständen → FRIST_TAGE */
+  frist_tage?: number | null;
 };
+
+export const fristVon = (p: Pick<PolterKern, 'frist_tage'>): number => (p.frist_tage && p.frist_tage > 0 ? p.frist_tage : FRIST_TAGE);
+
+/** Tage bis zur Frist (negativ = so viele Tage drüber) */
+export function restTage(p: PolterKern, jetzt: Date = new Date()): number {
+  return fristVon(p) - liegtSeitTage(p.abgelegt_am, jetzt);
+}
+
+/** „noch 5 Tage“, „Frist heute“, „12 Tage über der Frist“; leer bei abgefahrenen */
+export function fristText(p: PolterKern, jetzt: Date = new Date()): string {
+  if (p.status !== 'liegt') return '';
+  const r = restTage(p, jetzt);
+  if (r > 0) return `noch ${r} ${r === 1 ? 'Tag' : 'Tage'} bis zur Frist`;
+  if (r === 0) return 'Frist heute';
+  return `${-r} ${r === -1 ? 'Tag' : 'Tage'} über der Frist`;
+}
 
 const TAG_MS = 24 * 3600 * 1000;
 
@@ -27,7 +47,7 @@ export function liegtSeitTage(abgelegtAm: string, jetzt: Date = new Date()): num
 }
 
 export function istUeberfaellig(p: PolterKern, jetzt: Date = new Date()): boolean {
-  return p.status === 'liegt' && liegtSeitTage(p.abgelegt_am, jetzt) >= FRIST_TAGE;
+  return p.status === 'liegt' && liegtSeitTage(p.abgelegt_am, jetzt) >= fristVon(p);
 }
 
 /** „liegt seit heute“, „liegt seit 1 Tag“, „liegt seit 94 Tagen“ */

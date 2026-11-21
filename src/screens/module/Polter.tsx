@@ -6,7 +6,7 @@ import { navigieren } from '../../lib/router';
 import { datumDE } from '../../lib/zeit';
 import { speichernOderMerken, useWarteschlange, wartendePolter, warteschlangeAbarbeiten } from '../../lib/offline';
 import { BAUMARTEN } from '../../lib/stammdaten';
-import { FRIST_TAGE, POLTER_FARBE, POLTER_FARBE_UEBERFAELLIG, istUeberfaellig, liegtSeitText, passtZuFilter, polterText, sortieren, zaehlen, type PolterFilter } from '../../lib/polter';
+import { FRIST_TAGE, FRIST_VORSCHLAEGE, POLTER_FARBE, POLTER_FARBE_UEBERFAELLIG, fristText, fristVon, istUeberfaellig, liegtSeitText, passtZuFilter, polterText, sortieren, zaehlen, type PolterFilter } from '../../lib/polter';
 import { punktInFlaeche } from '../../karte/kern/geometrie';
 import { polterGeaendert, positionWahlBeenden, positionWahlStarten, usePositionWahl } from '../../karte/kern/positionWahl';
 import { useBreit } from '../../lib/useBreit';
@@ -20,6 +20,7 @@ type PolterEintrag = {
   menge_fm: number | null;
   abgelegt_am: string;
   abgefahren_am: string | null;
+  frist_tage: number | null;
   bestand_id: string | null;
   status: string;
   notiz: string | null;
@@ -60,6 +61,7 @@ function PolterListe({ k }: { k: BetriebKontext }) {
         menge_fm: w.menge_fm ?? null,
         abgelegt_am: w.abgelegt_am ?? new Date().toISOString(),
         abgefahren_am: null,
+        frist_tage: w.frist_tage ?? null,
         bestand_id: w.bestand_id ?? null,
         status: 'liegt',
         notiz: w.notiz ?? null,
@@ -75,6 +77,13 @@ function PolterListe({ k }: { k: BetriebKontext }) {
 
   const zahl = useMemo(() => zaehlen(liste ?? []), [liste]);
   const sichtbar = useMemo(() => (liste ?? []).filter((p) => passtZuFilter(p, filter)), [liste, filter]);
+
+  async function fristSetzen(p: PolterEintrag, tage: number) {
+    const { error } = await supabase.from('polter').update({ frist_tage: tage }).eq('id', p.id);
+    setFehler(error ? fehlertext(error) : null);
+    polterGeaendert();
+    await laden();
+  }
 
   async function umschalten(p: PolterEintrag) {
     const { error } = await supabase.from('polter').update({ status: p.status === 'abgefahren' ? 'liegt' : 'abgefahren' }).eq('id', p.id);
@@ -106,7 +115,7 @@ function PolterListe({ k }: { k: BetriebKontext }) {
       />
       {zahl.ueberfaellig > 0 && filter !== 'ueberfaellig' && (
         <Hinweis art="warnung">
-          {zahl.ueberfaellig} {zahl.ueberfaellig === 1 ? 'Polter liegt' : 'Polter liegen'} länger als {FRIST_TAGE} Tage.
+          {zahl.ueberfaellig} {zahl.ueberfaellig === 1 ? 'Polter liegt' : 'Polter liegen'} länger als die jeweilige Frist.
         </Hinweis>
       )}
       {offen > 0 && (
@@ -126,6 +135,7 @@ function PolterListe({ k }: { k: BetriebKontext }) {
         <Gruppe titel={`${sichtbar.length} Polter`}>
           {sichtbar.map((p) => {
             const ueberfaellig = istUeberfaellig(p);
+            const darfAendern = !p.wartet && (k.istInhaber || p.erfasst_von === k.userId);
             return (
               <div className="zeile" key={p.id}>
                 <span className="zeile-label">
@@ -134,6 +144,7 @@ function PolterListe({ k }: { k: BetriebKontext }) {
                   <small>
                     {[
                       p.status === 'abgefahren' ? `abgefahren${p.abgefahren_am ? ` am ${datumDE(p.abgefahren_am)}` : ''}` : liegtSeitText(p.abgelegt_am),
+                      fristText(p) || null,
                       `abgelegt am ${datumDE(p.abgelegt_am)}`,
                       p.notiz,
                       p.wartet ? 'wartet auf Netz' : null,
@@ -142,7 +153,18 @@ function PolterListe({ k }: { k: BetriebKontext }) {
                       .join(' · ')}
                   </small>
                 </span>
-                {!p.wartet && (k.istInhaber || p.erfasst_von === k.userId) && (
+                {darfAendern && p.status === 'liegt' && (
+                  <select className="frist-wahl" aria-label="Frist in Tagen" value={fristVon(p)} onChange={(e) => void fristSetzen(p, Number(e.target.value))}>
+                    {[...new Set([...FRIST_VORSCHLAEGE, fristVon(p)])]
+                      .sort((a, b) => a - b)
+                      .map((t) => (
+                        <option key={t} value={t}>
+                          Frist {t} T.
+                        </option>
+                      ))}
+                  </select>
+                )}
+                {darfAendern && (
                   <button
                     type="button"
                     className={`status-pill status-${p.status === 'abgefahren' ? 'erledigt' : ueberfaellig ? 'ueberfaellig' : 'geplant'}`}
@@ -188,6 +210,7 @@ function PolterErfassen({ k }: { k: BetriebKontext }) {
   const [stueck, setStueck] = useState(2);
   const [fm, setFm] = useState(1);
   const [notiz, setNotiz] = useState('');
+  const [frist, setFrist] = useState<number>(FRIST_TAGE);
   const [pos, setPos] = useState<Position | null>(null);
   const [gpsFehler, setGpsFehler] = useState<string | null>(null);
   const [fehler, setFehler] = useState<string | null>(null);
@@ -246,6 +269,7 @@ function PolterErfassen({ k }: { k: BetriebKontext }) {
           geom: `SRID=4326;POINT(${pos.lon} ${pos.lat})`,
           genauigkeit_m: pos.genauigkeit != null ? Math.round(pos.genauigkeit) : null,
           abgelegt_am: new Date().toISOString(),
+          frist_tage: frist,
           notiz: notiz.trim() || null,
         },
       });
@@ -327,6 +351,13 @@ function PolterErfassen({ k }: { k: BetriebKontext }) {
           </span>
         </Zeile>
       </Gruppe>
+
+      <Segmente<string>
+        label="Abfahren innerhalb von"
+        wert={String(frist)}
+        onAendern={(w) => setFrist(Number(w))}
+        optionen={FRIST_VORSCHLAEGE.map((t) => ({ wert: String(t), label: t % 7 === 0 && t < 90 ? `${t / 7} Wo.` : `${t} T.` }))}
+      />
 
       <Gruppe>
         <Feld label="Notiz" placeholder="z. B. liegt links am Hauptweg, Brennholz" value={notiz} onChange={(e) => setNotiz(e.target.value)} />

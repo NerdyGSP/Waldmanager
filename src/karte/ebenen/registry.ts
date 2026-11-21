@@ -8,6 +8,7 @@ export const EBENEN = [
   { id: 'polter', titel: 'Polter', gruppe: 'geschehen', schichten: ['polter-punkt'], standardSichtbar: true, standardDeckkraft: 1, modi: 'alle' },
   { id: 'heatmap', titel: 'Heatmap', gruppe: 'analyse', schichten: ['heatmap'], standardSichtbar: false, standardDeckkraft: 0.8, modi: ['ansehen', 'druck'] },
   { id: 'grenze', titel: 'Betriebsgrenze', gruppe: 'betrieb', schichten: ['grenze-linie'], standardSichtbar: true, standardDeckkraft: 1, modi: 'alle' },
+  { id: 'zonen', titel: 'Zonen', gruppe: 'betrieb', schichten: ['zonen-flaeche', 'zonen-linie', 'zonen-auswahl'], standardSichtbar: true, standardDeckkraft: 0.7, modi: 'alle' },
   { id: 'bestaende', titel: 'Bestände', gruppe: 'betrieb', schichten: ['bestaende-flaeche', 'bestaende-linie', 'bestaende-auswahl'], standardSichtbar: true, standardDeckkraft: 0.55, modi: 'alle' },
   { id: 'flurstuecke', titel: 'Flurstücke', gruppe: 'recht', schichten: ['flurstuecke-linie', 'flurstuecke-auswahl'], standardSichtbar: false, standardDeckkraft: 0.9, modi: 'alle' },
   { id: 'waldwege', titel: 'Waldwege (OSM)', gruppe: 'basis', schichten: ['waldwege-pfad', 'waldwege-rand', 'waldwege-linie'], standardSichtbar: false, standardDeckkraft: 1, modi: 'alle' },

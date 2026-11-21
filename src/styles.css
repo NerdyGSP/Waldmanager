@@ -1170,6 +1170,19 @@ button.kachel:active { transform: none; }
 .mischung-balken [data-art="Hbu"] { --art: #b89860; }
 .mischung-balken [data-art="Bi"] { --art: #e0c98a; }
 .mischung-balken [data-art="Erl"] { --art: #7d5a33; }
+.mischung-balken [data-art="KTa"] { --art: #2f6f5e; }
+.mischung-balken [data-art="ETa"] { --art: #4a7f9a; }
+.mischung-balken [data-art="REi"] { --art: #b4532f; }
+.mischung-balken [data-art="FAh"] { --art: #cfa95a; }
+.mischung-balken [data-art="BHa"] { --art: #9a7b4f; }
+
+/* ---------- Waldmanager: Polter ---------- */
+.frist-wahl { min-height: 36px; margin-right: 6px; font: inherit; font-size: var(--fs-sm); }
+
+/* ---------- Waldmanager: Zonen im Bestand ---------- */
+.stadien-legende { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 0; font-size: var(--fs-sm); color: var(--color-text-muted); }
+.zone-bearbeiten { display: grid; gap: var(--abstand); padding: 8px 0 var(--abstand); border-bottom: 1px solid var(--color-border); }
+.zone-bearbeiten .zeile input { min-height: 40px; max-width: 160px; }
 
 /* ---------- Waldmanager: Maßnahmen ---------- */
 .filter-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 var(--abstand); }

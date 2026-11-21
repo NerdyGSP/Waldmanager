@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('./supabase', () => ({ supabase: {} }));
 
-import { FRIST_TAGE, istUeberfaellig, liegtSeitTage, liegtSeitText, passtZuFilter, polterText, sortieren, zaehlen } from './polter';
+import { FRIST_TAGE, fristText, istUeberfaellig, restTage, liegtSeitTage, liegtSeitText, passtZuFilter, polterText, sortieren, zaehlen } from './polter';
 
 const JETZT = new Date('2026-11-21T12:00:00+01:00');
 const vor = (tage: number) => new Date(JETZT.getTime() - tage * 24 * 3600 * 1000).toISOString();
@@ -27,6 +27,21 @@ describe('Polter', () => {
     expect(istUeberfaellig({ status: 'liegt', abgelegt_am: vor(FRIST_TAGE - 1) }, JETZT)).toBe(false);
     expect(istUeberfaellig({ status: 'liegt', abgelegt_am: vor(FRIST_TAGE) }, JETZT)).toBe(true);
     expect(istUeberfaellig({ status: 'abgefahren', abgelegt_am: vor(200) }, JETZT)).toBe(false);
+  });
+
+  it('nutzt die Frist je Polter', () => {
+    expect(istUeberfaellig({ status: 'liegt', abgelegt_am: vor(10), frist_tage: 7 }, JETZT)).toBe(true);
+    expect(istUeberfaellig({ status: 'liegt', abgelegt_am: vor(40), frist_tage: 56 }, JETZT)).toBe(false);
+    // ungültige oder fehlende Frist → Standard
+    expect(istUeberfaellig({ status: 'liegt', abgelegt_am: vor(FRIST_TAGE), frist_tage: 0 }, JETZT)).toBe(true);
+    expect(restTage({ status: 'liegt', abgelegt_am: vor(3), frist_tage: 14 }, JETZT)).toBe(11);
+  });
+
+  it('beschreibt den Abstand zur Frist', () => {
+    expect(fristText({ status: 'liegt', abgelegt_am: vor(13), frist_tage: 14 }, JETZT)).toBe('noch 1 Tag bis zur Frist');
+    expect(fristText({ status: 'liegt', abgelegt_am: vor(14), frist_tage: 14 }, JETZT)).toBe('Frist heute');
+    expect(fristText({ status: 'liegt', abgelegt_am: vor(26), frist_tage: 14 }, JETZT)).toBe('12 Tage über der Frist');
+    expect(fristText({ status: 'abgefahren', abgelegt_am: vor(26), frist_tage: 14 }, JETZT)).toBe('');
   });
 
   it('beschreibt Baumart und Menge', () => {
