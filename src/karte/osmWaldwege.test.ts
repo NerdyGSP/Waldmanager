@@ -1,14 +1,43 @@
 import { describe, expect, it, vi } from 'vitest';
-import { abfrageBereich, overpassAbfrage, waldwegeLaden, wegArt, zuGeoJSON } from './osmWaldwege';
+import type { FeatureCollection, LineString, MultiPolygon } from 'geojson';
+import {
+  OVERPASS_URLS,
+  abfrageBereich,
+  aufFlaecheZuschneiden,
+  betriebsFlaeche,
+  flaechenSchluessel,
+  gespeicherteWege,
+  linieZuschneiden,
+  overpassAbfrage,
+  overpassAbrufen,
+  wegArt,
+  wegeSpeichern,
+  zuGeoJSON,
+} from './osmWaldwege';
 
-describe('OSM-Waldwege', () => {
-  it('rundet den Ausschnitt nach außen auf das Raster', () => {
-    expect(abfrageBereich([9.461, 52.181, 9.519, 52.219])).toEqual([9.46, 52.18, 9.52, 52.22]);
-    // Werte genau auf dem Raster bleiben stehen
-    expect(abfrageBereich([9.46, 52.18, 9.52, 52.22])).toEqual([9.46, 52.18, 9.52, 52.22]);
+// Quadrat 9.47–9.49 / 52.20–52.21 mit Loch 9.475–9.48 / 52.203–52.207
+const FLAECHE: MultiPolygon = {
+  type: 'MultiPolygon',
+  coordinates: [
+    [
+      [[9.47, 52.2], [9.49, 52.2], [9.49, 52.21], [9.47, 52.21], [9.47, 52.2]],
+      [[9.475, 52.203], [9.48, 52.203], [9.48, 52.207], [9.475, 52.207], [9.475, 52.203]],
+    ],
+  ],
+};
+
+const linien = (...ks: number[][][]): FeatureCollection<LineString> => ({
+  type: 'FeatureCollection',
+  features: ks.map((coordinates, i) => ({ type: 'Feature', geometry: { type: 'LineString', coordinates }, properties: { osm_id: i, art: 'weg' } })),
+});
+
+describe('OSM-Waldwege: Abfrage', () => {
+  it('erweitert um den Rand und rundet nach außen aufs Raster', () => {
+    // 1 km ≈ 0,009° Breite und ≈ 0,0147° Länge bei 52°
+    expect(abfrageBereich([9.47, 52.2, 9.49, 52.21])).toEqual([9.44, 52.18, 9.52, 52.22]);
   });
 
-  it('lehnt zu große Ausschnitte ab', () => {
+  it('lehnt zu ausgedehnte Betriebe ab', () => {
     expect(abfrageBereich([9, 52, 10, 52.2])).toBeNull();
   });
 
@@ -38,17 +67,77 @@ describe('OSM-Waldwege', () => {
     expect(fc.features[0]!.properties).toMatchObject({ art: 'weg', tracktype: 'grade2', name: 'Kammweg' });
     expect(fc.features[1]!.properties).toMatchObject({ art: 'pfad', tracktype: null, name: null });
   });
+});
 
-  it('fragt denselben Bereich nur einmal ab', async () => {
-    const abruf = vi.fn(async () => new Response(JSON.stringify({ elements: [] }), { status: 200 }));
-    const b: [number, number, number, number] = [10.0, 51.0, 10.02, 51.02];
-    await waldwegeLaden(b, undefined, abruf as unknown as typeof fetch);
-    await waldwegeLaden(b, undefined, abruf as unknown as typeof fetch);
-    expect(abruf).toHaveBeenCalledTimes(1);
+describe('OSM-Waldwege: Zuschneiden', () => {
+  it('kürzt eine Linie, die über die Grenze läuft, auf das Innere', () => {
+    const teile = linieZuschneiden([[9.46, 52.209], [9.5, 52.209]], FLAECHE);
+    expect(teile).toHaveLength(1);
+    expect(teile[0]![0]![0]).toBeCloseTo(9.47, 9);
+    expect(teile[0]!.at(-1)![0]).toBeCloseTo(9.49, 9);
   });
 
-  it('meldet Fehler des Dienstes', async () => {
-    const abruf = vi.fn(async () => new Response('zu viele Anfragen', { status: 429 }));
-    await expect(waldwegeLaden([11, 51, 11.02, 51.02], undefined, abruf as unknown as typeof fetch)).rejects.toThrow('429');
+  it('spart Löcher aus und teilt die Linie dort', () => {
+    const teile = linieZuschneiden([[9.471, 52.205], [9.489, 52.205]], FLAECHE);
+    expect(teile).toHaveLength(2);
+    expect(teile[0]!.at(-1)![0]).toBeCloseTo(9.475, 9);
+    expect(teile[1]![0]![0]).toBeCloseTo(9.48, 9);
+  });
+
+  it('behält innere Stützpunkte und verwirft Linien außerhalb', () => {
+    const fc = aufFlaecheZuschneiden(
+      linien(
+        [[9.472, 52.201], [9.474, 52.202], [9.474, 52.209]],
+        [[9.3, 52.1], [9.31, 52.11]],
+      ),
+      FLAECHE,
+    );
+    expect(fc.features).toHaveLength(1);
+    expect(fc.features[0]!.geometry.coordinates).toEqual([[9.472, 52.201], [9.474, 52.202], [9.474, 52.209]]);
+    expect(fc.features[0]!.properties).toMatchObject({ osm_id: 0 });
+  });
+
+  it('nimmt ohne Grenze Flurstücke und Bestände als Fläche', () => {
+    expect(betriebsFlaeche(FLAECHE, [])).toBe(FLAECHE);
+    const f = betriebsFlaeche(null, [
+      { type: 'Feature', geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] }, properties: {} },
+      { type: 'Feature', geometry: FLAECHE, properties: {} },
+    ]);
+    expect(f?.coordinates).toHaveLength(2);
+    expect(betriebsFlaeche(null, [])).toBeNull();
+  });
+
+  it('ändert den Flächenschlüssel, wenn sich die Grenze ändert', () => {
+    const verschoben: MultiPolygon = { type: 'MultiPolygon', coordinates: [[[[9.47, 52.2], [9.5, 52.2], [9.49, 52.21], [9.47, 52.21], [9.47, 52.2]]]] };
+    expect(flaechenSchluessel(FLAECHE)).not.toBe(flaechenSchluessel(verschoben));
+  });
+});
+
+describe('OSM-Waldwege: Abruf und Speicher', () => {
+  it('weicht auf die nächste Instanz aus und nennt die Gründe', async () => {
+    const abruf = vi.fn(async (url: string) =>
+      url === OVERPASS_URLS[1] ? new Response(JSON.stringify({ elements: [] }), { status: 200 }) : new Response('', { status: 504 }),
+    );
+    await expect(overpassAbrufen([9.44, 52.18, 9.52, 52.22], undefined, abruf as unknown as typeof fetch)).resolves.toMatchObject({ features: [] });
+    expect(abruf).toHaveBeenCalledTimes(2);
+    const init = (abruf.mock.calls[0] as unknown as [string, RequestInit])[1];
+    expect(init.method).toBe('POST');
+    expect(String(init.body)).toMatch(/^data=/);
+
+    const kaputt = vi.fn(async () => {
+      throw new TypeError('Failed to fetch');
+    });
+    await expect(overpassAbrufen([9.44, 52.18, 9.52, 52.22], undefined, kaputt as unknown as typeof fetch)).rejects.toThrow(/overpass-api\.de: nicht erreichbar/);
+  });
+
+  it('merkt Wege je Betrieb und verwirft alte oder fremde Stände', () => {
+    const daten = new Map<string, string>();
+    const speicher = { getItem: (k: string) => daten.get(k) ?? null, setItem: (k: string, v: string) => void daten.set(k, v) };
+    const fc = linien([[9.472, 52.201], [9.474, 52.202]]);
+    wegeSpeichern('b1', 's1', fc, speicher, 1000);
+    expect(gespeicherteWege('b1', 's1', speicher, 2000)).toEqual(fc);
+    expect(gespeicherteWege('b1', 's2', speicher, 2000)).toBeNull();
+    expect(gespeicherteWege('b2', 's1', speicher, 2000)).toBeNull();
+    expect(gespeicherteWege('b1', 's1', speicher, 1000 + 31 * 24 * 3600 * 1000)).toBeNull();
   });
 });
