@@ -34,7 +34,7 @@ import { useWarteschlange, wartendeFunde } from '../../lib/offline';
 import { navigieren } from '../../lib/router';
 import { datumZeitDE } from '../../lib/zeit';
 import { luftbildProtokollRegistrieren } from '../../karte/luftbildProtokoll';
-import { WALDWEGE_MIN_ZOOM, abfrageBereich, waldwegeLaden } from '../../karte/osmWaldwege';
+import { betriebsFlaeche, betriebsWaldwege } from '../../karte/osmWaldwege';
 import { HANDY_RAND_M, luftbildVollLesen, luftbildVollSpeichern, umRandErweitert, LUFTBILDER, LUFTBILD_IDS, luftbildFuer, luftbildQuelle, luftbildWahlLesen, luftbildWahlSpeichern, type LuftbildWahl } from '../../karte/luftbild';
 
 // ---------- Kartengrundlagen ----------
@@ -141,7 +141,7 @@ export default function Karte({
   const [meldung, setMeldung] = useState<{ art: 'fehler' | 'erfolg' | 'info'; text: string } | null>(null);
   const [reglerOffen, setReglerOffen] = useState<string[]>([]);
   // OSM-Waldwege (Testebene): Ladezustand für die Beschriftung im Ebenen-Panel
-  const [waldwegeStand, setWaldwegeStand] = useState<'bereit' | 'zoom' | 'gross' | 'laedt' | 'fehler'>('bereit');
+  const [waldwegeStand, setWaldwegeStand] = useState<'bereit' | 'ohneFlaeche' | 'gross' | 'laedt' | 'fehler'>('bereit');
   const grenzeRef = useRef<MultiPolygon | null>(null);
   const luftbildSchluessel = useRef('');
   // Luftbildquelle: automatisch nach Lage des Betriebs (NI, NW, HE) oder von Hand, je Gerät und Betrieb gemerkt
@@ -437,40 +437,34 @@ export default function Karte({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [daten, bereit, luftbild.id, nurBetrieb]);
 
-  // OSM-Waldwege für den sichtbaren Ausschnitt nachladen, solange die Ebene an ist (erst ab Zoom 13)
+  // OSM-Waldwege einmal für den ganzen Betrieb laden und lokal auf die Betriebsfläche zuschneiden
+  // (Grenze, sonst Flurstücke und Bestände); Ergebnis bleibt je Gerät gespeichert und gilt auch offline
   useEffect(() => {
     const m = karte.current;
-    if (!m || !bereit || !ebenen.waldwege) return;
-    let steuerung: AbortController | null = null;
-    let zuletzt = '';
-    const aktualisieren = () => {
-      if (m.getZoom() < WALDWEGE_MIN_ZOOM) return setWaldwegeStand('zoom');
-      const b = m.getBounds();
-      const bereich = abfrageBereich([b.getWest(), b.getSouth(), b.getEast(), b.getNorth()]);
-      if (!bereich) return setWaldwegeStand('gross');
-      const schluessel = bereich.join(',');
-      if (schluessel === zuletzt) return setWaldwegeStand('bereit');
-      steuerung?.abort();
-      const eigene = (steuerung = new AbortController());
-      setWaldwegeStand('laedt');
-      waldwegeLaden(bereich, eigene.signal)
-        .then((fc) => {
-          if (eigene.signal.aborted) return;
-          zuletzt = schluessel;
-          (m.getSource('waldwege') as GeoJSONSource | undefined)?.setData(fc);
-          setWaldwegeStand('bereit');
-        })
-        .catch(() => {
-          if (!eigene.signal.aborted) setWaldwegeStand('fehler');
-        });
-    };
-    aktualisieren();
-    m.on('moveend', aktualisieren);
-    return () => {
-      m.off('moveend', aktualisieren);
-      steuerung?.abort();
-    };
-  }, [bereit, ebenen.waldwege]);
+    if (!m || !bereit || !daten || !ebenen.waldwege) return;
+    const flaeche = betriebsFlaeche(daten.grenze, [...daten.flurstuecke, ...daten.bestaende]);
+    const quelle = () => m.getSource('waldwege') as GeoJSONSource | undefined;
+    if (!flaeche) {
+      quelle()?.setData(LEER);
+      setWaldwegeStand('ohneFlaeche');
+      return;
+    }
+    const steuerung = new AbortController();
+    setWaldwegeStand('laedt');
+    betriebsWaldwege(k.betriebId, flaeche, steuerung.signal)
+      .then((fc) => {
+        if (steuerung.signal.aborted) return;
+        quelle()?.setData(fc);
+        setWaldwegeStand('bereit');
+      })
+      .catch((err: unknown) => {
+        if (steuerung.signal.aborted) return;
+        const text = String((err as Error)?.message ?? err);
+        setWaldwegeStand(text === 'gross' ? 'gross' : 'fehler');
+        if (text !== 'gross') setMeldung({ art: 'fehler', text: `Waldwege (OSM) nicht geladen – ${text}` });
+      });
+    return () => steuerung.abort();
+  }, [bereit, daten, ebenen.waldwege, k.betriebId]);
 
   // Gefilterte Funde in die Karte (Punkte und Heatmap teilen sich die Quelle)
   useEffect(() => {
@@ -870,7 +864,7 @@ export default function Karte({
     waldwege: {
       name: 'Waldwege (OSM)',
       label: ebenen.waldwege
-        ? { bereit: 'Waldwege (OSM)', zoom: 'Waldwege (OSM) – näher heranzoomen', gross: 'Waldwege (OSM) – Ausschnitt zu groß', laedt: 'Waldwege (OSM) – lädt …', fehler: 'Waldwege (OSM) – Laden fehlgeschlagen' }[waldwegeStand]
+        ? { bereit: 'Waldwege (OSM, Betrieb)', ohneFlaeche: 'Waldwege (OSM) – erst Grenze, Flurstücke oder Bestand anlegen', gross: 'Waldwege (OSM) – Betrieb zu ausgedehnt', laedt: 'Waldwege (OSM) – lädt …', fehler: 'Waldwege (OSM) – Laden fehlgeschlagen' }[waldwegeStand]
         : 'Waldwege (OSM)',
       an: ebenen.waldwege,
     },
