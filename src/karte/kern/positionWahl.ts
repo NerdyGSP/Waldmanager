@@ -59,3 +59,13 @@ export function beiFundeGeaendert(f: () => void): () => void {
   bus.addEventListener('funde', f);
   return () => bus.removeEventListener('funde', f);
 }
+
+/** Ein Polter wurde gespeichert, vorgemerkt oder als abgefahren markiert */
+export function polterGeaendert() {
+  bus.dispatchEvent(new Event('polter'));
+}
+
+export function beiPolterGeaendert(f: () => void): () => void {
+  bus.addEventListener('polter', f);
+  return () => bus.removeEventListener('polter', f);
+}

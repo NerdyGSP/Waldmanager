@@ -570,6 +570,105 @@ export type Database = {
           },
         ]
       }
+      polter: {
+        Row: {
+          abgefahren_am: string | null
+          abgefahren_von: string | null
+          abgelegt_am: string
+          aktualisiert_am: string
+          baumart: string | null
+          bestand_id: string | null
+          betrieb_id: string
+          erfasst_von: string | null
+          erstellt_am: string
+          geaendert_von: string | null
+          geloescht_am: string | null
+          genauigkeit_m: number | null
+          geom: unknown
+          id: string
+          menge_fm: number | null
+          notiz: string | null
+          status: string
+          stueck: number | null
+        }
+        Insert: {
+          abgefahren_am?: string | null
+          abgefahren_von?: string | null
+          abgelegt_am?: string
+          aktualisiert_am?: string
+          baumart?: string | null
+          bestand_id?: string | null
+          betrieb_id: string
+          erfasst_von?: string | null
+          erstellt_am?: string
+          geaendert_von?: string | null
+          geloescht_am?: string | null
+          genauigkeit_m?: number | null
+          geom: unknown
+          id?: string
+          menge_fm?: number | null
+          notiz?: string | null
+          status?: string
+          stueck?: number | null
+        }
+        Update: {
+          abgefahren_am?: string | null
+          abgefahren_von?: string | null
+          abgelegt_am?: string
+          aktualisiert_am?: string
+          baumart?: string | null
+          bestand_id?: string | null
+          betrieb_id?: string
+          erfasst_von?: string | null
+          erstellt_am?: string
+          geaendert_von?: string | null
+          geloescht_am?: string | null
+          genauigkeit_m?: number | null
+          geom?: unknown
+          id?: string
+          menge_fm?: number | null
+          notiz?: string | null
+          status?: string
+          stueck?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "polter_abgefahren_von_fkey"
+            columns: ["abgefahren_von"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "polter_bestand_id_fkey"
+            columns: ["bestand_id"]
+            isOneToOne: false
+            referencedRelation: "bestaende"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "polter_betrieb_id_fkey"
+            columns: ["betrieb_id"]
+            isOneToOne: false
+            referencedRelation: "betriebe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "polter_erfasst_von_fkey"
+            columns: ["erfasst_von"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "polter_geaendert_von_fkey"
+            columns: ["geaendert_von"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           aktualisiert_am: string
@@ -677,6 +776,7 @@ export type Database = {
           user_id: string
         }[]
       }
+      polter_laden: { Args: { p_betrieb_id: string }; Returns: Json }
     }
     Enums: {
       betrieb_rolle: "inhaber" | "mitarbeiter"

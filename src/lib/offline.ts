@@ -5,7 +5,9 @@ import { fotosHochladen } from './fotos';
 
 // Offline-Warteschlange für Erfassungen im Wald.
 // Datensätze tragen eine clientseitige UUID; das Senden ist per Upsert idempotent.
-type Eintrag = { tabelle: 'funde'; daten: TablesInsert<'funde'> & { id: string } }; // Fundmeldung (Käferbaum, Windwurf …)
+type Eintrag =
+  | { tabelle: 'funde'; daten: TablesInsert<'funde'> & { id: string } } // Fundmeldung (Käferbaum, Windwurf …)
+  | { tabelle: 'polter'; daten: TablesInsert<'polter'> & { id: string } }; // Holz am Weg
 
 const schluessel = (e: Eintrag) => `${e.tabelle}:${e.daten.id}`;
 
@@ -36,7 +38,10 @@ function istNetzfehler(fehler: unknown): boolean {
 
 async function senden(e: Eintrag): Promise<{ ok: boolean; netz: boolean; fehler?: string }> {
   try {
-    const { error } = await supabase.from('funde').upsert(e.daten, { onConflict: 'id', ignoreDuplicates: true });
+    const { error } =
+      e.tabelle === 'polter'
+        ? await supabase.from('polter').upsert(e.daten, { onConflict: 'id', ignoreDuplicates: true })
+        : await supabase.from('funde').upsert(e.daten, { onConflict: 'id', ignoreDuplicates: true });
     if (!error) return { ok: true, netz: false };
     // Abgelaufene Anmeldung ist kein fachlicher Fehler: Eintrag behalten, bis das Token erneuert ist
     const abgelaufen = /jwt|token|expired|not authenticated/i.test(error.message) || error.code === 'PGRST301';
@@ -60,6 +65,11 @@ export async function speichernOderMerken(e: Eintrag): Promise<'gespeichert' | '
 // Noch nicht übertragene Funde eines Betriebs (für die lokale Anzeige)
 export function wartendeFunde(betriebId: string): Array<TablesInsert<'funde'> & { id: string }> {
   return lesen().flatMap((x) => (x.tabelle === 'funde' && x.daten.betrieb_id === betriebId ? [x.daten] : []));
+}
+
+// Noch nicht übertragene Polter eines Betriebs (für die lokale Anzeige)
+export function wartendePolter(betriebId: string): Array<TablesInsert<'polter'> & { id: string }> {
+  return lesen().flatMap((x) => (x.tabelle === 'polter' && x.daten.betrieb_id === betriebId ? [x.daten] : []));
 }
 
 let laeuft = false;
