@@ -34,6 +34,7 @@ import { useWarteschlange, wartendeFunde } from '../../lib/offline';
 import { navigieren } from '../../lib/router';
 import { datumZeitDE } from '../../lib/zeit';
 import { luftbildProtokollRegistrieren } from '../../karte/luftbildProtokoll';
+import { WALDWEGE_MIN_ZOOM, abfrageBereich, waldwegeLaden } from '../../karte/osmWaldwege';
 import { HANDY_RAND_M, luftbildVollLesen, luftbildVollSpeichern, umRandErweitert, LUFTBILDER, LUFTBILD_IDS, luftbildFuer, luftbildQuelle, luftbildWahlLesen, luftbildWahlSpeichern, type LuftbildWahl } from '../../karte/luftbild';
 
 // ---------- Kartengrundlagen ----------
@@ -139,6 +140,8 @@ export default function Karte({
   const [kartenFehler, setKartenFehler] = useState<string | null>(null);
   const [meldung, setMeldung] = useState<{ art: 'fehler' | 'erfolg' | 'info'; text: string } | null>(null);
   const [reglerOffen, setReglerOffen] = useState<string[]>([]);
+  // OSM-Waldwege (Testebene): Ladezustand für die Beschriftung im Ebenen-Panel
+  const [waldwegeStand, setWaldwegeStand] = useState<'bereit' | 'zoom' | 'gross' | 'laedt' | 'fehler'>('bereit');
   const grenzeRef = useRef<MultiPolygon | null>(null);
   const luftbildSchluessel = useRef('');
   // Luftbildquelle: automatisch nach Lage des Betriebs (NI, NW, HE) oder von Hand, je Gerät und Betrieb gemerkt
@@ -240,7 +243,36 @@ export default function Karte({
     m.addControl(new ScaleControl({ unit: 'metric' }), 'bottom-right');
 
     m.on('load', () => {
-      for (const id of ['grenze', 'bestaende', 'flurstuecke', 'funde', 'zeichnung']) m.addSource(id, { type: 'geojson', data: LEER });
+      for (const id of ['grenze', 'bestaende', 'flurstuecke', 'funde', 'zeichnung', 'waldwege']) m.addSource(id, { type: 'geojson', data: LEER });
+      // OSM-Waldwege: Fahrwege braun mit hellem Rand (auch auf dem Luftbild lesbar), Pfade gestrichelt
+      m.addLayer({
+        id: 'waldwege-pfad',
+        type: 'line',
+        source: 'waldwege',
+        filter: ['==', ['get', 'art'], 'pfad'],
+        layout: { visibility: 'none', 'line-cap': 'round' },
+        paint: { 'line-color': '#7a4e22', 'line-width': ['interpolate', ['linear'], ['zoom'], 13, 1, 17, 2], 'line-dasharray': [2, 2] },
+      });
+      m.addLayer({
+        id: 'waldwege-rand',
+        type: 'line',
+        source: 'waldwege',
+        filter: ['==', ['get', 'art'], 'weg'],
+        layout: { visibility: 'none', 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': '#fff', 'line-opacity': 0.7, 'line-width': ['interpolate', ['linear'], ['zoom'], 13, 2.5, 17, 6] },
+      });
+      m.addLayer({
+        id: 'waldwege-linie',
+        type: 'line',
+        source: 'waldwege',
+        filter: ['==', ['get', 'art'], 'weg'],
+        layout: { visibility: 'none', 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          // grade1 befestigt (dunkel) … grade5 Erdweg (hell); ohne Angabe mittel
+          'line-color': ['match', ['get', 'tracktype'], 'grade1', '#5a3412', 'grade2', '#7a4e22', 'grade3', '#9a6a35', 'grade4', '#b5864f', 'grade5', '#c9a272', '#8a5a2b'],
+          'line-width': ['interpolate', ['linear'], ['zoom'], 13, 1.2, 17, 3.5],
+        },
+      });
       // Flurstücke: dünne gestrichelte Linien, unsichtbare Fläche nur zum Antippen
       m.addLayer({ id: 'flurstuecke-flaeche', type: 'fill', source: 'flurstuecke', layout: { visibility: 'none' }, paint: { 'fill-color': '#000', 'fill-opacity': 0 } });
       m.addLayer({
@@ -405,6 +437,41 @@ export default function Karte({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [daten, bereit, luftbild.id, nurBetrieb]);
 
+  // OSM-Waldwege für den sichtbaren Ausschnitt nachladen, solange die Ebene an ist (erst ab Zoom 13)
+  useEffect(() => {
+    const m = karte.current;
+    if (!m || !bereit || !ebenen.waldwege) return;
+    let steuerung: AbortController | null = null;
+    let zuletzt = '';
+    const aktualisieren = () => {
+      if (m.getZoom() < WALDWEGE_MIN_ZOOM) return setWaldwegeStand('zoom');
+      const b = m.getBounds();
+      const bereich = abfrageBereich([b.getWest(), b.getSouth(), b.getEast(), b.getNorth()]);
+      if (!bereich) return setWaldwegeStand('gross');
+      const schluessel = bereich.join(',');
+      if (schluessel === zuletzt) return setWaldwegeStand('bereit');
+      steuerung?.abort();
+      const eigene = (steuerung = new AbortController());
+      setWaldwegeStand('laedt');
+      waldwegeLaden(bereich, eigene.signal)
+        .then((fc) => {
+          if (eigene.signal.aborted) return;
+          zuletzt = schluessel;
+          (m.getSource('waldwege') as GeoJSONSource | undefined)?.setData(fc);
+          setWaldwegeStand('bereit');
+        })
+        .catch(() => {
+          if (!eigene.signal.aborted) setWaldwegeStand('fehler');
+        });
+    };
+    aktualisieren();
+    m.on('moveend', aktualisieren);
+    return () => {
+      m.off('moveend', aktualisieren);
+      steuerung?.abort();
+    };
+  }, [bereit, ebenen.waldwege]);
+
   // Gefilterte Funde in die Karte (Punkte und Heatmap teilen sich die Quelle)
   useEffect(() => {
     const m = karte.current;
@@ -459,6 +526,7 @@ export default function Karte({
     for (const s of [...EBENEN_SCHICHTEN.flurstuecke, 'flurstuecke-flaeche']) sichtbar(s, ebenen.flurstuecke);
     sichtbar('funde-punkt', ebenen.funde);
     sichtbar('heatmap', ebenen.heatmap);
+    for (const s of EBENEN_SCHICHTEN.waldwege) sichtbar(s, ebenen.waldwege);
     for (const mk of beschriftungen.current) mk.getElement().style.display = ebenen.bestaende ? '' : 'none';
   }, [ebenen, bereit, daten, luftbild.id]);
 
@@ -476,6 +544,9 @@ export default function Karte({
     setze('grenze-linie', 'line-opacity', d.grenze);
     setze('flurstuecke-linie', 'line-opacity', d.flurstuecke);
     setze('heatmap', 'heatmap-opacity', d.heatmap);
+    setze('waldwege-linie', 'line-opacity', d.waldwege);
+    setze('waldwege-pfad', 'line-opacity', d.waldwege);
+    setze('waldwege-rand', 'line-opacity', d.waldwege * 0.7);
     setze('funde-punkt', 'circle-stroke-opacity', d.funde);
     for (const mk of beschriftungen.current) mk.getElement().style.opacity = String(Math.min(1, d.bestaende * 1.8));
     // von unten nach oben jeweils an die Spitze stellen; Zeichnung bleibt immer ganz oben
@@ -796,6 +867,13 @@ export default function Karte({
     funde: { name: 'Funde', label: `Funde (${sichtbareFunde.length})`, an: ebenen.funde },
     heatmap: { name: 'Heatmap', label: 'Heatmap', an: ebenen.heatmap },
     grenze: { name: 'Betriebsgrenze', label: 'Betriebsgrenze', an: ebenen.grenze },
+    waldwege: {
+      name: 'Waldwege (OSM)',
+      label: ebenen.waldwege
+        ? { bereit: 'Waldwege (OSM)', zoom: 'Waldwege (OSM) – näher heranzoomen', gross: 'Waldwege (OSM) – Ausschnitt zu groß', laedt: 'Waldwege (OSM) – lädt …', fehler: 'Waldwege (OSM) – Laden fehlgeschlagen' }[waldwegeStand]
+        : 'Waldwege (OSM)',
+      an: ebenen.waldwege,
+    },
   };
   const ohneFlaeche = bestaende.filter((b) => !b.hatGeometrie);
 
