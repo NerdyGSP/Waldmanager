@@ -21,10 +21,10 @@ describe('Ebenen-Registry', () => {
   });
 
   it('hat die Forstebenen in Standardreihenfolge', () => {
-    expect(STANDARD_REIHENFOLGE).toEqual(['funde', 'heatmap', 'grenze', 'bestaende', 'flurstuecke', 'luftbild']);
+    expect(STANDARD_REIHENFOLGE).toEqual(['funde', 'heatmap', 'grenze', 'bestaende', 'flurstuecke', 'waldwege', 'luftbild']);
     expect(STANDARD_DECKKRAFT).toMatchObject({ bestaende: 0.55, luftbild: 1 });
     expect(EBENEN_SCHICHTEN.bestaende).toEqual(['bestaende-flaeche', 'bestaende-linie', 'bestaende-auswahl']);
-    expect(standardSichtbarkeit()).toEqual({ funde: true, heatmap: false, grenze: true, bestaende: true, flurstuecke: false, luftbild: true });
+    expect(standardSichtbarkeit()).toEqual({ funde: true, heatmap: false, grenze: true, bestaende: true, flurstuecke: false, waldwege: false, luftbild: true });
   });
 
   it('zeigt die Grenze in jedem Modus', () => {
@@ -50,8 +50,8 @@ describe('Ebenen-Einstellungen', () => {
 
   it('fügt in alten Speicherständen fehlende Ebenen an ihrem Standardplatz ein', () => {
     // Speicherstand ohne „Bestände“: sie gehören direkt über das Luftbild
-    expect(reihenfolgeAnpassen(['grenze', 'bestaende', 'flurstuecke', 'luftbild'])).toEqual(['funde', 'heatmap', 'grenze', 'bestaende', 'flurstuecke', 'luftbild']);
-    expect(reihenfolgeAnpassen(['luftbild', 'grenze'])).toEqual(['bestaende', 'flurstuecke', 'luftbild', 'funde', 'heatmap', 'grenze']);
+    expect(reihenfolgeAnpassen(['grenze', 'bestaende', 'flurstuecke', 'luftbild'])).toEqual(['funde', 'heatmap', 'grenze', 'bestaende', 'flurstuecke', 'waldwege', 'luftbild']);
+    expect(reihenfolgeAnpassen(['luftbild', 'grenze'])).toEqual(['bestaende', 'flurstuecke', 'waldwege', 'luftbild', 'funde', 'heatmap', 'grenze']);
   });
 
   it('verwirft unbekannte und doppelte Ebenen', () => {
