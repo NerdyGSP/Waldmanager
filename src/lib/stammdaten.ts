@@ -26,13 +26,18 @@ export const BAUMARTEN: Array<{ kuerzel: string; name: string; gruppe: 'nadel' |
   { kuerzel: 'Dgl', name: 'Douglasie', gruppe: 'nadel' },
   { kuerzel: 'Lä', name: 'Lärche', gruppe: 'nadel' },
   { kuerzel: 'Ta', name: 'Tanne', gruppe: 'nadel' },
+  { kuerzel: 'KTa', name: 'Küstentanne', gruppe: 'nadel' },
+  { kuerzel: 'ETa', name: 'Edeltanne (Nobilis)', gruppe: 'nadel' },
   { kuerzel: 'Bu', name: 'Buche', gruppe: 'laub' },
   { kuerzel: 'Ei', name: 'Eiche', gruppe: 'laub' },
+  { kuerzel: 'REi', name: 'Roteiche', gruppe: 'laub' },
   { kuerzel: 'BAh', name: 'Bergahorn', gruppe: 'laub' },
+  { kuerzel: 'FAh', name: 'Feldahorn', gruppe: 'laub' },
   { kuerzel: 'Es', name: 'Esche', gruppe: 'laub' },
   { kuerzel: 'Hbu', name: 'Hainbuche', gruppe: 'laub' },
   { kuerzel: 'Bi', name: 'Birke', gruppe: 'laub' },
   { kuerzel: 'Erl', name: 'Erle', gruppe: 'laub' },
+  { kuerzel: 'BHa', name: 'Baumhasel (Türkenhasel)', gruppe: 'laub' },
 ];
 
 export function baumartName(kuerzel: string): string {
