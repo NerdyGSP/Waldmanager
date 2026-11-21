@@ -5,6 +5,7 @@ import type { EbenenDeklaration, KartenModus } from './typen';
 
 export const EBENEN = [
   { id: 'funde', titel: 'Funde', gruppe: 'geschehen', schichten: ['funde-punkt'], standardSichtbar: true, standardDeckkraft: 1, modi: 'alle' },
+  { id: 'polter', titel: 'Polter', gruppe: 'geschehen', schichten: ['polter-punkt'], standardSichtbar: true, standardDeckkraft: 1, modi: 'alle' },
   { id: 'heatmap', titel: 'Heatmap', gruppe: 'analyse', schichten: ['heatmap'], standardSichtbar: false, standardDeckkraft: 0.8, modi: ['ansehen', 'druck'] },
   { id: 'grenze', titel: 'Betriebsgrenze', gruppe: 'betrieb', schichten: ['grenze-linie'], standardSichtbar: true, standardDeckkraft: 1, modi: 'alle' },
   { id: 'bestaende', titel: 'Bestände', gruppe: 'betrieb', schichten: ['bestaende-flaeche', 'bestaende-linie', 'bestaende-auswahl'], standardSichtbar: true, standardDeckkraft: 0.55, modi: 'alle' },

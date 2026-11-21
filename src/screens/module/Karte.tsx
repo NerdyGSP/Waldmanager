@@ -27,10 +27,11 @@ import { Symbol } from '../../components/symbole';
 import { EBENEN_SCHICHTEN, standardSichtbarkeit, type EbenenId } from '../../karte/ebenen/registry';
 import { EBENEN_SPEICHER, ebenenEinstellungenLesen } from '../../karte/ebenen/einstellungen';
 import { koordinaten, mittelpunkt, naechsterRandpunkt, punktInFlaeche } from '../../karte/kern/geometrie';
-import { beiFundeGeaendert, positionMelden, positionWahlAktiv, positionWahlBeenden, usePositionWahl } from '../../karte/kern/positionWahl';
+import { beiFundeGeaendert, beiPolterGeaendert, positionMelden, positionWahlAktiv, positionWahlBeenden, usePositionWahl } from '../../karte/kern/positionWahl';
 import { flurstueckText } from '../../lib/flurstuecke';
 import { FUND_TYPEN, ZEITRAEUME, gewicht, imZeitraum, jeBestand, mengeText, merkmalLabel, typFarbe, typLabel, zeitraumBeginn, type FundTyp, type Zeitraum } from '../../lib/funde';
-import { useWarteschlange, wartendeFunde } from '../../lib/offline';
+import { useWarteschlange, wartendeFunde, wartendePolter } from '../../lib/offline';
+import { POLTER_FARBE, POLTER_FARBE_UEBERFAELLIG, istUeberfaellig, liegtSeitText, polterText } from '../../lib/polter';
 import { navigieren } from '../../lib/router';
 import { datumZeitDE } from '../../lib/zeit';
 import { luftbildProtokollRegistrieren } from '../../karte/luftbildProtokoll';
@@ -167,6 +168,9 @@ export default function Karte({
   const [fundTyp, setFundTyp] = useState<'' | FundTyp>('kaeferbaum');
   const [zeitraum, setZeitraum] = useState<Zeitraum>('saison');
   const [fund, setFund] = useState<Record<string, unknown> | null>(null);
+  // Polter: Holz am Weg, überfällige rot
+  const [polter, setPolter] = useState<Feature[]>([]);
+  const [polterInfo, setPolterInfo] = useState<Record<string, unknown> | null>(null);
   const wartend = useWarteschlange();
   // Positionswahl für die Fundmeldung in der Seitenleiste (Browseransicht)
   const wahl = usePositionWahl();
@@ -207,6 +211,22 @@ export default function Karte({
     setFunde([...server, ...lokal]);
   }, [k.betriebId]);
 
+  const polterLaden = useCallback(async () => {
+    const { data } = await supabase.rpc('polter_laden', { p_betrieb_id: k.betriebId });
+    const server = ((data as { features?: Feature[] } | null)?.features ?? []) as Feature[];
+    const lokal: Feature[] = wartendePolter(k.betriebId).flatMap((w) => {
+      const m = /POINT\(([-\d.]+) ([-\d.]+)\)/.exec(String(w.geom ?? ''));
+      if (!m || server.some((s) => s.properties?.id === w.id)) return [];
+      return [{ type: 'Feature', geometry: { type: 'Point', coordinates: [Number(m[1]), Number(m[2])] }, properties: { id: w.id, baumart: w.baumart ?? null, stueck: w.stueck ?? null, menge_fm: w.menge_fm ?? null, bestand_id: w.bestand_id ?? null, status: 'liegt', abgelegt_am: w.abgelegt_am ?? new Date().toISOString(), wartet: true } }];
+    });
+    // Auf der Karte nur, was noch liegt
+    setPolter(
+      [...server, ...lokal]
+        .filter((f) => f.properties?.status === 'liegt')
+        .map((f): Feature => ({ ...f, properties: { ...f.properties, ueberfaellig: istUeberfaellig({ status: 'liegt', abgelegt_am: String(f.properties?.abgelegt_am ?? '') }) } })),
+    );
+  }, [k.betriebId]);
+
   const sichtbareFunde = useMemo(() => {
     const beginn = zeitraumBeginn(zeitraum);
     return funde
@@ -243,7 +263,7 @@ export default function Karte({
     m.addControl(new ScaleControl({ unit: 'metric' }), 'bottom-right');
 
     m.on('load', () => {
-      for (const id of ['grenze', 'bestaende', 'flurstuecke', 'funde', 'zeichnung', 'waldwege']) m.addSource(id, { type: 'geojson', data: LEER });
+      for (const id of ['grenze', 'bestaende', 'flurstuecke', 'funde', 'polter', 'zeichnung', 'waldwege']) m.addSource(id, { type: 'geojson', data: LEER });
       // OSM-Waldwege: Fahrwege braun mit hellem Rand (auch auf dem Luftbild lesbar), Pfade gestrichelt
       m.addLayer({
         id: 'waldwege-pfad',
@@ -334,6 +354,18 @@ export default function Karte({
           'circle-stroke-color': '#fff',
           'circle-stroke-width': ['case', ['==', ['get', 'wartet'], true], 2.5, 1.5],
           'circle-opacity': ['case', ['==', ['get', 'status'], 'erledigt'], 0.4, 1],
+        },
+      });
+      // Polter: größer als Funde, braun; überfällige rot
+      m.addLayer({
+        id: 'polter-punkt',
+        type: 'circle',
+        source: 'polter',
+        paint: {
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 4, 17, 9],
+          'circle-color': ['case', ['==', ['get', 'ueberfaellig'], true], POLTER_FARBE_UEBERFAELLIG, POLTER_FARBE],
+          'circle-stroke-color': '#fff',
+          'circle-stroke-width': ['case', ['==', ['get', 'wartet'], true], 3, 2],
         },
       });
       m.addLayer({
@@ -476,6 +508,17 @@ export default function Karte({
   // Neuer Fund aus dem Formular: sofort nachladen
   useEffect(() => beiFundeGeaendert(() => void fundeLaden()), [fundeLaden]);
 
+  // Polter laden und in die Karte schreiben; nach Änderungen und nach dem Übertragen wartender Meldungen erneut
+  useEffect(() => {
+    if (bereit) void polterLaden();
+  }, [bereit, polterLaden, wartend, aktualisierung]);
+  useEffect(() => beiPolterGeaendert(() => void polterLaden()), [polterLaden]);
+  useEffect(() => {
+    const m = karte.current;
+    if (!m || !bereit) return;
+    (m.getSource('polter') as GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features: polter });
+  }, [polter, bereit]);
+
   // Gewählte Position als Marker zeigen, Fadenkreuz während der Wahl
   useEffect(() => {
     const m = karte.current;
@@ -519,6 +562,7 @@ export default function Karte({
     for (const s of EBENEN_SCHICHTEN.bestaende) sichtbar(s, ebenen.bestaende);
     for (const s of [...EBENEN_SCHICHTEN.flurstuecke, 'flurstuecke-flaeche']) sichtbar(s, ebenen.flurstuecke);
     sichtbar('funde-punkt', ebenen.funde);
+    sichtbar('polter-punkt', ebenen.polter);
     sichtbar('heatmap', ebenen.heatmap);
     for (const s of EBENEN_SCHICHTEN.waldwege) sichtbar(s, ebenen.waldwege);
     for (const mk of beschriftungen.current) mk.getElement().style.display = ebenen.bestaende ? '' : 'none';
@@ -542,6 +586,8 @@ export default function Karte({
     setze('waldwege-pfad', 'line-opacity', d.waldwege);
     setze('waldwege-rand', 'line-opacity', d.waldwege * 0.7);
     setze('funde-punkt', 'circle-stroke-opacity', d.funde);
+    setze('polter-punkt', 'circle-opacity', d.polter);
+    setze('polter-punkt', 'circle-stroke-opacity', d.polter);
     for (const mk of beschriftungen.current) mk.getElement().style.opacity = String(Math.min(1, d.bestaende * 1.8));
     // von unten nach oben jeweils an die Spitze stellen; Zeichnung bleibt immer ganz oben
     for (const id of [...einst.reihenfolge].reverse()) {
@@ -599,14 +645,22 @@ export default function Karte({
         return;
       }
       if (aktiv) return;
-      const ebenenTreffer = ['funde-punkt', 'bestaende-flaeche', 'flurstuecke-flaeche'].filter((l) => m.getLayer(l) && m.getLayoutProperty(l, 'visibility') !== 'none');
+      const ebenenTreffer = ['polter-punkt', 'funde-punkt', 'bestaende-flaeche', 'flurstuecke-flaeche'].filter((l) => m.getLayer(l) && m.getLayoutProperty(l, 'visibility') !== 'none');
       const treffer = m.queryRenderedFeatures(e.point, { layers: ebenenTreffer });
-      // Funde vor Beständen, Bestände vor Flurstücken
-      const f = treffer.find((x) => x.layer.id === 'funde-punkt') ?? treffer.find((x) => x.layer.id === 'bestaende-flaeche') ?? treffer[0];
+      // Polter und Funde vor Beständen, Bestände vor Flurstücken
+      const f = treffer.find((x) => x.layer.id === 'polter-punkt') ?? treffer.find((x) => x.layer.id === 'funde-punkt') ?? treffer.find((x) => x.layer.id === 'bestaende-flaeche') ?? treffer[0];
+      setPolterInfo(null);
       if (!f) {
         setGewaehlt(null);
         setFlurstueck(null);
         setFund(null);
+        return;
+      }
+      if (f.layer.id === 'polter-punkt') {
+        setGewaehlt(null);
+        setFlurstueck(null);
+        setFund(null);
+        setPolterInfo({ ...(f.properties ?? {}) });
         return;
       }
       if (f.layer.id === 'funde-punkt') {
@@ -861,6 +915,7 @@ export default function Karte({
     funde: { name: 'Funde', label: `Funde (${sichtbareFunde.length})`, an: ebenen.funde },
     heatmap: { name: 'Heatmap', label: 'Heatmap', an: ebenen.heatmap },
     grenze: { name: 'Betriebsgrenze', label: 'Betriebsgrenze', an: ebenen.grenze },
+    polter: { name: 'Polter', label: `Polter (${polter.length})`, an: ebenen.polter },
     waldwege: {
       name: 'Waldwege (OSM)',
       label: ebenen.waldwege
@@ -1165,6 +1220,41 @@ export default function Karte({
               Alle Funde
             </button>
             <button className="zonen-info-zu" onClick={() => setFund(null)} aria-label="Informationsfenster schließen">
+              <Symbol name="schliessen" className="symbol klein" />
+            </button>
+          </header>
+        </section>
+      )}
+
+      {polterInfo && !modus && (
+        <section className="zonen-info" role="dialog" aria-label="Polter">
+          <header className="zonen-info-kopf">
+            <i className="farbpunkt" style={{ background: polterInfo.ueberfaellig ? POLTER_FARBE_UEBERFAELLIG : POLTER_FARBE }} />
+            <div>
+              <strong>
+                Polter
+                {polterInfo.bestand_id ? ` · Bestand ${String(daten?.bestaende.find((b) => String(b.properties?.id) === polterInfo.bestand_id)?.properties?.name ?? '')}` : ''}
+              </strong>
+              <small>
+                {[
+                  polterText({
+                    baumart: (polterInfo.baumart as string | null) ?? null,
+                    stueck: polterInfo.stueck != null ? Number(polterInfo.stueck) : null,
+                    menge_fm: polterInfo.menge_fm != null ? Number(polterInfo.menge_fm) : null,
+                  }) || null,
+                  liegtSeitText(String(polterInfo.abgelegt_am ?? '')),
+                  polterInfo.ueberfaellig ? 'überfällig' : null,
+                  (polterInfo.notiz as string | null) || null,
+                  polterInfo.wartet ? 'wartet auf Netz' : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </small>
+            </div>
+            <button className="knopf knopf-ghost klein" onClick={() => navigieren('/polter')}>
+              Alle Polter
+            </button>
+            <button className="zonen-info-zu" onClick={() => setPolterInfo(null)} aria-label="Informationsfenster schließen">
               <Symbol name="schliessen" className="symbol klein" />
             </button>
           </header>

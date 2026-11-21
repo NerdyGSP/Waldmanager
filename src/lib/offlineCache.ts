@@ -3,7 +3,7 @@
 const DB_NAME = 'waldmanager-offline';
 const STORE = 'antworten';
 const MAX_ALTER_MS = 30 * 24 * 3600 * 1000;
-const LESENDE_RPC = new Set(['karte_daten', 'bestaende_flaechen', 'funde_laden', 'betrieb_letzte_logins', 'masteradmin_letzte_logins']);
+const LESENDE_RPC = new Set(['karte_daten', 'bestaende_flaechen', 'funde_laden', 'polter_laden', 'betrieb_letzte_logins', 'masteradmin_letzte_logins']);
 
 type Eintrag = { status: number; body: string; headers: Array<[string, string]>; zeit: number };
 
