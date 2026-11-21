@@ -611,7 +611,11 @@ button.kachel:active { transform: none; }
 @media (max-width: 899px) {
   .zonen-info { max-height: 62%; padding-bottom: calc(env(safe-area-inset-bottom) + 14px); }
   .zonen-info-inhalt { grid-template-columns: 1fr; }
-  .zonen-info-kopf .knopf { display: none; }
+  /* Aktionen (Punkte bearbeiten, Zone einzeichnen …) unter Titel und Schließen-Knopf umbrechen statt ausblenden */
+  .zonen-info-kopf { flex-wrap: wrap; row-gap: 8px; }
+  .zonen-info-kopf > div { flex: 1 1 calc(100% - 80px); }
+  .zonen-info-kopf .zonen-info-zu { order: 2; }
+  .zonen-info-kopf .knopf { order: 3; flex: 1 1 auto; min-height: 44px; }
 }
 @media (max-width: 1250px) and (min-width: 900px) { .zonen-info-inhalt { grid-template-columns: 1fr; } }
 
