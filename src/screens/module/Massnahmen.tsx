@@ -27,13 +27,14 @@ export type Massnahme = {
   status: string;
   faellig_am: string | null;
   bestand_id: string | null;
+  zone_id: string | null;
   zugewiesen_an: string | null;
   zustaendig_extern: string | null;
   beschreibung: string | null;
   erstellt_von: string | null;
 };
 
-const SPALTEN = 'id, titel, typ, status, faellig_am, bestand_id, zugewiesen_an, zustaendig_extern, beschreibung, erstellt_von';
+const SPALTEN = 'id, titel, typ, status, faellig_am, bestand_id, zone_id, zugewiesen_an, zustaendig_extern, beschreibung, erstellt_von';
 
 export function useMassnahmen(betriebId: string, bestandId?: string) {
   const [liste, setListe] = useState<Massnahme[] | null>(null);
@@ -51,11 +52,27 @@ export function useMassnahmen(betriebId: string, bestandId?: string) {
   return { liste, fehler, laden };
 }
 
+/** Zonen aller Bestände des Betriebs (für die Auswahl im Formular) */
+function useZonen(betriebId: string) {
+  const [zonen, setZonen] = useState<Array<{ id: string; name: string; bestand_id: string }>>([]);
+  useEffect(() => {
+    void supabase
+      .from('bestand_zonen')
+      .select('id, name, bestand_id')
+      .eq('betrieb_id', betriebId)
+      .is('geloescht_am', null)
+      .order('name')
+      .then(({ data }) => setZonen(data ?? []));
+  }, [betriebId]);
+  return zonen;
+}
+
 // Modul „Maßnahmen“: Filter oben, Tabelle, Formular für neue oder geänderte Maßnahmen
 export function Massnahmen({ k }: { k: BetriebKontext }) {
   const { liste, fehler: ladeFehler, laden } = useMassnahmen(k.betriebId);
   const { bestaende } = useBestaende(k.betriebId);
   const mitglieder = useMitglieder(k.betriebId);
+  const zonen = useZonen(k.betriebId);
   const [filter, setFilter] = useState<Filter>('offen');
   const [bearbeiten, setBearbeiten] = useState<Massnahme | 'neu' | null>(null);
   const [fehler, setFehler] = useState<string | null>(null);
@@ -64,6 +81,7 @@ export function Massnahmen({ k }: { k: BetriebKontext }) {
   const zahlen = useMemo(() => zaehlen(liste ?? [], heute), [liste, heute]);
   const sichtbar = useMemo(() => (liste ?? []).filter((m) => passtZuFilter(m, filter, heute)), [liste, filter, heute]);
   const bestandName = (id: string | null) => (id ? bestaende.find((b) => b.id === id)?.name ?? '–' : '–');
+  const zoneName = (id: string | null) => (id ? zonen.find((z) => z.id === id)?.name ?? null : null);
   const zustaendig = (m: Massnahme) => (m.zugewiesen_an ? mitglieder.find((x) => x.user_id === m.zugewiesen_an)?.name ?? '?' : m.zustaendig_extern ?? '–');
   const darfAendern = (m: Massnahme) => k.istInhaber || m.erstellt_von === k.userId || m.zugewiesen_an === k.userId;
 
@@ -80,6 +98,7 @@ export function Massnahmen({ k }: { k: BetriebKontext }) {
         k={k}
         massnahme={bearbeiten === 'neu' ? null : bearbeiten}
         bestaende={bestaende.map((b) => ({ id: b.id, name: b.name }))}
+        zonen={zonen}
         mitglieder={mitglieder}
         onFertig={async () => {
           setBearbeiten(null);
@@ -144,6 +163,7 @@ export function Massnahmen({ k }: { k: BetriebKontext }) {
                       {m.bestand_id ? (
                         <button type="button" className="link" onClick={() => navigieren(`/bestaende/${m.bestand_id}`)}>
                           {bestandName(m.bestand_id)}
+                          {zoneName(m.zone_id) ? ` · ${zoneName(m.zone_id)}` : ''}
                         </button>
                       ) : (
                         '–'
@@ -204,6 +224,7 @@ function MassnahmeFormular({
   k,
   massnahme,
   bestaende,
+  zonen,
   mitglieder,
   onFertig,
   onAbbrechen,
@@ -211,6 +232,7 @@ function MassnahmeFormular({
   k: BetriebKontext;
   massnahme: Massnahme | null;
   bestaende: Array<{ id: string; name: string }>;
+  zonen: Array<{ id: string; name: string; bestand_id: string }>;
   mitglieder: Array<{ user_id: string; name: string }>;
   onFertig: () => Promise<void>;
   onAbbrechen: () => void;
@@ -218,6 +240,8 @@ function MassnahmeFormular({
   const [titel, setTitel] = useState(massnahme?.titel ?? '');
   const [typ, setTyp] = useState(massnahme?.typ ?? 'sonstiges');
   const [bestandId, setBestandId] = useState(massnahme?.bestand_id ?? '');
+  const [zoneId, setZoneId] = useState(massnahme?.zone_id ?? '');
+  const zonenDesBestands = zonen.filter((z) => z.bestand_id === bestandId);
   const [termin, setTermin] = useState(massnahme?.faellig_am ?? '');
   // Zuständig: Mitglied („m:<id>“), extern („extern“) oder niemand („“)
   const [zustaendig, setZustaendig] = useState(massnahme?.zugewiesen_an ? `m:${massnahme.zugewiesen_an}` : massnahme?.zustaendig_extern ? 'extern' : '');
@@ -235,6 +259,7 @@ function MassnahmeFormular({
       titel: titel.trim(),
       typ,
       bestand_id: bestandId || null,
+      zone_id: bestandId && zonenDesBestands.some((z) => z.id === zoneId) ? zoneId : null,
       faellig_am: termin || null,
       zugewiesen_an: zustaendig.startsWith('m:') ? zustaendig.slice(2) : null,
       zustaendig_extern: zustaendig === 'extern' ? extern.trim() || null : null,
@@ -268,7 +293,14 @@ function MassnahmeFormular({
               </option>
             ))}
           </Auswahl>
-          <Auswahl label="Bestand" value={bestandId} onChange={(e) => setBestandId(e.target.value)}>
+          <Auswahl
+            label="Bestand"
+            value={bestandId}
+            onChange={(e) => {
+              setBestandId(e.target.value);
+              setZoneId('');
+            }}
+          >
             <option value="">– ganzer Betrieb –</option>
             {bestaende.map((b) => (
               <option key={b.id} value={b.id}>
@@ -276,6 +308,16 @@ function MassnahmeFormular({
               </option>
             ))}
           </Auswahl>
+          {zonenDesBestands.length > 0 && (
+            <Auswahl label="Zone" value={zoneId} onChange={(e) => setZoneId(e.target.value)}>
+              <option value="">– ganzer Bestand –</option>
+              {zonenDesBestands.map((z) => (
+                <option key={z.id} value={z.id}>
+                  {z.name}
+                </option>
+              ))}
+            </Auswahl>
+          )}
           <Feld label="Termin" type="date" value={termin} onChange={(e) => setTermin(e.target.value)} />
           <Auswahl label="Zuständig" value={zustaendig} onChange={(e) => setZustaendig(e.target.value)}>
             <option value="">– offen –</option>

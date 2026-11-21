@@ -19,10 +19,13 @@ export function BestandInfo({
   bestand,
   onSchliessen,
   onBearbeiten,
+  onZoneZeichnen,
 }: {
   bestand: GewaehlterBestand;
   onSchliessen: () => void;
   onBearbeiten?: () => void;
+  /** Neue Zone (Teilfläche) in diesem Bestand einzeichnen */
+  onZoneZeichnen?: () => void;
 }) {
   const alter = bestandesalter(bestand.pflanzjahr);
   const gesamtVorrat = bestand.vorratVfmHa != null && bestand.flaecheHa != null ? Math.round(bestand.vorratVfmHa * bestand.flaecheHa) : null;
@@ -41,6 +44,11 @@ export function BestandInfo({
         {onBearbeiten && (
           <button className="knopf knopf-sekundaer klein" onClick={onBearbeiten}>
             Punkte bearbeiten
+          </button>
+        )}
+        {onZoneZeichnen && (
+          <button className="knopf knopf-sekundaer klein" onClick={onZoneZeichnen}>
+            Zone einzeichnen
           </button>
         )}
         <button className="knopf knopf-ghost klein" onClick={() => navigieren(`/bestaende/${bestand.id}`)}>

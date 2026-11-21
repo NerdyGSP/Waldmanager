@@ -2,8 +2,10 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { supabase } from '../../lib/supabase';
 import { fehlertext } from '../../lib/fehler';
 import { navigieren } from '../../lib/router';
-import { BAUMARTEN, BESTANDSFARBEN, baumartenText, nameVergeben, useBestaende, type Baumartenanteil, type Bestand } from '../../lib/stammdaten';
-import { anteilSumme, baumartenPruefen, bestandesalter, pflanzjahrAusAlter } from '../../lib/forst';
+import { BESTANDSFARBEN, baumartenText, nameVergeben, useBestaende, type Baumartenanteil, type Bestand } from '../../lib/stammdaten';
+import { baumartenPruefen, bestandesalter, pflanzjahrAusAlter } from '../../lib/forst';
+import { BaumartenEingabe } from '../../components/BaumartenEingabe';
+import { ZonenAbschnitt } from './Zonen';
 import { Farbwahl, Feld, Gruppe, Hinweis, Knopf, Leer, Seite, Zeile } from '../../components/ui';
 import type { BetriebKontext } from './kontext';
 import { MassnahmenKurz } from './Massnahmen';
@@ -174,8 +176,6 @@ function BestandDetail({ k, bestand, alle, onGeaendert }: { k: BetriebKontext; b
     navigieren('/bestaende');
   }
 
-  const freieArten = (aktuell: string) => BAUMARTEN.filter((b) => b.kuerzel === aktuell || !mischung.some((m) => m.art === b.kuerzel));
-
   return (
     <Seite titel={`Bestand ${bestand.name}`} untertitel={bestand.hatGeometrie ? undefined : 'Noch ohne Fläche – auf der Karte über + NEU → Bestand zeichnen'} zurueck={() => navigieren('/bestaende')}>
       <form onSubmit={speichern}>
@@ -193,49 +193,7 @@ function BestandDetail({ k, bestand, alle, onGeaendert }: { k: BetriebKontext; b
           )}
         </Gruppe>
 
-        <Gruppe titel="Baumarten" fuss={mischung.length ? `Summe ${anteilSumme(mischung)} %${mischFehler ? ` – ${mischFehler}` : ''}` : 'Noch keine Baumarten eingetragen.'}>
-          {mischung.map((m, i) => (
-            <div key={i} className="zeile baumart-zeile">
-              <select
-                aria-label={`Baumart ${i + 1}`}
-                disabled={!darf}
-                value={m.art}
-                onChange={(e) => setMischung((alt) => alt.map((x, j) => (j === i ? { ...x, art: e.target.value } : x)))}
-              >
-                <option value="">Baumart wählen</option>
-                {freieArten(m.art).map((b) => (
-                  <option key={b.kuerzel} value={b.kuerzel}>
-                    {b.name} ({b.kuerzel})
-                  </option>
-                ))}
-              </select>
-              <input
-                aria-label={`Anteil ${i + 1} in Prozent`}
-                inputMode="numeric"
-                disabled={!darf}
-                value={String(m.anteil)}
-                onChange={(e) => setMischung((alt) => alt.map((x, j) => (j === i ? { ...x, anteil: Number(e.target.value.replace(/\D/g, '') || 0) } : x)))}
-              />
-              <span>%</span>
-              {darf && (
-                <button type="button" className="link gefahr" onClick={() => setMischung((alt) => alt.filter((_, j) => j !== i))}>
-                  Entfernen
-                </button>
-              )}
-            </div>
-          ))}
-          {darf && mischung.length < BAUMARTEN.length && (
-            <div style={{ padding: '8px var(--abstand)' }}>
-              <button
-                type="button"
-                className="link"
-                onClick={() => setMischung((alt) => [...alt, { art: '', anteil: Math.max(0, 100 - anteilSumme(alt)) }])}
-              >
-                + Baumart hinzufügen
-              </button>
-            </div>
-          )}
-        </Gruppe>
+        <BaumartenEingabe wert={mischung} onAendern={setMischung} darf={darf} />
 
         {meldung && <Hinweis art={meldung.art}>{meldung.text}</Hinweis>}
         {darf && (
@@ -244,6 +202,8 @@ function BestandDetail({ k, bestand, alle, onGeaendert }: { k: BetriebKontext; b
           </Knopf>
         )}
       </form>
+
+      <ZonenAbschnitt k={k} bestand={bestand} />
 
       <MassnahmenKurz k={k} bestandId={bestand.id} />
 

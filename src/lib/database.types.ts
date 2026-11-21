@@ -96,6 +96,83 @@ export type Database = {
           },
         ]
       }
+      bestand_zonen: {
+        Row: {
+          aktualisiert_am: string
+          baumarten: Json
+          bemerkung: string | null
+          bestand_id: string
+          betrieb_id: string
+          erstellt_am: string
+          erstellt_von: string | null
+          geaendert_von: string | null
+          geloescht_am: string | null
+          geom: unknown
+          id: string
+          name: string
+          pflanzjahr: number | null
+        }
+        Insert: {
+          aktualisiert_am?: string
+          baumarten?: Json
+          bemerkung?: string | null
+          bestand_id: string
+          betrieb_id: string
+          erstellt_am?: string
+          erstellt_von?: string | null
+          geaendert_von?: string | null
+          geloescht_am?: string | null
+          geom: unknown
+          id?: string
+          name: string
+          pflanzjahr?: number | null
+        }
+        Update: {
+          aktualisiert_am?: string
+          baumarten?: Json
+          bemerkung?: string | null
+          bestand_id?: string
+          betrieb_id?: string
+          erstellt_am?: string
+          erstellt_von?: string | null
+          geaendert_von?: string | null
+          geloescht_am?: string | null
+          geom?: unknown
+          id?: string
+          name?: string
+          pflanzjahr?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bestand_zonen_bestand_id_fkey"
+            columns: ["bestand_id"]
+            isOneToOne: false
+            referencedRelation: "bestaende"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bestand_zonen_betrieb_id_fkey"
+            columns: ["betrieb_id"]
+            isOneToOne: false
+            referencedRelation: "betriebe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bestand_zonen_erstellt_von_fkey"
+            columns: ["erstellt_von"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bestand_zonen_geaendert_von_fkey"
+            columns: ["geaendert_von"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       betrieb_grenzen: {
         Row: {
           aktualisiert_am: string
@@ -461,6 +538,7 @@ export type Database = {
           status: string
           titel: string
           typ: string
+          zone_id: string | null
           zugewiesen_an: string | null
           zustaendig_extern: string | null
         }
@@ -480,6 +558,7 @@ export type Database = {
           status?: string
           titel: string
           typ?: string
+          zone_id?: string | null
           zugewiesen_an?: string | null
           zustaendig_extern?: string | null
         }
@@ -499,6 +578,7 @@ export type Database = {
           status?: string
           titel?: string
           typ?: string
+          zone_id?: string | null
           zugewiesen_an?: string | null
           zustaendig_extern?: string | null
         }
@@ -545,6 +625,13 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "massnahmen_zone_id_fkey"
+            columns: ["zone_id"]
+            isOneToOne: false
+            referencedRelation: "bestand_zonen"
+            referencedColumns: ["id"]
+          },
         ]
       }
       masteradmins: {
@@ -581,6 +668,7 @@ export type Database = {
           betrieb_id: string
           erfasst_von: string | null
           erstellt_am: string
+          frist_tage: number
           geaendert_von: string | null
           geloescht_am: string | null
           genauigkeit_m: number | null
@@ -601,6 +689,7 @@ export type Database = {
           betrieb_id: string
           erfasst_von?: string | null
           erstellt_am?: string
+          frist_tage?: number
           geaendert_von?: string | null
           geloescht_am?: string | null
           genauigkeit_m?: number | null
@@ -621,6 +710,7 @@ export type Database = {
           betrieb_id?: string
           erfasst_von?: string | null
           erstellt_am?: string
+          frist_tage?: number
           geaendert_von?: string | null
           geloescht_am?: string | null
           genauigkeit_m?: number | null
@@ -777,6 +867,15 @@ export type Database = {
         }[]
       }
       polter_laden: { Args: { p_betrieb_id: string }; Returns: Json }
+      zone_speichern: {
+        Args: {
+          p_bestand_id: string
+          p_geojson: Json
+          p_name: string
+          p_zone_id: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       betrieb_rolle: "inhaber" | "mitarbeiter"
